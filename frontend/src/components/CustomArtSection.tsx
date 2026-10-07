@@ -6,13 +6,13 @@ import { api, ApiError } from "@/lib/api";
 import { customArtUrl } from "@/lib/links";
 import type { CustomPrinting } from "@/lib/types";
 
-export const MAX_ART_BYTES = 4 * 1024 * 1024;
+export const MAX_ART_BYTES = 10 * 1024 * 1024;
 export const ART_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 /** Why a file cannot be used as card art, or null when it can. Checked here to save an upload, and again by the server. */
 export function artProblem(file: File): string | null {
   if (!ART_TYPES.includes(file.type)) return `${file.name} is not a PNG, JPEG or WebP image.`;
-  if (file.size > MAX_ART_BYTES) return `${file.name} is over 4 MB.`;
+  if (file.size > MAX_ART_BYTES) return `${file.name} is over 10 MB.`;
   return null;
 }
 
@@ -169,7 +169,7 @@ export function CustomArtSection({ cardId, currentId = null, onChoose, onChanged
               +
             </span>
             <span>{busy ? "Uploading" : "Add art"}</span>
-            <span className="text-xs">PNG, JPEG or WebP, up to 4 MB</span>
+            <span className="text-xs">PNG, JPEG or WebP, up to 10 MB</span>
             <input ref={input} type="file" accept={ART_TYPES.join(",")} multiple disabled={busy} onChange={(event) => void add(event.target.files)} className="sr-only" aria-label="Add custom art" />
           </label>
         </li>

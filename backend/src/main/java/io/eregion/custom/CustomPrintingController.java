@@ -32,7 +32,9 @@ import io.eregion.custom.CustomPrintingRepository.Image;
 @RequestMapping("/api")
 public class CustomPrintingController {
 
-	static final int MAX_BYTES = 4 * 1024 * 1024;
+	static final int MAX_BYTES = 10 * 1024 * 1024;
+	/** All of one player's images together, so many large files cannot fill the database. */
+	static final long MAX_TOTAL_BYTES = 500L * 1024 * 1024;
 	static final int MAX_PER_USER = 300;
 	static final int MAX_LABEL = 60;
 
@@ -65,12 +67,15 @@ public class CustomPrintingController {
 			throw ApiException.badRequest("Choose an image file");
 		}
 		if (file.getSize() > MAX_BYTES) {
-			throw ApiException.badRequest("Images can be at most 4 MB");
+			throw ApiException.badRequest("Images can be at most 10 MB");
 		}
 		byte[] data = file.getBytes();
 		String type = ImageSniffer.contentType(data).orElseThrow(() -> ApiException.badRequest("Only PNG, JPEG and WebP images are accepted"));
 		if (repository.count(userId) >= MAX_PER_USER) {
 			throw ApiException.conflict("You can keep up to " + MAX_PER_USER + " custom arts. Delete some first");
+		}
+		if (repository.totalBytes(userId) + data.length > MAX_TOTAL_BYTES) {
+			throw ApiException.conflict("Your custom art takes up the 500 MB you can use. Delete some first");
 		}
 		UUID id = repository.insert(userId, cardId, cleanLabel(label), type, data);
 		return repository.findOwned(id, userId).orElseThrow();
