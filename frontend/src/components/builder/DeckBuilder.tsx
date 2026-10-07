@@ -619,7 +619,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">{deck.name}</h1>
         </div>
 
-        <div className="flex flex-col items-end gap-3.5">
+        <div className="ml-auto flex flex-col items-end gap-3.5">
           <p className="text-base text-muted">
             <span className="text-4xl font-medium tracking-[-0.03em] text-ink">{stats.totalCards}</span> of 100 cards
           </p>
@@ -644,7 +644,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               <p className="mt-3 text-muted">The banned list is not checked.</p>
             </div>
           </details>
-          <div className="flex flex-wrap items-center justify-end gap-2.5">
+        </div>
+
+        {/* Its own row, so a long set of controls (note, branch name) wraps under the title instead of squeezing the count */}
+        <div className="flex w-full flex-wrap items-center justify-end gap-2.5">
             <label className="sr-only" htmlFor="version-note">
               Version note
             </label>
@@ -708,7 +711,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             >
               {saving ? "Saving" : needsBranch ? "Save as new branch" : "Save version"}
             </button>
-          </div>
         </div>
       </div>
 
