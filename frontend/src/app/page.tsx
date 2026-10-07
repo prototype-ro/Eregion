@@ -77,21 +77,14 @@ export default function Home() {
             className="h-80"
           />
           <div className="flex flex-1 flex-col gap-4 p-8">
-            <h3 className="text-3xl leading-tight font-medium tracking-[-0.025em]">Guided deck builder</h3>
+            <h3 className="text-3xl leading-tight font-medium tracking-[-0.025em]">A builder that stays out of the way</h3>
             <p className="max-w-[440px] leading-normal text-muted">
-              Pick a commander, a playstyle and your colors. Get a first draft built from cards you own.
+              Search any card, add it in one click, and view your list as text, stacks or full cards. Paste a list from another site to start.
             </p>
             <ul className="mt-auto flex flex-wrap gap-2 pt-3 text-sm">
-              {["Aggro", "Control", "Combo", "Tokens"].map((style) => (
-                <li
-                  key={style}
-                  className={
-                    style === "Control"
-                      ? "rounded-full bg-accent px-4 py-2 font-bold text-on-accent"
-                      : "rounded-full border border-line px-4 py-2"
-                  }
-                >
-                  {style}
+              {["List", "Stacks", "Gallery", "Custom tags", "Import"].map((feature) => (
+                <li key={feature} className="rounded-full border border-line px-4 py-2">
+                  {feature}
                 </li>
               ))}
             </ul>
