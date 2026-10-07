@@ -1,6 +1,5 @@
+import { ManaCost } from "@/components/Mana";
 import type { CardChange, DeckDiff, PrintingChange, QuantityChange, TagChange } from "@/lib/types";
-
-const cost = (manaCost: string) => manaCost.replace(/[{}]/g, "");
 
 function signed(value: number, digits = 0): string {
   if (value === 0) return "no change";
@@ -30,7 +29,7 @@ function Added({ change }: { change: CardChange }) {
         {change.quantity > 1 && <span className="font-mono text-sm text-muted">{change.quantity}x</span>}
         <BoardTag board={change.board} />
       </span>
-      <span className="font-mono text-sm text-add-text">{cost(change.manaCost) || "no cost"}</span>
+      <span className="text-sm text-add-text"><ManaCost cost={change.manaCost} empty="no cost" /></span>
     </li>
   );
 }
@@ -43,7 +42,7 @@ function Removed({ change }: { change: CardChange }) {
         {change.quantity > 1 && <span className="font-mono text-sm">{change.quantity}x</span>}
         <BoardTag board={change.board} />
       </span>
-      <span className="font-mono text-sm">{cost(change.manaCost) || "no cost"}</span>
+      <span className="text-sm"><ManaCost cost={change.manaCost} empty="no cost" /></span>
     </li>
   );
 }

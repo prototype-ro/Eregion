@@ -5,11 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CardGallery, CardStacks } from "@/components/builder/CardViews";
 import { CardList } from "@/components/builder/CardList";
+import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
+import { GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { exploreCommanderUrl, formatPrice, sortColors } from "@/lib/links";
 import type { DeckDetail, PublicDeckDetail } from "@/lib/types";
@@ -26,6 +27,8 @@ export default function PublicDeckPage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("list");
   const [group, setGroup] = useState<GroupMode>("type");
+  const [sort, setSort] = useState<SortMode>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [size, setSize] = useState(210);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
@@ -43,7 +46,7 @@ export default function PublicDeckPage() {
   }, [id, router]);
 
   const counted = useMemo(() => (detail?.cards ?? []).filter((line) => line.board === "commander" || line.board === "main"), [detail]);
-  const groups = useMemo(() => groupLines(counted, group), [counted, group]);
+  const groups = useMemo(() => groupLines(counted, group, sort, sortDirection), [counted, group, sort, sortDirection]);
   const selected = counted.find((line) => lineKey(line) === selectedKey) ?? counted.find((line) => line.board === "commander") ?? null;
   const legality = useMemo(() => checkLegality(detail?.cards ?? []), [detail]);
 
@@ -137,6 +140,19 @@ export default function PublicDeckPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <label htmlFor="pub-sort" className="text-sm text-muted">
+                Sort by
+              </label>
+              <select id="pub-sort" value={sort} onChange={(event) => setSort(event.target.value as SortMode)} className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none">
+                {SORT_MODES.map(([mode, label]) => (
+                  <option key={mode} value={mode}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <SortDirectionButton direction={sortDirection} onFlip={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))} />
             </div>
             {view !== "list" && (
               <label className="flex min-h-11 items-center gap-3 text-sm text-muted">

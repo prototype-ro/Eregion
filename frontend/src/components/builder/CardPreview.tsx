@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ManaCost } from "@/components/Mana";
 import { formatPrice } from "@/lib/links";
 import type { DeckCardLine } from "@/lib/types";
 
@@ -25,7 +26,11 @@ export function CardPreview({ line, showCollection }: { line: DeckCardLine | nul
         <p className="font-display text-[35px] leading-none">{line.name}</p>
         <p className="mt-2 font-mono text-[13px] text-muted">
           {line.typeLine}
-          {line.manaCost ? `, ${line.manaCost.replace(/[{}]/g, "")}` : ""}
+          {line.manaCost && (
+            <>
+              , <ManaCost cost={line.manaCost} className="text-[17px]" />
+            </>
+          )}
         </p>
         <p className="mt-3 text-[28px] leading-none font-medium tracking-[-0.03em]">{formatPrice(line.priceUsd)}</p>
         <p className="mt-2 font-mono text-xs text-muted">

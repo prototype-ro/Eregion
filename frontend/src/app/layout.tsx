@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Pirata_One } from "next/font/google";
+import "mana-font/css/mana.min.css";
 import "./globals.css";
 
 const display = Pirata_One({ subsets: ["latin"], weight: "400", variable: "--font-pirata", display: "swap" });

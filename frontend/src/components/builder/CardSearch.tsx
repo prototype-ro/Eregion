@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ManaCost } from "@/components/Mana";
 import { useState } from "react";
 import { useCardSearch } from "@/lib/useCardSearch";
 import type { Card } from "@/lib/types";
@@ -79,7 +80,11 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                     <p className="truncate text-[17px] font-medium">{card.name}</p>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted">
                       {card.typeLine}
-                      {card.manaCost ? `, ${card.manaCost}` : ""}
+                      {card.manaCost && (
+                        <>
+                          , <ManaCost cost={card.manaCost} className="text-[15px]" />
+                        </>
+                      )}
                     </p>
                   </div>
                   {showCollection ? (

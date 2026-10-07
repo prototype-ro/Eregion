@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Dialog } from "@/components/Dialog";
+import { ManaCost, ManaText } from "@/components/Mana";
 import { formatPrice } from "@/lib/links";
 import type { DeckCardLine } from "@/lib/types";
 
@@ -33,13 +34,19 @@ export function CardPeek({ line, showCollection, onClose, onChangePrinting }: Pr
             <h2 className="font-display text-[44px] leading-none">{line.name}</h2>
             <p className="mt-3 font-mono text-[13px] text-muted">
               {line.typeLine}
-              {line.manaCost ? `, ${line.manaCost.replace(/[{}]/g, "")}` : ""}
+              {line.manaCost && (
+                <>
+                  , <ManaCost cost={line.manaCost} className="text-[18px]" />
+                </>
+              )}
             </p>
 
             {line.oracleText && (
               <div className="mt-5 flex flex-col gap-2.5 text-[15px] leading-relaxed">
                 {line.oracleText.split("\n").map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
+                  <p key={index}>
+                    <ManaText text={paragraph} />
+                  </p>
                 ))}
               </div>
             )}

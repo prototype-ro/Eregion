@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
-import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
+import { allTags, GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
@@ -23,6 +23,7 @@ import { TagEditor } from "./TagEditor";
 import { BranchesDialog } from "./BranchesDialog";
 import { CardHistoryDialog } from "./CardHistoryDialog";
 import { MergeDialog } from "./MergeDialog";
+import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
 import { VersionTimeline } from "./VersionTimeline";
 
@@ -44,6 +45,9 @@ const VIEWS: Array<[ViewMode, string]> = [
 const MAX_QUANTITY = 99;
 const VIEW_KEY = "eregion-deck-view";
 const SIZE_KEY = "eregion-card-size";
+const GROUP_KEY = "eregion-deck-group";
+const SORT_KEY = "eregion-deck-sort";
+const SORT_DIR_KEY = "eregion-deck-sort-direction";
 const SIZE_MIN = 120;
 const SIZE_MAX = 360;
 const SIZE_DEFAULT = 210;
@@ -135,6 +139,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [lines, setLines] = useState<DeckCardLine[]>(baseLines);
   const [tab, setTab] = useState<Tab>("main");
   const [group, setGroup] = useState<GroupMode>("type");
+  const [sort, setSort] = useState<SortMode>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [view, setView] = useState<ViewMode>("list");
   const [cardSize, setCardSize] = useState(SIZE_DEFAULT);
   const [timelineOpen, setTimelineOpen] = useState(true);
@@ -166,6 +172,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     try {
       const storedView = localStorage.getItem(VIEW_KEY);
       if (storedView === "list" || storedView === "stacks" || storedView === "gallery") setView(storedView);
+      const storedGroup = localStorage.getItem(GROUP_KEY);
+      if (GROUP_MODES.some(([mode]) => mode === storedGroup)) setGroup(storedGroup as GroupMode);
+      const storedSort = localStorage.getItem(SORT_KEY);
+      if (SORT_MODES.some(([mode]) => mode === storedSort)) setSort(storedSort as SortMode);
+      if (localStorage.getItem(SORT_DIR_KEY) === "desc") setSortDirection("desc");
       const storedSize = Number(localStorage.getItem(SIZE_KEY));
       if (Number.isFinite(storedSize) && storedSize >= SIZE_MIN && storedSize <= SIZE_MAX) setCardSize(storedSize);
       if (localStorage.getItem(TIMELINE_KEY) === "closed") setTimelineOpen(false);
@@ -214,7 +225,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const canSave = lines.length > 0 && !saving && (needsBranch ? branchName.trim() !== "" : dirty);
 
   const visible = withOwned.filter((line) => (tab === "main" ? line.board === "main" || line.board === "commander" : line.board === tab));
-  const groups = groupLines(visible, tab === "main" ? group : "type");
+  const groups = groupLines(visible, tab === "main" ? group : "type", sort, sortDirection);
   const lineByKey = (key: string | null) => withOwned.find((line) => lineKey(line) === key) ?? null;
   const selected = lineByKey(selectedKey) ?? withOwned.find((line) => line.board === "commander") ?? null;
 
@@ -224,6 +235,22 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       .reduce((sum, line) => sum + line.quantity, 0);
 
   const versionSummary = timeline.branches.flatMap((branch) => branch.versions).find((v) => v.versionNumber === version?.versionNumber);
+
+  function chooseGroup(next: GroupMode) {
+    setGroup(next);
+    remember(GROUP_KEY, next);
+  }
+
+  function chooseSort(next: SortMode) {
+    setSort(next);
+    remember(SORT_KEY, next);
+  }
+
+  function flipSortDirection() {
+    const next: SortDirection = sortDirection === "asc" ? "desc" : "asc";
+    setSortDirection(next);
+    remember(SORT_DIR_KEY, next);
+  }
 
   function chooseSize(next: number) {
     setCardSize(next);
@@ -664,7 +691,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               <select
                 id="group-by"
                 value={group}
-                onChange={(event) => setGroup(event.target.value as GroupMode)}
+                onChange={(event) => chooseGroup(event.target.value as GroupMode)}
                 className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
               >
                 {GROUP_MODES.map(([mode, label]) => (
@@ -675,6 +702,24 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               </select>
             </div>
           )}
+          <div className="flex items-center gap-3">
+            <label htmlFor="sort-by" className="text-sm text-muted">
+              Sort by
+            </label>
+            <select
+              id="sort-by"
+              value={sort}
+              onChange={(event) => chooseSort(event.target.value as SortMode)}
+              className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+            >
+              {SORT_MODES.map(([mode, label]) => (
+                <option key={mode} value={mode}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <SortDirectionButton direction={sortDirection} onFlip={flipSortDirection} />
+          </div>
           <button
             type="button"
             role="switch"
