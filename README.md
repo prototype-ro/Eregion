@@ -43,8 +43,10 @@ cd frontend && npm run build     # type check and production build
 | `POST /api/cards/resolve` | Turn pasted card names into catalog cards in bulk (75 per Scryfall request, fuzzy fallback for typos). Powers list import. |
 | `GET /api/cards/{id}/printings` | Every English paper printing of a card, newest first, with set, art and price |
 | `POST /api/cards/import` | Import cards by exact name from Scryfall |
-| `GET /api/decks`, `POST /api/decks` | List and create decks |
+| `GET /api/decks`, `POST /api/decks` | List decks with their latest version's size, price, commander colors and what keeps it from being a legal Commander deck. Create a deck |
 | `GET /api/decks/{id}` | Deck with its latest version and stats |
+| `PATCH /api/decks/{id}` | Rename a deck |
+| `POST /api/decks/{id}/duplicate` | Copy the latest version into a new private deck |
 | `POST /api/decks/{id}/versions` | Save a new full snapshot. Send `fromVersion` (the version the draft started from). Saving from the newest version of a branch extends it. Saving from an older one needs `branchName`, which starts a new branch. |
 | `GET /api/decks/{id}/versions[/{n}]` | Version history and one version |
 | `GET /api/decks/{id}/timeline` | Every branch with its versions, for the multiverse timeline |

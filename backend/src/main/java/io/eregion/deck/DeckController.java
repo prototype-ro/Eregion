@@ -60,6 +60,17 @@ public class DeckController {
 		return service.get(deckId, CurrentUser.id(jwt));
 	}
 
+	@PatchMapping("/{deckId}")
+	public DeckDetail rename(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody DeckDtos.RenameDeckRequest request) {
+		return service.rename(deckId, CurrentUser.id(jwt), request.name());
+	}
+
+	@PostMapping("/{deckId}/duplicate")
+	@ResponseStatus(HttpStatus.CREATED)
+	public DeckDetail duplicate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		return service.duplicate(deckId, CurrentUser.id(jwt));
+	}
+
 	@DeleteMapping("/{deckId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {

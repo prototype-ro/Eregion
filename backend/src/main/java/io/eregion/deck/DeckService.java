@@ -49,8 +49,44 @@ public class DeckService {
 		this.decks = decks;
 	}
 
+	/** Every deck of the player with its latest version's size, price, colors and what stops it being legal. */
+	@Transactional(readOnly = true)
 	public List<DeckSummary> list(UUID userId) {
-		return decks.summaries(userId);
+		List<DeckRepository.SummaryRow> rows = decks.summaryRows(userId);
+		Map<UUID, List<DeckLegality.Line>> lines = decks.legalityLines(
+				rows.stream().map(DeckRepository.SummaryRow::latestVersionId).filter(java.util.Objects::nonNull).toList());
+		return rows.stream().map(row -> {
+			// A deck with no versions has no id here, and an immutable map would refuse the lookup.
+			List<DeckLegality.Line> cards = row.latestVersionId() == null ? List.of() : lines.getOrDefault(row.latestVersionId(), List.of());
+			return new DeckSummary(row.id(), row.name(), row.format(), row.latestVersion(), row.latestBranch(), row.latestOnMain(),
+					row.versionCount(), row.branchCount(), row.cardCount(), StatsCalculator.round2(row.priceUsd()), row.commanderName(),
+					row.artUrls(), DeckLegality.identity(cards), DeckLegality.issues(cards), row.updatedAt(), row.visibility(),
+					row.publishedVersion());
+		}).toList();
+	}
+
+	@Transactional
+	public DeckDetail rename(UUID deckId, UUID userId, String name) {
+		owned(deckId, userId);
+		decks.renameDeck(deckId, name.trim().replaceAll("\\s+", " "));
+		return get(deckId, userId);
+	}
+
+	/**
+	 * Starts a new private deck from the latest version of this one: one version with the same cards,
+	 * printings, custom art and tags. The history and the public listing are not copied.
+	 */
+	@Transactional
+	public DeckDetail duplicate(UUID deckId, UUID userId) {
+		DeckRow source = owned(deckId, userId);
+		String suffix = " (copy)";
+		String name = (source.name().length() > 80 - suffix.length() ? source.name().substring(0, 80 - suffix.length()) : source.name()) + suffix;
+		VersionRow latest = decks.findLatestVersion(deckId).orElse(null);
+		List<DeckCardInput> cards = latest == null ? List.of() : decks.versionLines(latest.id(), userId).stream()
+				.map(line -> new DeckCardInput(line.cardId(), line.quantity(), line.board(), line.printingId(), line.tags(), line.customPrintingId()))
+				.toList();
+		String note = latest == null ? null : "Copied from " + source.name() + ", version " + latest.number();
+		return create(userId, new CreateDeckRequest(name, source.format(), note, cards));
 	}
 
 	@Transactional

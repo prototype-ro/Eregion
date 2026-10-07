@@ -18,7 +18,6 @@ import org.springframework.stereotype.Repository;
 
 import io.eregion.deck.DeckDtos.DeckCardInput;
 import io.eregion.deck.DeckDtos.DeckCardLine;
-import io.eregion.deck.DeckDtos.DeckSummary;
 import io.eregion.deck.DeckDtos.VersionSummary;
 
 @Repository
@@ -89,35 +88,87 @@ public class DeckRepository {
 				.optional();
 	}
 
-	public List<DeckSummary> summaries(UUID ownerId) {
+	/** What the decks page needs about one deck before legality is worked out. */
+	public record SummaryRow(UUID id, String name, String format, int latestVersion, UUID latestVersionId, String latestBranch,
+			boolean latestOnMain, int versionCount, int branchCount, int cardCount, double priceUsd, String commanderName,
+			List<String> artUrls, Instant updatedAt, String visibility, Integer publishedVersion) {
+	}
+
+	/** Every deck of a player with the facts about its latest version, in one query. */
+	public List<SummaryRow> summaryRows(UUID ownerId) {
 		return jdbc.sql("""
 				SELECT d.id, d.name, d.format, d.updated_at, d.visibility,
-				       COALESCE(v.version_number, 0) AS latest_version,
+				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version,
+				       v.id AS latest_id, COALESCE(v.version_number, 0) AS latest_version,
+				       b.name AS latest_branch, COALESCE(b.is_main, TRUE) AS latest_main,
+				       (SELECT COUNT(*) FROM deck_versions x WHERE x.deck_id = d.id) AS version_count,
+				       (SELECT COUNT(*) FROM deck_branches y WHERE y.deck_id = d.id) AS branch_count,
 				       COALESCE((SELECT SUM(dc.quantity) FROM deck_version_cards dc
 				                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS card_count,
-				       (SELECT c.name FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
-				         WHERE dc.version_id = v.id AND dc.board = 'commander' LIMIT 1) AS commander_name,
-				       (SELECT c.image_art_crop FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
-				         WHERE dc.version_id = v.id AND dc.board = 'commander' LIMIT 1) AS art_url
+				       COALESCE((SELECT SUM(COALESCE(CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END, 0) * dc.quantity)
+				                   FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
+				                   LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
+				                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS price,
+				       (SELECT string_agg(c.name, ' + ' ORDER BY c.name) FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
+				         WHERE dc.version_id = v.id AND dc.board = 'commander') AS commander_name,
+				       (SELECT array_agg(a.art ORDER BY a.name) FROM (
+				            SELECT c.name, c.image_art_crop AS art FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
+				             WHERE dc.version_id = v.id AND dc.board = 'commander' AND c.image_art_crop <> '' LIMIT 2) a) AS arts
 				  FROM decks d
-				  LEFT JOIN LATERAL (
-				        SELECT id, version_number FROM deck_versions
-				         WHERE deck_id = d.id ORDER BY version_number DESC LIMIT 1) v ON TRUE
+				  LEFT JOIN LATERAL (SELECT id, version_number, branch_id FROM deck_versions
+				                      WHERE deck_id = d.id ORDER BY version_number DESC LIMIT 1) v ON TRUE
+				  LEFT JOIN deck_branches b ON b.id = v.branch_id
 				 WHERE d.owner_id = :owner
 				 ORDER BY d.updated_at DESC
 				""")
 				.param("owner", ownerId)
-				.query((rs, n) -> new DeckSummary(
-						rs.getObject("id", UUID.class),
-						rs.getString("name"),
-						rs.getString("format"),
-						rs.getInt("latest_version"),
-						rs.getInt("card_count"),
-						rs.getString("commander_name"),
-						rs.getString("art_url"),
-						rs.getTimestamp("updated_at").toInstant(),
-						rs.getString("visibility")))
+				.query((rs, n) -> {
+					java.sql.Array arts = rs.getArray("arts");
+					return new SummaryRow(
+							rs.getObject("id", UUID.class),
+							rs.getString("name"),
+							rs.getString("format"),
+							rs.getInt("latest_version"),
+							rs.getObject("latest_id", UUID.class),
+							rs.getString("latest_branch"),
+							rs.getBoolean("latest_main"),
+							rs.getInt("version_count"),
+							rs.getInt("branch_count"),
+							rs.getInt("card_count"),
+							rs.getDouble("price"),
+							rs.getString("commander_name"),
+							arts == null ? List.of() : List.of((String[]) arts.getArray()),
+							rs.getTimestamp("updated_at").toInstant(),
+							rs.getString("visibility"),
+							(Integer) rs.getObject("published_version"));
+				})
 				.list();
+	}
+
+	/** The commander and main board cards of these versions, with what is needed to judge legality. */
+	public Map<UUID, List<DeckLegality.Line>> legalityLines(Collection<UUID> versionIds) {
+		if (versionIds.isEmpty()) {
+			return Map.of();
+		}
+		Map<UUID, List<DeckLegality.Line>> result = new HashMap<>();
+		jdbc.sql("""
+				SELECT dc.version_id, c.id AS card_id, c.name, dc.board, dc.quantity, c.color_identity, c.type_line, c.oracle_text
+				  FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
+				 WHERE dc.version_id IN (:ids) AND dc.board IN ('commander', 'main')
+				""")
+				.param("ids", versionIds)
+				.query((rs, n) -> {
+					result.computeIfAbsent(rs.getObject("version_id", UUID.class), key -> new java.util.ArrayList<>()).add(
+							new DeckLegality.Line(rs.getObject("card_id", UUID.class), rs.getString("name"), rs.getString("board"),
+									rs.getInt("quantity"), rs.getString("color_identity"), rs.getString("type_line"), rs.getString("oracle_text")));
+					return null;
+				})
+				.list();
+		return result;
+	}
+
+	public void renameDeck(UUID deckId, String name) {
+		jdbc.sql("UPDATE decks SET name = :name, updated_at = now() WHERE id = :id").param("id", deckId).param("name", name).update();
 	}
 
 	/** Shows the given version to everyone, or hides the deck again when versionId is null. */

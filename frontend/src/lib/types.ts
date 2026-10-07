@@ -51,16 +51,28 @@ export interface ResolveResult {
   notFound: string[];
 }
 
+/** A deck as listed on the decks page. The numbers describe its latest version, the one the deck opens on. */
 export interface DeckSummary {
   id: string;
   name: string;
   format: string;
   latestVersion: number;
+  latestBranch: string | null;
+  latestOnMain: boolean;
+  versionCount: number;
+  branchCount: number;
   cardCount: number;
+  priceUsd: number;
   commanderName: string | null;
-  artUrl: string | null;
+  /** Art for the commander, or both partners. */
+  artUrls: string[];
+  /** The commander's colors in game order, empty for colorless. */
+  colorIdentity: string;
+  /** What keeps the deck from being a legal Commander deck. Empty when it is legal. */
+  issues: string[];
   updatedAt: string;
   visibility: Visibility;
+  publishedVersion: number | null;
 }
 
 export interface DeckCardLine {

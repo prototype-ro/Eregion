@@ -140,16 +140,31 @@ public final class DeckDtos {
 	public record VisibilityRequest(@NotBlank String visibility, Integer versionNumber) {
 	}
 
+	/**
+	 * A deck as listed on the decks page. The numbers describe the latest version, the one the deck opens
+	 * on. issues is what keeps that version from being a legal Commander deck, empty when it is.
+	 */
 	public record DeckSummary(
 			UUID id,
 			String name,
 			String format,
 			int latestVersion,
+			String latestBranch,
+			boolean latestOnMain,
+			int versionCount,
+			int branchCount,
 			int cardCount,
+			double priceUsd,
 			String commanderName,
-			String artUrl,
+			List<String> artUrls,
+			String colorIdentity,
+			List<String> issues,
 			Instant updatedAt,
-			String visibility) {
+			String visibility,
+			Integer publishedVersion) {
+	}
+
+	public record RenameDeckRequest(@NotBlank @Size(max = 80) String name) {
 	}
 
 	// ---- diff ----
