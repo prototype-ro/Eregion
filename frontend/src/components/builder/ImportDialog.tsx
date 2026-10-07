@@ -6,6 +6,14 @@ import { api, ApiError } from "@/lib/api";
 import { parseDecklist, type ParsedEntry } from "@/lib/decklist";
 import type { Board, Card, ResolveResult } from "@/lib/types";
 
+/** Where a list came from when it was read from a link. */
+export interface ImportSource {
+  name: string;
+  site: string;
+}
+
+const isLink = (text: string) => /^https?:\/\/\S+$/i.test(text.trim());
+
 export interface ImportedCard {
   card: Card;
   quantity: number;
@@ -23,13 +31,13 @@ interface Props {
   /** The text of the final button, given how many cards were found. */
   confirmLabel?: (count: number) => string;
   /** Called with the cards found. replace is true when the draft should be emptied first. */
-  onImport: (cards: ImportedCard[], replace: boolean) => void;
+  onImport: (cards: ImportedCard[], replace: boolean, source?: ImportSource) => void;
 }
 
 const CHUNK = 200;
 const MAX_FILE_BYTES = 512 * 1024;
 
-type Step = { kind: "edit" } | { kind: "working"; count: number } | { kind: "review"; found: ImportedCard[]; notFound: string[]; ignored: string[] };
+type Step = { kind: "edit" } | { kind: "working"; count: number } | { kind: "review"; found: ImportedCard[]; notFound: string[]; ignored: string[]; source?: ImportSource };
 
 /** Import a decklist by pasting it or loading a text or CSV file. Names are matched on Scryfall. */
 export function ImportDialog({
@@ -72,7 +80,23 @@ export function ImportDialog({
 
   async function run() {
     setError(null);
-    const parsed = parseDecklist(text);
+    let listText = text;
+    let source: ImportSource | undefined;
+    // A pasted link is read by the server, then goes through the same steps as a pasted list.
+    if (isLink(text)) {
+      setStep({ kind: "working", count: 0 });
+      try {
+        const fetched = await api<{ name: string; site: string; text: string }>("/api/import/url", { method: "POST", body: { url: text.trim() } });
+        listText = fetched.text;
+        source = { name: fetched.name, site: fetched.site };
+        setText(fetched.text);
+      } catch (err) {
+        setStep({ kind: "edit" });
+        setError(err instanceof ApiError ? err.message : "Could not read that link. Try again.");
+        return;
+      }
+    }
+    const parsed = parseDecklist(listText);
     if (parsed.entries.length === 0) {
       setError("No cards found. Paste one card per line, like \"1 Sol Ring\".");
       return;
@@ -105,10 +129,10 @@ export function ImportDialog({
 
       const found = [...merged.values()];
       if (notFound.length === 0 && parsed.ignored.length === 0) {
-        onImport(found, replace);
+        onImport(found, replace, source);
         close();
       } else {
-        setStep({ kind: "review", found, notFound, ignored: parsed.ignored });
+        setStep({ kind: "review", found, notFound, ignored: parsed.ignored, source });
       }
     } catch (err) {
       setStep({ kind: "edit" });
@@ -126,7 +150,7 @@ export function ImportDialog({
         <div className="mt-6 flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <label htmlFor="decklist" className="text-sm text-muted">
-              Paste a decklist, one card per line
+              Paste a decklist, one card per line, or a link to a deck
             </label>
             <textarea
               id="decklist"
@@ -134,12 +158,12 @@ export function ImportDialog({
               onChange={(event) => setText(event.target.value)}
               rows={12}
               spellCheck={false}
-              placeholder={"1 Sol Ring\n1 Arcane Signet\n4 Island\n\nSideboard\n1 Mana Drain"}
+              placeholder={"1 Sol Ring\n1 Arcane Signet\n4 Island\n\nSideboard\n1 Mana Drain\n\nor https://archidekt.com/decks/..."}
               className="w-full resize-y rounded-3xl border border-line bg-surface px-5 py-4 font-mono text-sm leading-relaxed text-ink placeholder:text-muted focus:border-ink focus:outline-none"
             />
             <p className="text-sm text-muted">
               Works with lists copied from Moxfield, Archidekt, MTG Arena and MTGO. Set codes like (CMM) are ignored.
-              Headings such as Commander and Sideboard are understood.
+              Headings such as Commander and Sideboard are understood. A link to a deck on Archidekt, Scryfall, TappedOut or MTGGoldfish is read for you. Moxfield blocks that, so copy its export instead.
             </p>
           </div>
 
@@ -191,13 +215,18 @@ export function ImportDialog({
 
       {step.kind === "working" && (
         <p role="status" className="mt-8 text-lg text-muted">
-          Matching {step.count} card names on Scryfall.
+          {step.count === 0 ? "Reading the deck from the link." : `Matching ${step.count} card names on Scryfall.`}
         </p>
       )}
 
       {step.kind === "review" && (
         <div className="mt-6 flex flex-col gap-6">
           <p className="text-lg">
+            {step.source && (
+              <>
+                Read <span className="font-medium">{step.source.name}</span> from {step.source.site}.{" "}
+              </>
+            )}
             Found <span className="font-medium">{cardCount}</span> cards.{" "}
             {step.notFound.length + step.ignored.length > 0 && "Some lines could not be matched."}
           </p>
@@ -236,7 +265,7 @@ export function ImportDialog({
               type="button"
               disabled={step.found.length === 0}
               onClick={() => {
-                onImport(step.found, replace);
+                onImport(step.found, replace, step.source);
                 close();
               }}
               className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent disabled:opacity-50"

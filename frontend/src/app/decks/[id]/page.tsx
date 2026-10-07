@@ -68,6 +68,7 @@ export default function DeckPage() {
   return (
     <div className="shell">
       <Nav active="decks" />
+      <main>
       {error && (
         <div className="py-16">
           <p role="alert" className="max-w-[560px] rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
@@ -93,6 +94,7 @@ export default function DeckPage() {
           onReload={() => void load()}
         />
       )}
+      </main>
     </div>
   );
 }

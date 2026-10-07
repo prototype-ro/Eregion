@@ -26,6 +26,7 @@ export default function Home() {
     <div className="shell">
       <Nav />
 
+      <main>
       {/* Hero */}
       <section className="grid items-stretch gap-10 pt-14 md:grid-cols-2">
         <div className="flex flex-col justify-center gap-7">
@@ -163,6 +164,7 @@ export default function Home() {
           Start a deck
         </Link>
       </section>
+      </main>
 
       <footer className="flex flex-wrap justify-between gap-3 pt-8 pb-10 text-[13px] text-muted">
         <p>Eregion, a deck ledger for Commander players.</p>

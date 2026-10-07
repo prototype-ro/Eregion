@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DeleteDeckDialog, RenameDeckDialog } from "@/components/decks/DeckDialogs";
 import { NewDeckDialog, type NewDeckDraft } from "@/components/decks/NewDeckDialog";
 import { DeckRow, DeckTile } from "@/components/decks/DeckTile";
-import { ImportDialog, type ImportedCard } from "@/components/builder/ImportDialog";
+import { ImportDialog, type ImportedCard, type ImportSource } from "@/components/builder/ImportDialog";
 import type { DeckActions } from "@/components/decks/DeckMenu";
 import { DeckToolbar } from "@/components/decks/DeckToolbar";
 import { Nav } from "@/components/Nav";
@@ -159,8 +159,8 @@ export default function DecksPage() {
   const createFromDraft = (next: NewDeckDraft) =>
     createDeck(next.name, next.commander ? [{ cardId: next.commander.id, quantity: 1, board: "commander" }] : []);
 
-  function importedToDeck(cards: ImportedCard[]) {
-    const name = draft?.name || "Imported deck";
+  function importedToDeck(cards: ImportedCard[], source?: ImportSource) {
+    const name = draft?.name || source?.name || "Imported deck";
     const lines = cards.map(({ card, quantity, board }) => ({ cardId: card.id, quantity, board }));
     // A commander chosen in the dialog leads the deck, unless the list brought its own.
     if (draft?.commander && !lines.some((line) => line.board === "commander")) {
@@ -347,7 +347,7 @@ export default function DecksPage() {
       <ImportDialog
         open={listOpen}
         onClose={() => setListOpen(false)}
-        onImport={(cards) => importedToDeck(cards)}
+        onImport={(cards, _replace, source) => importedToDeck(cards, source)}
         title="Start a deck from a list"
         addLabel="Create a new deck from this list"
         replaceLabel={null}

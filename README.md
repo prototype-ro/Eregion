@@ -63,6 +63,7 @@ cd frontend && npm run build     # type check and production build
 | `PUT /api/decks/{id}/visibility` | Publish one saved version of a deck (`public` plus `versionNumber`) or make it private again. Only the chosen version is ever shown to others |
 | `GET /api/explore?commander=&q=&limit=&offset=` | Public decks, newest first, optionally only those with a given commander card |
 | `GET /api/explore/{id}` | A public deck's published version, read only. Private decks answer 404 |
+| `POST /api/import/url` | Reads a deck from a link (Archidekt, Scryfall, TappedOut, MTGGoldfish) and returns it as a list for the normal list import. Moxfield is explained, not fetched, because it blocks other sites. The server only fetches fixed templates for those hosts, with the deck id filled in, never a redirect |
 | `GET /api/custom-printings`, `GET`/`POST /api/cards/{id}/custom-printings` | A player's own card art (proxies). Upload PNG, JPEG or WebP up to 10 MB (500 MB per player) as multipart `file` plus `label`. Private to the owner |
 | `GET /api/custom-printings/{id}/image`, `DELETE /api/custom-printings/{id}` | The image (owner, or anyone while it is part of a public deck's published version) and removal |
 | `GET /api/collection`, `PUT /api/collection/{cardId}` | Cards you own, and set how many of one card |
@@ -113,3 +114,9 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 - Names are matched ignoring case, accents, ligatures and curly quotes, so `Atraxa, Praetors’ Voice`, `SOL RING` and `Æther Vial` all find their card. `eregion_norm` in the database and `NameNormalizer` in the API do the same folding and must stay in step.
 - Each card carries Scryfall's Commander legality (`legal`, `not_legal`, `banned`), refreshed with the daily price refresh. A deck with a banned or not legal card says so.
 - The legality rules live twice, in `DeckLegality` (Java, for the decks page) and `legality.ts` (the builder). Both run every case in `shared/legality-cases.json`, so a change to a rule is a change to that file and shows up in both test suites. They cover copy limits ("any number" and "up to seven" cards), partner pairs (partner, partner with, partner variants, friends forever, background, Doctor's companion), colors and size.
+
+### Export and import
+
+- Export (builder and public deck pages): plain list, with sets (Moxfield, Archidekt), MTG Arena, MTG Online and CSV, as text to copy or a file to download. What is exported can be imported again.
+- Import takes a pasted list, a file, or a link. Importing into a deck keeps the art already chosen for each card, a printing or your custom art, for cards that were in the deck before.
+- In a quick test the deck sites other than Archidekt answered 403 to automated requests, so for them the import explains that and asks for the text export. Archidekt works.

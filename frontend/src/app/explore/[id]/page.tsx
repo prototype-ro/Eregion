@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CardGallery, CardStacks } from "@/components/builder/CardViews";
 import { CardList } from "@/components/builder/CardList";
+import { ExportDialog } from "@/components/ExportDialog";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
@@ -33,6 +34,7 @@ export default function PublicDeckPage() {
   const [size, setSize] = useState(210);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     api<PublicDeckDetail>(`/api/explore/${id}`)
@@ -123,6 +125,9 @@ export default function PublicDeckPage() {
                   More decks with this commander
                 </Link>
               )}
+              <button type="button" onClick={() => setExportOpen(true)} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium">
+                Export
+              </button>
               <button type="button" onClick={() => void copy()} disabled={copying} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
                 {copying ? "Copying" : "Copy to my decks"}
               </button>
@@ -189,6 +194,7 @@ export default function PublicDeckPage() {
           </div>
         </main>
       )}
+      {detail && <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={detail.deck.name} lines={counted} />}
     </div>
   );
 }

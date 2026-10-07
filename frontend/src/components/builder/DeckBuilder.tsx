@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/Dialog";
+import { ExportDialog } from "@/components/ExportDialog";
 import { api, ApiError } from "@/lib/api";
 import { allTags, GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
+import { inheritArt } from "@/lib/importArt";
 import { canApplyInPlace } from "@/lib/versions";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
@@ -153,6 +155,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
@@ -452,7 +455,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   }
 
   function importCards(cards: ImportedCard[], replace: boolean) {
-    const incoming = cards.map(({ card, quantity, board }) => lineFromCard(card, board, quantity));
+    // Cards that were already in the deck keep the art that was chosen for them, whichever way the list is added.
+    const { lines: incoming, inherited } = inheritArt(
+      lines,
+      cards.map(({ card, quantity, board }) => lineFromCard(card, board, quantity)),
+    );
     setLines((previous) => {
       const base = replace ? [] : previous;
       let next = base;
@@ -471,7 +478,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       }
       return next;
     });
-    setToast(`Imported ${incoming.reduce((sum, line) => sum + line.quantity, 0)} cards`);
+    setToast(`Imported ${incoming.reduce((sum, line) => sum + line.quantity, 0)} cards${inherited > 0 ? `, ${inherited} kept their chosen art` : ""}`);
   }
 
   /** The cards of the draft as the server wants them. */
@@ -854,6 +861,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         >
           Import list
         </button>
+        <button
+          type="button"
+          onClick={() => setExportOpen(true)}
+          disabled={lines.length === 0}
+          className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium disabled:opacity-40"
+        >
+          Export
+        </button>
       </div>
 
       {/* Cards */}
@@ -880,6 +895,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       {/* Overlays */}
+      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={deck.name} lines={lines} />
       <Dialog open={confirmApply} onClose={() => setConfirmApply(false)} label="Update the public version" size="sm">
         <div className="flex flex-col gap-5">
           <h2 className="font-display text-[44px] leading-none">This version is public</h2>
