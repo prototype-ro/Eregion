@@ -47,6 +47,17 @@ public class CardRepository {
 				.list();
 	}
 
+	/** Which of these card ids are in the catalog. */
+	public java.util.Set<UUID> existingIds(java.util.Collection<UUID> ids) {
+		if (ids.isEmpty()) {
+			return java.util.Set.of();
+		}
+		return new java.util.HashSet<>(jdbc.sql("SELECT id FROM cards WHERE id IN (:ids)")
+				.param("ids", ids)
+				.query(UUID.class)
+				.list());
+	}
+
 	public List<Card> findByNames(java.util.Collection<String> names) {
 		if (names.isEmpty()) {
 			return List.of();

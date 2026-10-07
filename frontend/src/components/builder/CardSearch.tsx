@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { useState } from "react";
+import { useCardSearch } from "@/lib/useCardSearch";
 import type { Card } from "@/lib/types";
 
 interface Props {
@@ -18,63 +18,27 @@ interface Props {
 
 export function CardSearch({ token, inDeck, owned, showCollection, onAdd, onSetCommander }: Props) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Card[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const input = useRef<HTMLInputElement>(null);
-  const trimmed = query.trim();
-  const searchable = trimmed.length >= 2;
-
-  // The backend searches our catalog and, for names it does not know yet, Scryfall too.
-  // Debounced so typing "garland" is one request, not seven.
-  useEffect(() => {
-    if (!searchable) {
-      setResults([]);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    const timer = setTimeout(async () => {
-      try {
-        const found = await api<Card[]>(`/api/cards/search?q=${encodeURIComponent(trimmed)}&limit=8`, { token });
-        if (!cancelled) {
-          setResults(found);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Search failed.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 350);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [trimmed, searchable, token]);
+  const { results, loading, error, searchable } = useCardSearch(query, token);
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onKeyDown={(event) => {
+        // Escape from the box or from a result button leaves the search: empty it and drop focus.
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setQuery("");
+          (document.activeElement as HTMLElement | null)?.blur();
+        }
+      }}
+    >
       <label htmlFor="card-search" className="mb-2 block text-sm text-muted">
         Add a card
       </label>
       <input
         id="card-search"
-        ref={input}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        onKeyDown={(event) => {
-          // Escape leaves the search: it empties the box, closes the results and drops focus.
-          if (event.key === "Escape") {
-            event.preventDefault();
-            setQuery("");
-            setResults([]);
-            setError(null);
-            input.current?.blur();
-          }
-        }}
         autoComplete="off"
         placeholder="Search by card name"
         className="min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"

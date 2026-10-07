@@ -48,7 +48,8 @@ cd frontend && npm run build     # type check and production build
 | `GET /api/decks/{id}/versions[/{n}]` | Version history and one version |
 | `GET /api/decks/{id}/timeline` | Every branch with its versions, for the multiverse timeline |
 | `GET /api/decks/{id}/diff?from=7&to=8` | Added, removed and changed cards plus stat deltas |
-| `GET /api/collection`, `PUT /api/collection/{cardId}` | Cards you own |
+| `GET /api/collection`, `PUT /api/collection/{cardId}` | Cards you own, and set how many of one card |
+| `POST /api/collection/bulk` | Add many cards at once (`mode`: `add` or `replace`). Powers list import on the collection screen. |
 
 Authenticated routes take `Authorization: Bearer <token>`. Errors are RFC 9457 problem details.
 

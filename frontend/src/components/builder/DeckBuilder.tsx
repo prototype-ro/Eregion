@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
@@ -411,6 +412,15 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         <p className="mb-6 rounded-2xl border border-line bg-surface px-5 py-3.5 text-[15px] text-muted">
           You are looking at version {version.versionNumber} on {version.branchName}, which is not its latest. Saving from here
           starts a new branch, so nothing you already saved is changed.
+        </p>
+      )}
+      {checkCollection && owned.size === 0 && (
+        <p className="mb-6 rounded-2xl border border-line bg-surface px-5 py-3.5 text-[15px] text-muted">
+          Your collection is empty, so every card counts as missing.{" "}
+          <Link href="/collection" className="text-accent-text underline underline-offset-4">
+            Add the cards you own
+          </Link>
+          .
         </p>
       )}
       {error && (

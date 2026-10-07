@@ -16,9 +16,11 @@ public class CollectionRepository {
 	}
 
 	private final JdbcClient jdbc;
+	private final org.springframework.jdbc.core.JdbcTemplate template;
 
-	public CollectionRepository(JdbcClient jdbc) {
+	public CollectionRepository(JdbcClient jdbc, org.springframework.jdbc.core.JdbcTemplate template) {
 		this.jdbc = jdbc;
+		this.template = template;
 	}
 
 	public List<CollectionEntry> list(UUID userId) {
@@ -34,6 +36,24 @@ public class CollectionRepository {
 				.param("user", userId)
 				.query((rs, n) -> new CollectionEntry(CardRepository.map(rs, n), rs.getInt("quantity")))
 				.list();
+	}
+
+	/** Adds to what is already owned, never going past the per-card cap. */
+	public void addQuantities(UUID userId, java.util.Map<UUID, Integer> quantities) {
+		if (quantities.isEmpty()) {
+			return;
+		}
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		quantities.forEach((cardId, quantity) -> rows.add(new Object[] { userId, cardId, quantity }));
+		template.batchUpdate("""
+				INSERT INTO collection_entries (user_id, card_id, quantity) VALUES (?, ?, ?)
+				ON CONFLICT (user_id, card_id)
+				DO UPDATE SET quantity = LEAST(%d, collection_entries.quantity + EXCLUDED.quantity)
+				""".formatted(CollectionService.MAX_QUANTITY), rows);
+	}
+
+	public void clear(UUID userId) {
+		jdbc.sql("DELETE FROM collection_entries WHERE user_id = :user").param("user", userId).update();
 	}
 
 	/** Setting a quantity of zero removes the card from the collection. */

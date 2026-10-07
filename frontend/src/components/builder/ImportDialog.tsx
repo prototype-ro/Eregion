@@ -16,6 +16,10 @@ interface Props {
   open: boolean;
   token: string;
   onClose: () => void;
+  /** Wording, so the same dialog can import into a deck or into the collection. */
+  title?: string;
+  addLabel?: string;
+  replaceLabel?: string;
   /** Called with the cards found. replace is true when the draft should be emptied first. */
   onImport: (cards: ImportedCard[], replace: boolean) => void;
 }
@@ -26,7 +30,15 @@ const MAX_FILE_BYTES = 512 * 1024;
 type Step = { kind: "edit" } | { kind: "working"; count: number } | { kind: "review"; found: ImportedCard[]; notFound: string[]; ignored: string[] };
 
 /** Import a decklist by pasting it or loading a text or CSV file. Names are matched on Scryfall. */
-export function ImportDialog({ open, token, onClose, onImport }: Props) {
+export function ImportDialog({
+  open,
+  token,
+  onClose,
+  onImport,
+  title = "Import a list",
+  addLabel = "Add to the current draft",
+  replaceLabel = "Replace the current draft",
+}: Props) {
   const [text, setText] = useState("");
   const [replace, setReplace] = useState(false);
   const [step, setStep] = useState<Step>({ kind: "edit" });
@@ -107,7 +119,7 @@ export function ImportDialog({ open, token, onClose, onImport }: Props) {
 
   return (
     <Dialog open={open} onClose={close} label="Import a decklist" size="md">
-      <h2 className="font-display text-[44px] leading-none">Import a list</h2>
+      <h2 className="font-display text-[44px] leading-none">{title}</h2>
 
       {step.kind === "edit" && (
         <div className="mt-6 flex flex-col gap-5">
@@ -149,11 +161,11 @@ export function ImportDialog({ open, token, onClose, onImport }: Props) {
             <legend className="mb-1 text-sm text-muted">When importing</legend>
             <label className="flex min-h-11 items-center gap-3 text-[15px]">
               <input type="radio" name="mode" checked={!replace} onChange={() => setReplace(false)} className="h-4 w-4 accent-[var(--accent-text)]" />
-              Add to the current draft
+              {addLabel}
             </label>
             <label className="flex min-h-11 items-center gap-3 text-[15px]">
               <input type="radio" name="mode" checked={replace} onChange={() => setReplace(true)} className="h-4 w-4 accent-[var(--accent-text)]" />
-              Replace the current draft
+              {replaceLabel}
             </label>
           </fieldset>
 
