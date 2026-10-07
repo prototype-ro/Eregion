@@ -1,0 +1,14 @@
+import { AuthForm } from "@/components/AuthForm";
+import { Nav } from "@/components/Nav";
+
+export default function RegisterPage() {
+  return (
+    <div className="shell">
+      <Nav />
+      <main className="flex flex-col gap-10 py-16">
+        <h1 className="font-display text-[clamp(64px,9vw,128px)] leading-[0.92]">Start a deck</h1>
+        <AuthForm mode="register" />
+      </main>
+    </div>
+  );
+}

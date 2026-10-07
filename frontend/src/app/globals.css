@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Dark is the default. The light theme applies when the system asks for
+ * it, unless the user picked dark, or when the user picked light with the toggle.
+ * Black plus one accent: Lyons Blue. --accent-text is a lighter tint of the same blue
+ * for text and lines on dark, where the accent itself is too dark to read.
+ */
+:root {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface-2: #1c1c1c;
+  --text: #f2f2f0;
+  --muted: #a3a3a0;
+  --line: rgba(242, 242, 240, 0.14);
+  --accent: #0b4e66;
+  --accent-text: #5db1cf;
+  --on-accent: #f2f2f0;
+  --add-bg: rgba(93, 177, 207, 0.12);
+  --add-line: rgba(93, 177, 207, 0.42);
+  --add-text: #5db1cf;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f4f2;
+    --surface: #e9e9e6;
+    --surface-2: #deded9;
+    --text: #0a0a0a;
+    --muted: #55554f;
+    --line: rgba(10, 10, 10, 0.16);
+    --accent-text: #0b4e66;
+    --add-bg: rgba(11, 78, 102, 0.1);
+    --add-line: rgba(11, 78, 102, 0.4);
+    --add-text: #0b4e66;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f4f2;
+  --surface: #e9e9e6;
+  --surface-2: #deded9;
+  --text: #0a0a0a;
+  --muted: #55554f;
+  --line: rgba(10, 10, 10, 0.16);
+  --accent-text: #0b4e66;
+  --add-bg: rgba(11, 78, 102, 0.1);
+  --add-line: rgba(11, 78, 102, 0.4);
+  --add-text: #0b4e66;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-on-accent: var(--on-accent);
+  --color-add-bg: var(--add-bg);
+  --color-add-line: var(--add-line);
+  --color-add-text: var(--add-text);
+
+  --font-display: var(--font-pirata);
+  --font-sans: var(--font-bricolage);
+  --font-mono: var(--font-plex-mono);
+
+  --radius-card: 28px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Outline pill that fills upward on hover. */
+.pill {
+  background: linear-gradient(var(--text), var(--text)) no-repeat 0 100% / 100% 0;
+  transition: background-size 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s;
+}
+.pill:hover {
+  background-size: 100% 100%;
+  color: var(--bg);
+}
+.press {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.press:hover {
+  transform: translateY(-1px);
+}
+.pill:active,
+.press:active {
+  transform: scale(0.98);
+}
+
+/* Card art is grayscale so the accent is the only color on screen. */
+.art {
+  filter: grayscale(1) contrast(1.1);
+  transition: filter 0.6s, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.group:hover .art {
+  filter: none;
+  transform: scale(1.03);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill,
+  .press,
+  .art {
+    transition: none;
+  }
+  .press:hover,
+  .pill:active,
+  .press:active,
+  .group:hover .art {
+    transform: none;
+  }
+}
+
+/*
+ * Page width. Fluid padding and a very wide cap, so large monitors use their space
+ * instead of leaving a narrow column in the middle.
+ */
+.shell {
+  width: 100%;
+  max-width: 2200px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 3.4vw, 80px);
+}
+
+/* Card groups flow into as many columns as fit, and a group never splits across columns. */
+.group-columns {
+  column-width: 340px;
+  column-gap: clamp(28px, 3vw, 64px);
+}
+.group-columns > * {
+  break-inside: avoid;
+}

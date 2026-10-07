@@ -1,0 +1,105 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { DeckBuilder } from "@/components/builder/DeckBuilder";
+import { Nav } from "@/components/Nav";
+import { api, ApiError } from "@/lib/api";
+import { clearToken, getToken } from "@/lib/auth";
+import type { DeckDetail, Timeline, VersionDetail } from "@/lib/types";
+
+interface CollectionEntry {
+  card: { id: string };
+  quantity: number;
+}
+
+interface Loaded {
+  deck: DeckDetail;
+  version: VersionDetail | null;
+  timeline: Timeline;
+  owned: Map<string, number>;
+}
+
+export default function DeckPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const search = useSearchParams();
+  const requested = search.get("v");
+
+  const [token, setToken] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const stored = getToken();
+    if (!stored) {
+      router.replace("/login");
+      return;
+    }
+    setToken(stored);
+    try {
+      const [deck, timeline, collection] = await Promise.all([
+        api<DeckDetail>(`/api/decks/${id}`, { token: stored }),
+        api<Timeline>(`/api/decks/${id}/timeline`, { token: stored }),
+        api<CollectionEntry[]>("/api/collection", { token: stored }),
+      ]);
+
+      // The URL picks the version. Without one, open the most recently saved.
+      const wanted = requested === null ? null : Number(requested);
+      let version: VersionDetail | null = deck.latest;
+      if (wanted !== null && Number.isInteger(wanted) && wanted !== deck.latest?.versionNumber) {
+        version = await api<VersionDetail>(`/api/decks/${id}/versions/${wanted}`, { token: stored });
+      }
+
+      setLoaded({ deck, version, timeline, owned: new Map(collection.map((entry) => [entry.card.id, entry.quantity])) });
+      setError(null);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearToken();
+        router.replace("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "Could not load the deck.");
+    }
+  }, [id, requested, router]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const openVersion = useCallback(
+    (versionNumber: number) => router.push(`/decks/${id}?v=${versionNumber}`, { scroll: false }),
+    [id, router],
+  );
+
+  return (
+    <div className="shell">
+      <Nav active="decks" />
+      {error && (
+        <div className="py-16">
+          <p role="alert" className="max-w-[560px] rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+            {error}
+          </p>
+          <Link href="/decks" className="mt-6 inline-block text-accent-text underline underline-offset-4">
+            Back to your decks
+          </Link>
+        </div>
+      )}
+      {!error && !loaded && <p className="py-16 text-muted">Loading the deck.</p>}
+      {loaded && token && (
+        // Remounting per version resets the draft to that version's snapshot.
+        <DeckBuilder
+          key={loaded.version?.versionNumber ?? 0}
+          deck={loaded.deck}
+          version={loaded.version}
+          timeline={loaded.timeline}
+          token={token}
+          owned={loaded.owned}
+          onSaved={openVersion}
+          onSelectVersion={openVersion}
+        />
+      )}
+    </div>
+  );
+}
