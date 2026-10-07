@@ -25,7 +25,8 @@ public final class DeckDtos {
 			@Min(1) @Max(99) int quantity,
 			@NotBlank String board,
 			UUID printingId,
-			@Size(max = 12) List<@NotBlank @Size(max = 30) String> tags) {
+			@Size(max = 12) List<@NotBlank @Size(max = 30) String> tags,
+			UUID customPrintingId) {
 	}
 
 	public record CreateDeckRequest(
@@ -65,6 +66,7 @@ public final class DeckDtos {
 			String imageNormal,
 			String imageArtCrop,
 			UUID printingId,
+			UUID customPrintingId,
 			String setCode,
 			String setName,
 			String collectorNumber,

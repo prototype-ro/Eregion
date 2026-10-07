@@ -20,14 +20,16 @@ interface RequestOptions {
  */
 export async function api<T>(path: string, { method = "GET", body }: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // A FormData body (file uploads) sets its own content type with the multipart boundary.
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
 
   let response: Response;
   try {
     response = await fetch(path, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       cache: "no-store",
     });
   } catch {

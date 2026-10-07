@@ -54,6 +54,8 @@ cd frontend && npm run build     # type check and production build
 | `PUT /api/decks/{id}/visibility` | Publish one saved version of a deck (`public` plus `versionNumber`) or make it private again. Only the chosen version is ever shown to others |
 | `GET /api/explore?commander=&q=&limit=&offset=` | Public decks, newest first, optionally only those with a given commander card |
 | `GET /api/explore/{id}` | A public deck's published version, read only. Private decks answer 404 |
+| `GET /api/custom-printings`, `GET`/`POST /api/cards/{id}/custom-printings` | A player's own card art (proxies). Upload PNG, JPEG or WebP up to 4 MB as multipart `file` plus `label`. Private to the owner |
+| `GET /api/custom-printings/{id}/image`, `DELETE /api/custom-printings/{id}` | The image (owner, or anyone while it is part of a public deck's published version) and removal |
 | `GET /api/collection`, `PUT /api/collection/{cardId}` | Cards you own, and set how many of one card |
 | `POST /api/collection/bulk` | Add many cards at once (`mode`: `add` or `replace`). Powers list import on the collection screen. |
 
@@ -73,3 +75,7 @@ Authenticated routes read the `eregion_session` cookie, or an `Authorization: Be
 - A card is identified inside a version by card and board together (`commander`, `main`, `maybe`, `considering`). Only commander and main count toward the 100 cards and the stats.
 - A deck line can pin a specific printing (art, set and price) and carry free-form tags. Tags drive the "Custom tag" grouping. Prices are Scryfall market prices in USD, refreshed by a background job (`PriceRefreshService`) for stale cards and pinned printings.
 - The card catalog is filled on demand from Scryfall by exact name. Card art is placeholder art owned by Wizards of the Coast and the artists.
+
+### Custom art
+
+Custom printings are images a player uploads for a card. A deck line can pin one instead of a Scryfall printing (`customPrintingId`), and the picker shows them in a Custom section above the Scryfall printings. On the Collection page, "Import custom art" takes many files named after their cards (`Sol Ring - foil proxy.png`) and can add the cards to the collection. Images are checked by their first bytes (SVG and HTML are refused), stored in Postgres, and served with `nosniff` and a sandbox CSP. Deleting art leaves saved versions intact: their lines fall back to the card's default printing.

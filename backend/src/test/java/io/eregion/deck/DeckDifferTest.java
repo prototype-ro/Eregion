@@ -1,5 +1,6 @@
 package io.eregion.deck;
 
+import static io.eregion.deck.Lines.custom;
 import static io.eregion.deck.Lines.line;
 import static io.eregion.deck.Lines.main;
 import static io.eregion.deck.Lines.printing;
@@ -143,5 +144,23 @@ class DeckDifferTest {
 
 		assertThat(diff.added()).hasSize(1);
 		assertThat(diff.tags()).isEmpty();
+	}
+
+	@Test
+	void switchingToCustomArtIsAPrintingChange() {
+		var ring = main("Sol Ring", "Artifact", 1, 1);
+
+		DeckDiff diff = DeckDiffer.diff(1, List.of(printing(ring, "C21", "263")), 2, List.of(custom(ring, "Foil proxy")));
+
+		assertThat(diff.printings()).hasSize(1);
+		assertThat(diff.printings().get(0).from()).isEqualTo("C21 263");
+		assertThat(diff.printings().get(0).to()).isEqualTo("Custom: Foil proxy");
+	}
+
+	@Test
+	void sameCustomArtIsNotAChange() {
+		var ring = custom(main("Sol Ring", "Artifact", 1, 1), "Foil proxy");
+
+		assertThat(DeckDiffer.diff(1, List.of(ring), 2, List.of(ring)).printings()).isEmpty();
 	}
 }

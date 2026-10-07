@@ -9,7 +9,7 @@ function line(over: Partial<DeckCardLine>): DeckCardLine {
   return {
     cardId: `c${next}`, name: `Card ${next}`, manaCost: "", manaValue: 1, primaryType: "Instant", typeLine: "Instant",
     colors: "", colorIdentity: "", oracleText: "", rarity: "common", artist: "", imageSmall: "", imageNormal: "", imageArtCrop: "",
-    printingId: "", setCode: "", setName: "", collectorNumber: "", priceUsd: null, board: "main", quantity: 1, owned: 0, tags: [],
+    printingId: "", customPrintingId: null, setCode: "", setName: "", collectorNumber: "", priceUsd: null, board: "main", quantity: 1, owned: 0, tags: [],
     ...over,
   };
 }

@@ -26,3 +26,6 @@ export const exploreCommanderUrl = (cardId: string) => `/explore?commander=${car
 
 /** Colors in the game's own order: white, blue, black, red, green. */
 export const sortColors = (identity: string) => "WUBRG".split("").filter((color) => identity.includes(color)).join("");
+
+/** Where a custom art's image is served from. */
+export const customArtUrl = (id: string) => `/api/custom-printings/${id}/image`;

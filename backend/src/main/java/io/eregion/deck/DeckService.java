@@ -55,7 +55,7 @@ public class DeckService {
 		UUID deckId = decks.insertDeck(userId, request.name().trim(), format);
 		decks.insertBranch(deckId, MAIN_BRANCH, null);
 		if (request.cards() != null && !request.cards().isEmpty()) {
-			List<DeckCardInput> cards = prepare(request.cards());
+			List<DeckCardInput> cards = prepare(userId, request.cards());
 			UUID main = decks.findBranchId(deckId, MAIN_BRANCH).orElseThrow();
 			write(deckId, request.note(), cards, main, null);
 		}
@@ -152,7 +152,7 @@ public class DeckService {
 	@Transactional
 	public VersionDetail saveVersion(UUID deckId, UUID userId, SaveVersionRequest request) {
 		owned(deckId, userId);
-		List<DeckCardInput> cards = prepare(request.cards());
+		List<DeckCardInput> cards = prepare(userId, request.cards());
 
 		VersionRow base = request.fromVersion() == null ? null : requireVersion(deckId, request.fromVersion());
 		Plan plan = SavePlanner.plan(
@@ -254,10 +254,11 @@ public class DeckService {
 	 * Checks a draft and returns it in storage form: pinned printings that are just the card's
 	 * default become null, and tags are trimmed and de-duplicated.
 	 */
-	private List<DeckCardInput> prepare(List<DeckCardInput> cards) {
+	private List<DeckCardInput> prepare(UUID userId, List<DeckCardInput> cards) {
 		Set<String> seen = new HashSet<>();
 		Set<UUID> cardIds = new HashSet<>();
 		Set<UUID> printingIds = new HashSet<>();
+		Set<UUID> customIds = new HashSet<>();
 		int commanders = 0;
 
 		for (DeckCardInput card : cards) {
@@ -275,6 +276,9 @@ public class DeckService {
 			if (card.printingId() != null) {
 				printingIds.add(card.printingId());
 			}
+			if (card.customPrintingId() != null) {
+				customIds.add(card.customPrintingId());
+			}
 		}
 		if (commanders > 2) {
 			throw ApiException.badRequest("A deck can have at most two commanders: a partner pair or a commander with a background");
@@ -285,17 +289,27 @@ public class DeckService {
 			throw ApiException.badRequest((cardIds.size() - defaults.size()) + " card id(s) are not in the catalog. Import them first.");
 		}
 		Map<UUID, UUID> owners = decks.printingOwners(printingIds);
+		Map<UUID, DeckRepository.CustomOwner> customOwners = decks.customPrintingOwners(customIds);
 
 		List<DeckCardInput> prepared = new ArrayList<>(cards.size());
 		for (DeckCardInput card : cards) {
 			UUID printing = card.printingId();
-			if (printing != null && printing.equals(defaults.get(card.cardId()))) {
+			UUID custom = card.customPrintingId();
+			if (custom != null) {
+				// Custom art is private to its owner and for one card. It replaces any Scryfall printing.
+				DeckRepository.CustomOwner owner = customOwners.get(custom);
+				if (owner == null || !owner.userId().equals(userId) || !owner.cardId().equals(card.cardId())) {
+					throw ApiException.badRequest("That custom art is not yours or is for a different card");
+				}
+				printing = null;
+			}
+			else if (printing != null && printing.equals(defaults.get(card.cardId()))) {
 				printing = null;
 			}
 			else if (printing != null && !card.cardId().equals(owners.get(printing))) {
 				throw ApiException.badRequest("That printing is not one of this card's printings");
 			}
-			prepared.add(new DeckCardInput(card.cardId(), card.quantity(), card.board(), printing, cleanTags(card.tags())));
+			prepared.add(new DeckCardInput(card.cardId(), card.quantity(), card.board(), printing, cleanTags(card.tags()), custom));
 		}
 		return prepared;
 	}

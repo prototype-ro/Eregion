@@ -6,10 +6,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ImportDialog, type ImportedCard } from "@/components/builder/ImportDialog";
 import { CollectionSearch } from "@/components/collection/CollectionSearch";
+import { CustomArtImportDialog } from "@/components/CustomArtImportDialog";
+import { CustomArtSection } from "@/components/CustomArtSection";
+import { Dialog } from "@/components/Dialog";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { formatPrice } from "@/lib/links";
-import type { Card } from "@/lib/types";
+import { customArtUrl, formatPrice } from "@/lib/links";
+import type { Card, CustomPrinting } from "@/lib/types";
 
 interface Entry {
   card: Card;
@@ -39,9 +42,21 @@ export default function CollectionPage() {
   const [sort, setSort] = useState<Sort>("name");
   const [view, setView] = useState<View>("list");
   const [importOpen, setImportOpen] = useState(false);
+  const [artImportOpen, setArtImportOpen] = useState(false);
+  const [arts, setArts] = useState<CustomPrinting[]>([]);
+  const [artFor, setArtFor] = useState<Card | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const loadArts = useCallback(async () => {
+    try {
+      setArts(await api<CustomPrinting[]>("/api/custom-printings"));
+    } catch {
+      // Custom art is an extra: the collection still works without it.
+    }
+  }, []);
+
   const load = useCallback(async () => {
+    void loadArts();
     try {
       setEntries(await api<Entry[]>("/api/collection"));
       setError(null);
@@ -52,7 +67,7 @@ export default function CollectionPage() {
       }
       setError(err instanceof ApiError ? err.message : "Could not load your collection.");
     }
-  }, [router]);
+  }, [router, loadArts]);
 
   useEffect(() => {
     void load();
@@ -63,6 +78,13 @@ export default function CollectionPage() {
     const timer = setTimeout(() => setToast(null), 2400);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  const artsByCard = useMemo(() => {
+    const map = new Map<string, CustomPrinting[]>();
+    arts.forEach((art) => map.set(art.cardId, [...(map.get(art.cardId) ?? []), art]));
+    return map;
+  }, [arts]);
+  const ownedIds = useMemo(() => new Set((entries ?? []).map((entry) => entry.card.id)), [entries]);
 
   const quantities = useMemo(() => new Map((entries ?? []).map((entry) => [entry.card.id, entry.quantity])), [entries]);
 
@@ -172,6 +194,9 @@ export default function CollectionPage() {
           <button type="button" onClick={() => setImportOpen(true)} className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium">
             Import list
           </button>
+          <button type="button" onClick={() => setArtImportOpen(true)} className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium">
+            Import custom art
+          </button>
           <button
             type="button"
             onClick={download}
@@ -261,6 +286,9 @@ export default function CollectionPage() {
                     <p className="hidden text-right text-[15px] sm:block">{formatPrice(card.priceUsd)}</p>
                     <p className="hidden font-mono text-xs text-muted sm:block">{card.setCode.toUpperCase()}</p>
                     <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setArtFor(card)} aria-label={`Custom art for ${card.name}`} className="pill mr-2 hidden min-h-11 items-center rounded-full border border-line px-4 text-sm sm:inline-flex">
+                        Custom art{artsByCard.get(card.id) ? ` (${artsByCard.get(card.id)?.length})` : ""}
+                      </button>
                       <button type="button" aria-label={`Remove one ${card.name}`} className={stepper} onClick={() => void setQuantity(card, quantity - 1)}>
                         -
                       </button>
@@ -279,7 +307,15 @@ export default function CollectionPage() {
                 {shown.map(({ card, quantity }) => (
                   <li key={card.id} className="flex flex-col gap-2.5">
                     <div className="relative aspect-[488/680] overflow-hidden rounded-[14px] bg-surface">
-                      {card.imageNormal && <Image src={card.imageNormal} alt={card.name} fill sizes="260px" className="object-cover" />}
+                      {(artsByCard.get(card.id)?.[0] || card.imageNormal) && (
+                        <Image
+                          src={artsByCard.get(card.id)?.[0] ? customArtUrl(artsByCard.get(card.id)![0].id) : card.imageNormal}
+                          alt={card.name}
+                          fill
+                          sizes="260px"
+                          className="object-cover"
+                        />
+                      )}
                       {quantity > 1 && (
                         <span className="absolute top-2 right-2 rounded-full bg-bg px-2 py-0.5 font-mono text-xs">{quantity}x</span>
                       )}
@@ -287,6 +323,9 @@ export default function CollectionPage() {
                     <div className="flex items-center justify-between gap-2 px-1">
                       <p className="min-w-0 truncate text-sm">{card.name}</p>
                       <div className="flex shrink-0 items-center gap-1">
+                        <button type="button" onClick={() => setArtFor(card)} aria-label={`Custom art for ${card.name}`} className="pill min-h-11 rounded-full border border-line px-3 text-xs">
+                          Art{artsByCard.get(card.id) ? ` (${artsByCard.get(card.id)?.length})` : ""}
+                        </button>
                         <button type="button" aria-label={`Remove one ${card.name}`} className={stepper} onClick={() => void setQuantity(card, quantity - 1)}>
                           -
                         </button>
@@ -303,6 +342,20 @@ export default function CollectionPage() {
         )}
       </main>
 
+      <CustomArtImportDialog open={artImportOpen} onClose={() => setArtImportOpen(false)} owned={ownedIds} onDone={() => void load()} />
+      <Dialog open={artFor !== null} onClose={() => setArtFor(null)} label="Custom art" size="md">
+        {artFor && (
+          <div className="flex flex-col gap-6">
+            <h2 className="font-display text-[44px] leading-none">{artFor.name}</h2>
+            <CustomArtSection cardId={artFor.id} onChanged={() => void loadArts()} />
+            <div>
+              <button type="button" onClick={() => setArtFor(null)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </Dialog>
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}

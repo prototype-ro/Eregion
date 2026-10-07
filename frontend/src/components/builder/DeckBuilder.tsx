@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
+import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
-import type { Board, Card, DeckCardLine, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
+import type { Board, Card, DeckCardLine, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
 import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
@@ -62,6 +63,7 @@ function lineFromCard(card: Card, board: Board, quantity = 1): DeckCardLine {
     imageNormal: card.imageNormal,
     imageArtCrop: card.imageArtCrop,
     printingId: card.scryfallId,
+    customPrintingId: null,
     setCode: card.setCode,
     setName: card.setName,
     collectorNumber: card.collectorNumber,
@@ -76,7 +78,7 @@ function lineFromCard(card: Card, board: Board, quantity = 1): DeckCardLine {
 /** Order-independent fingerprint of a card list, used to tell whether the draft changed. */
 const signature = (lines: DeckCardLine[]) =>
   lines
-    .map((line) => `${lineKey(line)}:${line.quantity}:${line.printingId}:${[...line.tags].sort().join("|")}`)
+    .map((line) => `${lineKey(line)}:${line.quantity}:${line.printingId}:${line.customPrintingId ?? ""}:${[...line.tags].sort().join("|")}`)
     .sort()
     .join(",");
 
@@ -319,6 +321,19 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     setLines((previous) => previous.map((line) => (lineKey(line) === lineKey(target) ? { ...line, tags } : line)));
   }
 
+  /** Pins the player's own art. It shows on the card now, and the saved version remembers it. */
+  function chooseCustom(target: DeckCardLine, art: CustomPrinting) {
+    const url = customArtUrl(art.id);
+    setLines((previous) =>
+      previous.map((line) =>
+        lineKey(line) === lineKey(target)
+          ? { ...line, customPrintingId: art.id, setCode: "custom", setName: art.label, collectorNumber: "", artist: "Custom art", imageSmall: url, imageNormal: url, imageArtCrop: url }
+          : line,
+      ),
+    );
+    setPrintingKey(null);
+  }
+
   function choosePrinting(target: DeckCardLine, printing: Printing) {
     setLines((previous) =>
       previous.map((line) =>
@@ -326,6 +341,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           ? {
               ...line,
               printingId: printing.scryfallId,
+              customPrintingId: null,
               setCode: printing.setCode,
               setName: printing.setName,
               collectorNumber: printing.collectorNumber,
@@ -377,7 +393,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             cardId: line.cardId,
             quantity: line.quantity,
             board: line.board,
-            printingId: line.printingId,
+            printingId: line.customPrintingId ? null : line.printingId,
+        customPrintingId: line.customPrintingId,
             tags: line.tags,
           })),
           fromVersion: version?.versionNumber,
@@ -757,7 +774,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           setPrintingKey(lineKey(line));
         }}
       />
-      <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} />
+      <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} onChooseCustom={chooseCustom} />
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={importCards} />
 

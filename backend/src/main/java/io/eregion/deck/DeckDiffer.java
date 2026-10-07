@@ -53,7 +53,8 @@ public final class DeckDiffer {
 					changed.add(new QuantityChange(line.cardId(), line.name(), line.board(), previous.quantity(),
 							line.quantity()));
 				}
-				if (!previous.printingId().equals(line.printingId())) {
+				if (!previous.printingId().equals(line.printingId())
+						|| !java.util.Objects.equals(previous.customPrintingId(), line.customPrintingId())) {
 					printings.add(new PrintingChange(line.cardId(), line.name(), line.board(), printing(previous),
 							printing(line)));
 				}
@@ -78,6 +79,9 @@ public final class DeckDiffer {
 	}
 
 	private static String printing(DeckCardLine line) {
+		if (line.customPrintingId() != null) {
+			return "Custom: " + line.setName();
+		}
 		return (line.setCode() + " " + line.collectorNumber()).trim();
 	}
 

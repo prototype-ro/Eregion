@@ -2,19 +2,24 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { CustomArtSection } from "@/components/CustomArtSection";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import { formatPrice } from "@/lib/links";
-import type { DeckCardLine, Printing } from "@/lib/types";
+import type { CustomPrinting, DeckCardLine, Printing } from "@/lib/types";
 
 interface Props {
   line: DeckCardLine | null;
   onClose: () => void;
   onChoose: (line: DeckCardLine, printing: Printing) => void;
+  onChooseCustom: (line: DeckCardLine, art: CustomPrinting) => void;
 }
 
-/** Every English paper printing of a card, newest first. Picking one changes the art and price for that card. */
-export function PrintingPicker({ line, onClose, onChoose }: Props) {
+/**
+ * The art choices for a card, in two sections: the player's own custom art, and every English paper
+ * printing from Scryfall, newest first. Picking one changes the art for that card in the deck.
+ */
+export function PrintingPicker({ line, onClose, onChoose, onChooseCustom }: Props) {
   const [printings, setPrintings] = useState<Printing[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cardId = line?.cardId ?? null;
@@ -40,9 +45,15 @@ export function PrintingPicker({ line, onClose, onChoose }: Props) {
     <Dialog open={line !== null} onClose={onClose} label="Choose a printing" size="lg">
       {line && (
         <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="font-display text-[44px] leading-none">{line.name}</h2>
-            <p className="text-[15px] text-muted">{printings ? `${printings.length} printings` : "Loading printings"}</p>
+          <h2 className="font-display text-[44px] leading-none">{line.name}</h2>
+
+          <div className="mt-8">
+            <CustomArtSection cardId={line.cardId} currentId={line.customPrintingId} onChoose={(art) => onChooseCustom(line, art)} />
+          </div>
+
+          <div className="mt-12 flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-8">
+            <h3 className="text-[22px] font-medium tracking-[-0.02em]">Scryfall</h3>
+            <p className="text-sm text-muted">{printings ? `${printings.length} printings` : "Loading printings"}</p>
           </div>
 
           {error && (
@@ -54,9 +65,9 @@ export function PrintingPicker({ line, onClose, onChoose }: Props) {
           {printings && printings.length === 0 && <p className="mt-6 text-muted">No other printings were found for this card.</p>}
 
           {printings && (
-            <ul className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-7">
+            <ul className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-7">
               {printings.map((printing) => {
-                const current = printing.scryfallId === line.printingId;
+                const current = line.customPrintingId === null && printing.scryfallId === line.printingId;
                 return (
                   <li key={printing.scryfallId}>
                     <button

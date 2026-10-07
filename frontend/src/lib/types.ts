@@ -80,6 +80,8 @@ export interface DeckCardLine {
   imageArtCrop: string;
   /** The printing shown: a pinned one, or the card's default. */
   printingId: string;
+  /** Set when the line uses the player's own art instead of a Scryfall printing. */
+  customPrintingId: string | null;
   setCode: string;
   setName: string;
   collectorNumber: string;
@@ -225,4 +227,14 @@ export interface TagChange {
   board: Board;
   added: string[];
   removed: string[];
+}
+
+/** Art a player uploaded for a card, such as a proxy. Only they can use it, and only for that card. */
+export interface CustomPrinting {
+  id: string;
+  cardId: string;
+  label: string;
+  createdAt: string;
+  /** How many saved deck versions use it. */
+  usedIn: number;
 }

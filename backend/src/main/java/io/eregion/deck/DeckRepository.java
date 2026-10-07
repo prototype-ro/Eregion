@@ -33,6 +33,9 @@ public class DeckRepository {
 			Integer parentVersion, boolean head) {
 	}
 
+	public record CustomOwner(UUID userId, UUID cardId) {
+	}
+
 	public record BranchRow(UUID id, String name, Integer forkedFromVersion) {
 	}
 
@@ -241,8 +244,8 @@ public class DeckRepository {
 
 	public void insertVersionCards(UUID versionId, List<DeckCardInput> cards) {
 		template.batchUpdate(
-				"INSERT INTO deck_version_cards (version_id, card_id, board, quantity, printing_id, tags)"
-						+ " VALUES (?, ?, ?, ?, ?, ?)",
+				"INSERT INTO deck_version_cards (version_id, card_id, board, quantity, printing_id, tags, custom_printing_id)"
+						+ " VALUES (?, ?, ?, ?, ?, ?, ?)",
 				new BatchPreparedStatementSetter() {
 					@Override
 					public void setValues(PreparedStatement ps, int i) throws SQLException {
@@ -254,6 +257,7 @@ public class DeckRepository {
 						ps.setObject(5, card.printingId());
 						List<String> tags = card.tags() == null ? List.of() : card.tags();
 						ps.setArray(6, ps.getConnection().createArrayOf("text", tags.toArray(new String[0])));
+						ps.setObject(7, card.customPrintingId());
 					}
 
 					@Override
@@ -320,19 +324,24 @@ public class DeckRepository {
 				SELECT c.id AS card_id, c.name, c.mana_cost, c.mana_value, c.primary_type, c.type_line, c.colors, c.color_identity,
 				       c.oracle_text,
 				       COALESCE(p.rarity, c.rarity) AS rarity,
-				       COALESCE(p.artist, c.artist) AS artist,
-				       COALESCE(p.image_small, c.image_small) AS image_small,
-				       COALESCE(p.image_normal, c.image_normal) AS image_normal,
-				       COALESCE(p.image_art_crop, c.image_art_crop) AS image_art_crop,
+				       CASE WHEN cp.id IS NOT NULL THEN 'Custom art' ELSE COALESCE(p.artist, c.artist) END AS artist,
+				       CASE WHEN cp.id IS NOT NULL THEN '/api/custom-printings/' || cp.id || '/image'
+				            ELSE COALESCE(p.image_small, c.image_small) END AS image_small,
+				       CASE WHEN cp.id IS NOT NULL THEN '/api/custom-printings/' || cp.id || '/image'
+				            ELSE COALESCE(p.image_normal, c.image_normal) END AS image_normal,
+				       CASE WHEN cp.id IS NOT NULL THEN '/api/custom-printings/' || cp.id || '/image'
+				            ELSE COALESCE(p.image_art_crop, c.image_art_crop) END AS image_art_crop,
 				       COALESCE(p.scryfall_id, c.scryfall_id) AS printing_id,
-				       COALESCE(p.set_code, c.set_code) AS set_code,
-				       COALESCE(p.set_name, c.set_name) AS set_name,
-				       COALESCE(p.collector_number, c.collector_number) AS collector_number,
+				       cp.id AS custom_printing_id,
+				       CASE WHEN cp.id IS NOT NULL THEN 'custom' ELSE COALESCE(p.set_code, c.set_code) END AS set_code,
+				       CASE WHEN cp.id IS NOT NULL THEN cp.label ELSE COALESCE(p.set_name, c.set_name) END AS set_name,
+				       CASE WHEN cp.id IS NOT NULL THEN '' ELSE COALESCE(p.collector_number, c.collector_number) END AS collector_number,
 				       CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END AS price_usd,
 				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned, dc.tags
 				  FROM deck_version_cards dc
 				  JOIN cards c ON c.id = dc.card_id
 				  LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
+				  LEFT JOIN custom_printings cp ON cp.id = dc.custom_printing_id
 				  LEFT JOIN collection_entries e ON e.card_id = c.id AND e.user_id = :user
 				 WHERE dc.version_id = :version
 				 ORDER BY CASE dc.board WHEN 'commander' THEN 0 WHEN 'main' THEN 1 WHEN 'maybe' THEN 2 ELSE 3 END,
@@ -342,6 +351,23 @@ public class DeckRepository {
 				.param("user", userId)
 				.query(DeckRepository::mapLine)
 				.list();
+	}
+
+	/** Who owns each of these custom arts and which card it is for. Unknown ids are left out. */
+	public Map<UUID, CustomOwner> customPrintingOwners(Collection<UUID> ids) {
+		if (ids.isEmpty()) {
+			return Map.of();
+		}
+		Map<UUID, CustomOwner> result = new HashMap<>();
+		jdbc.sql("SELECT id, user_id, card_id FROM custom_printings WHERE id IN (:ids)")
+				.param("ids", ids)
+				.query((rs, n) -> {
+					result.put(rs.getObject("id", UUID.class),
+							new CustomOwner(rs.getObject("user_id", UUID.class), rs.getObject("card_id", UUID.class)));
+					return null;
+				})
+				.list();
+		return result;
 	}
 
 	/** Default printing id of each known card, keyed by card id. Also tells which card ids exist. */
@@ -407,6 +433,7 @@ public class DeckRepository {
 				rs.getString("image_normal"),
 				rs.getString("image_art_crop"),
 				rs.getObject("printing_id", UUID.class),
+				rs.getObject("custom_printing_id", UUID.class),
 				rs.getString("set_code"),
 				rs.getString("set_name"),
 				rs.getString("collector_number"),
