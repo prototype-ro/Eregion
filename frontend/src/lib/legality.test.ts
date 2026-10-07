@@ -1,71 +1,60 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { checkLegality } from "./legality.ts";
+import { checkLegality, copyLimit } from "./legality.ts";
 import type { DeckCardLine } from "./types";
 
-let next = 0;
+interface SharedLine {
+  name: string;
+  board: DeckCardLine["board"];
+  quantity: number;
+  colorIdentity: string;
+  typeLine: string;
+  oracleText: string;
+  commanderLegality: string;
+}
+
+interface SharedCase {
+  name: string;
+  lines: SharedLine[];
+  filler: number;
+  fillerIdentity: string;
+  issues: string[];
+}
+
 function line(over: Partial<DeckCardLine>): DeckCardLine {
-  next += 1;
   return {
-    cardId: `c${next}`, name: `Card ${next}`, manaCost: "", manaValue: 1, primaryType: "Instant", typeLine: "Instant",
-    colors: "", colorIdentity: "", oracleText: "", rarity: "common", artist: "", imageSmall: "", imageNormal: "", imageArtCrop: "",
-    printingId: "", customPrintingId: null, setCode: "", setName: "", collectorNumber: "", priceUsd: null, board: "main", quantity: 1, owned: 0, tags: [],
-    ...over,
+    cardId: over.name ?? "x", name: "x", manaCost: "", manaValue: 1, primaryType: "Instant", typeLine: "Instant", colors: "", colorIdentity: "",
+    oracleText: "", commanderLegality: "legal", rarity: "common", artist: "", imageSmall: "", imageNormal: "", imageArtCrop: "", printingId: "",
+    customPrintingId: null, setCode: "", setName: "", collectorNumber: "", priceUsd: null, board: "main", quantity: 1, owned: 0, tags: [], ...over,
   };
 }
-const commander = (over: Partial<DeckCardLine> = {}) =>
-  line({ board: "commander", name: "Boss", typeLine: "Legendary Creature - Human", colorIdentity: "WU", ...over });
-function fullDeck(extra: DeckCardLine[] = []): DeckCardLine[] {
-  const filler = Array.from({ length: 99 - extra.reduce((s, l) => s + l.quantity, 0) }, () => line({ colorIdentity: "W" }));
-  return [commander(), ...extra, ...filler];
+
+// The API runs the same file, so both implementations give the same results and the same wording.
+const shared = JSON.parse(readFileSync(new URL("../../../shared/legality-cases.json", import.meta.url), "utf8")) as { cases: SharedCase[] };
+
+for (const testCase of shared.cases) {
+  test(`shared case: ${testCase.name}`, () => {
+    const lines = testCase.lines.map((entry) => line({ ...entry, cardId: entry.name }));
+    for (let i = 0; i < testCase.filler; i++) lines.push(line({ cardId: `Filler ${i}`, name: `Filler ${i}`, colorIdentity: testCase.fillerIdentity }));
+
+    assert.deepEqual(checkLegality(lines).issues, testCase.issues);
+  });
 }
 
-test("a full singleton deck inside the colors is legal", () => {
-  assert.deepEqual(checkLegality(fullDeck()), { legal: true, issues: [] });
+test("the shared file has enough cases", () => {
+  assert.ok(shared.cases.length > 30);
 });
 
-test("wrong size is reported either way", () => {
-  assert.match(checkLegality(fullDeck().slice(1)).issues[0], /1 card short/);
-  assert.match(checkLegality([...fullDeck(), line({})]).issues[0], /1 card over/);
+test("legal means no issues", () => {
+  const lines = [line({ name: "Boss", board: "commander", typeLine: "Legendary Creature - Human", colorIdentity: "W" })];
+  for (let i = 0; i < 99; i++) lines.push(line({ cardId: `F${i}`, name: `F${i}`, colorIdentity: "W" }));
+
+  assert.deepEqual(checkLegality(lines), { legal: true, issues: [] });
 });
 
-test("maybeboard and considering do not count", () => {
-  assert.equal(checkLegality([...fullDeck(), line({ board: "maybe" }), line({ board: "considering" })]).legal, true);
-});
-
-test("no commander", () => {
-  assert.ok(checkLegality(fullDeck().slice(1)).issues.includes("No commander chosen."));
-});
-
-test("a non-legendary commander cannot lead", () => {
-  const r = checkLegality(fullDeck().map((l) => (l.board === "commander" ? { ...l, typeLine: "Creature - Elf" } : l)));
-  assert.ok(r.issues.some((i) => /cannot be a commander/.test(i)));
-});
-
-test("two commanders need partner", () => {
-  const two = (text: string) => [commander({ oracleText: text }), commander({ oracleText: text }), ...Array.from({ length: 98 }, () => line({ colorIdentity: "W" }))];
-  assert.equal(checkLegality(two("Partner")).legal, true);
-  assert.ok(checkLegality(two("")).issues.some((i) => /Only one commander/.test(i)));
-});
-
-test("duplicates are illegal except basics and any-number cards", () => {
-  const dup = line({ name: "Sol Ring", quantity: 2 });
-  assert.ok(checkLegality(fullDeck([dup])).issues.some((i) => i.includes("Sol Ring (2)")));
-  assert.equal(checkLegality(fullDeck([line({ typeLine: "Basic Land - Plains", quantity: 20 })])).legal, true);
-  assert.equal(checkLegality(fullDeck([line({ oracleText: "A deck can have any number of cards named Rats.", quantity: 9 })])).legal, true);
-});
-
-test("the same card on two boards counts together", () => {
-  const a = line({ name: "Dup" });
-  const b = { ...a, board: "commander" as const };
-  assert.ok(checkLegality([commander(), a, b, ...Array.from({ length: 97 }, () => line({ colorIdentity: "W" }))]).issues.some((i) => i.includes("Dup (2)")));
-});
-
-test("cards outside the commander's colors are named", () => {
-  const r = checkLegality(fullDeck([line({ name: "Lightning Bolt", colorIdentity: "R" })]));
-  assert.ok(r.issues.some((i) => /Outside the commander's colors: Lightning Bolt/.test(i)));
-});
-
-test("colorless cards fit any commander", () => {
-  assert.equal(checkLegality(fullDeck([line({ colorIdentity: "" })])).legal, true);
+test("copy limits read the card text", () => {
+  assert.equal(copyLimit(line({ oracleText: "A deck can have up to nine cards named X." })), 9);
+  assert.equal(copyLimit(line({ typeLine: "Basic Land - Forest" })), Number.MAX_SAFE_INTEGER);
+  assert.equal(copyLimit(line({})), 1);
 });

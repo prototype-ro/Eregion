@@ -154,7 +154,7 @@ public class DeckRepository {
 		}
 		Map<UUID, List<DeckLegality.Line>> result = new HashMap<>();
 		jdbc.sql("""
-				SELECT dc.version_id, c.id AS card_id, c.name, dc.board, dc.quantity, c.color_identity, c.type_line, c.oracle_text
+				SELECT dc.version_id, c.id AS card_id, c.name, dc.board, dc.quantity, c.color_identity, c.type_line, c.oracle_text, c.commander_legality
 				  FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
 				 WHERE dc.version_id IN (:ids) AND dc.board IN ('commander', 'main')
 				""")
@@ -162,7 +162,8 @@ public class DeckRepository {
 				.query((rs, n) -> {
 					result.computeIfAbsent(rs.getObject("version_id", UUID.class), key -> new java.util.ArrayList<>()).add(
 							new DeckLegality.Line(rs.getObject("card_id", UUID.class), rs.getString("name"), rs.getString("board"),
-									rs.getInt("quantity"), rs.getString("color_identity"), rs.getString("type_line"), rs.getString("oracle_text")));
+									rs.getInt("quantity"), rs.getString("color_identity"), rs.getString("type_line"), rs.getString("oracle_text"),
+									rs.getString("commander_legality")));
 					return null;
 				})
 				.list();
@@ -530,7 +531,7 @@ public class DeckRepository {
 	public List<DeckCardLine> versionLines(UUID versionId, UUID userId) {
 		return jdbc.sql("""
 				SELECT c.id AS card_id, c.name, c.mana_cost, c.mana_value, c.primary_type, c.type_line, c.colors, c.color_identity,
-				       c.oracle_text,
+				       c.oracle_text, c.commander_legality,
 				       COALESCE(p.rarity, c.rarity) AS rarity,
 				       CASE WHEN cp.id IS NOT NULL THEN 'Custom art' ELSE COALESCE(p.artist, c.artist) END AS artist,
 				       CASE WHEN cp.id IS NOT NULL THEN '/api/custom-printings/' || cp.id || '/image'
@@ -637,6 +638,7 @@ public class DeckRepository {
 				rs.getString("colors"),
 				rs.getString("color_identity"),
 				rs.getString("oracle_text"),
+				rs.getString("commander_legality"),
 				rs.getString("rarity"),
 				rs.getString("artist"),
 				rs.getString("image_small"),

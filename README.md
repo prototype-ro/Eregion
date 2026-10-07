@@ -107,3 +107,9 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 - CI (`.github/workflows/ci.yml`) runs the backend tests and the frontend type check, tests and build.
 - The site forwards `/api` to the API with `src/proxy.ts`, which reads `BACKEND_URL` when the server starts, so one built image can run against any backend. (A rewrite in `next.config` would have fixed the address at build time.)
 - Accounts: new accounts must confirm their email before making a deck public. Password reset links last an hour and work once. Changing the password, resetting it or signing out everywhere ends every other session, and deleting an account removes everything it owns. Without `SPRING_MAIL_HOST` the API writes each email, with its link, to its log.
+
+### Card names and Commander legality
+
+- Names are matched ignoring case, accents, ligatures and curly quotes, so `Atraxa, Praetors’ Voice`, `SOL RING` and `Æther Vial` all find their card. `eregion_norm` in the database and `NameNormalizer` in the API do the same folding and must stay in step.
+- Each card carries Scryfall's Commander legality (`legal`, `not_legal`, `banned`), refreshed with the daily price refresh. A deck with a banned or not legal card says so.
+- The legality rules live twice, in `DeckLegality` (Java, for the decks page) and `legality.ts` (the builder). Both run every case in `shared/legality-cases.json`, so a change to a rule is a change to that file and shows up in both test suites. They cover copy limits ("any number" and "up to seven" cards), partner pairs (partner, partner with, partner variants, friends forever, background, Doctor's companion), colors and size.

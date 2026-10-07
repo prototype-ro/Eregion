@@ -21,5 +21,7 @@ public record Card(
 		Double priceUsd,
 		String imageSmall,
 		String imageNormal,
-		String imageArtCrop) {
+		String imageArtCrop,
+		/** legal, not_legal or banned in Commander, or unknown until read from Scryfall. */
+		String commanderLegality) {
 }

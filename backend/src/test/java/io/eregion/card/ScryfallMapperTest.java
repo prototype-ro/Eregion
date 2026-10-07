@@ -56,7 +56,7 @@ class ScryfallMapperTest {
 				"Legendary Creature — Phyrexian Angel Horror", List.of("W", "U", "B", "G"),
 				List.of("W", "U", "B", "G"), "Flying", "c16", "Commander 2016", "10", "2016-11-11", "mythic",
 				"Victor Adame Minguez", new ScryfallCard.Prices("12.50", null, null),
-				new ImageUris("small.jpg", "normal.jpg", "art.jpg"), null);
+				new ImageUris("small.jpg", "normal.jpg", "art.jpg"), null, java.util.Map.of("commander", "legal"));
 
 		Card card = ScryfallMapper.toCard(source);
 
@@ -83,7 +83,7 @@ class ScryfallMapperTest {
 		ScryfallCard source = new ScryfallCard(
 				"22222222-2222-2222-2222-222222222222", "Sol Ring", "{1}", 1.0, "Artifact", List.of(), List.of(),
 				"{T}: Add {C}{C}.", "cmd", "Commander 2011", "250", "2011-06-17", "uncommon", "Mark Tedin",
-				new ScryfallCard.Prices("1.10", null, null), new ImageUris("s.jpg", "n.jpg", "a.jpg"), null);
+				new ScryfallCard.Prices("1.10", null, null), new ImageUris("s.jpg", "n.jpg", "a.jpg"), null, null);
 		java.util.UUID cardId = java.util.UUID.randomUUID();
 
 		Printing printing = ScryfallMapper.toPrinting(source, cardId);
@@ -102,7 +102,7 @@ class ScryfallMapperTest {
 		ScryfallCard source = new ScryfallCard(
 				"11111111-1111-1111-1111-111111111111", "Delver of Secrets // Insectile Aberration", null, 1.0, null,
 				List.of(), List.of("U"), null, "isd", "Innistrad", "51", "2011-09-30", "common", null, null, null,
-				List.of(front, back));
+				List.of(front, back), java.util.Map.of("commander", "banned"));
 
 		Card card = ScryfallMapper.toCard(source);
 
@@ -111,5 +111,20 @@ class ScryfallMapperTest {
 		assertThat(card.primaryType()).isEqualTo("Creature");
 		assertThat(card.artist()).isEqualTo("Artist One");
 		assertThat(card.imageSmall()).isEqualTo("s.jpg");
+	}
+
+	@Test
+	void commanderLegalityIsReadFromScryfallAndUnknownWhenMissing() {
+		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("commander", "legal")))).isEqualTo("legal");
+		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("commander", "banned")))).isEqualTo("banned");
+		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("commander", "not_legal")))).isEqualTo("not_legal");
+		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("commander", "restricted")))).isEqualTo("legal");
+		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("modern", "legal")))).isEqualTo("unknown");
+		assertThat(ScryfallMapper.commanderLegality(withLegalities(null))).isEqualTo("unknown");
+	}
+
+	private static ScryfallCard withLegalities(java.util.Map<String, String> legalities) {
+		return new ScryfallCard("33333333-3333-3333-3333-333333333333", "X", "", 0.0, "Instant", List.of(), List.of(), "", "s", "S", "1",
+				"2020-01-01", "common", "A", null, null, null, legalities);
 	}
 }

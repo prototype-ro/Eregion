@@ -30,6 +30,8 @@ export interface Card {
   imageSmall: string;
   imageNormal: string;
   imageArtCrop: string;
+  /** legal, not_legal or banned in Commander, or unknown until read from Scryfall. */
+  commanderLegality: string;
 }
 
 /** One printing of a card: a set, a collector number, its own art and price. */
@@ -90,6 +92,7 @@ export interface DeckCardLine {
   colors: string;
   colorIdentity: string;
   oracleText: string;
+  commanderLegality: string;
   rarity: string;
   artist: string;
   imageSmall: string;

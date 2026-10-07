@@ -42,7 +42,19 @@ public final class ScryfallMapper {
 				price(source.prices()),
 				images == null ? "" : orEmpty(images.small()),
 				images == null ? "" : orEmpty(images.normal()),
-				images == null ? "" : orEmpty(images.art_crop()));
+				images == null ? "" : orEmpty(images.art_crop()),
+				commanderLegality(source));
+	}
+
+	/** What Scryfall says about Commander. unknown when it says nothing, so a missing answer is never read as banned. */
+	static String commanderLegality(ScryfallCard source) {
+		String value = source.legalities() == null ? null : source.legalities().get("commander");
+		return switch (value == null ? "" : value) {
+			case "legal", "restricted" -> "legal";
+			case "banned" -> "banned";
+			case "not_legal" -> "not_legal";
+			default -> "unknown";
+		};
 	}
 
 	/** One printing of a card, as returned for the printing picker. */

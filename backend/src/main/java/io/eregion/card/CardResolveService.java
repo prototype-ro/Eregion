@@ -3,7 +3,6 @@ package io.eregion.card;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,16 +39,19 @@ public class CardResolveService {
 	}
 
 	public Result resolve(List<String> requested) {
-		// Keep the first spelling of each name, in the order given.
-		Map<String, String> byKey = new LinkedHashMap<>();
+		// Each distinct spelling is answered, so "sol ring" and "Sol Ring" in one list both get their card.
+		Map<String, String> spellings = new LinkedHashMap<>();
 		for (String name : requested) {
 			String trimmed = name == null ? "" : name.trim();
 			if (!trimmed.isEmpty()) {
-				byKey.putIfAbsent(trimmed.toLowerCase(Locale.ROOT), trimmed);
+				spellings.putIfAbsent(trimmed, trimmed);
 			}
 		}
+		// Names that mean the same card once case, accents and quotes are ignored are looked up once.
+		Map<String, String> byKey = new LinkedHashMap<>();
+		spellings.values().forEach(spelling -> byKey.putIfAbsent(NameNormalizer.normalize(spelling), NameNormalizer.forSearch(spelling)));
 
-		Set<String> known = knownKeys(byKey);
+		Set<String> known = knownKeys(byKey.keySet());
 		List<String> missing = byKey.entrySet().stream()
 				.filter(entry -> !known.contains(entry.getKey()))
 				.map(Map.Entry::getValue)
@@ -77,7 +79,7 @@ public class CardResolveService {
 				break;
 			}
 			try {
-				scryfall.fuzzy(name).ifPresent(card -> fuzzy.put(name.toLowerCase(Locale.ROOT), cards.upsert(ScryfallMapper.toCard(card))));
+				scryfall.fuzzy(name).ifPresent(card -> fuzzy.put(NameNormalizer.normalize(name), cards.upsert(ScryfallMapper.toCard(card))));
 			}
 			catch (RuntimeException ex) {
 				log.warn("Fuzzy lookup failed for '{}'", name, ex);
@@ -85,34 +87,35 @@ public class CardResolveService {
 		}
 
 		Map<String, Card> catalog = new LinkedHashMap<>();
-		for (Card card : cards.findByNames(byKey.values())) {
+		for (Card card : cards.findByNames(byKey.keySet())) {
 			keysOf(card.name()).forEach(key -> catalog.putIfAbsent(key, card));
 		}
 
 		List<Match> matches = new ArrayList<>();
 		List<String> notFound = new ArrayList<>();
-		for (Map.Entry<String, String> entry : byKey.entrySet()) {
-			Card card = catalog.getOrDefault(entry.getKey(), fuzzy.get(entry.getKey()));
+		for (String spelling : spellings.values()) {
+			String key = NameNormalizer.normalize(spelling);
+			Card card = catalog.getOrDefault(key, fuzzy.get(key));
 			if (card == null) {
-				notFound.add(entry.getValue());
+				notFound.add(spelling);
 			}
 			else {
-				matches.add(new Match(entry.getValue(), card));
+				matches.add(new Match(spelling, card));
 			}
 		}
 		return new Result(List.copyOf(matches), List.copyOf(notFound));
 	}
 
-	private Set<String> knownKeys(Map<String, String> byKey) {
-		return cards.findByNames(byKey.values()).stream()
+	private Set<String> knownKeys(java.util.Collection<String> keys) {
+		return cards.findByNames(keys).stream()
 				.flatMap(card -> keysOf(card.name()).stream())
 				.collect(Collectors.toSet());
 	}
 
 	/** A card is known by its full name, and a double-faced card also by its front face. */
 	static Set<String> keysOf(String name) {
-		String lower = name.toLowerCase(Locale.ROOT);
-		int split = lower.indexOf(" // ");
-		return split < 0 ? Set.of(lower) : Set.of(lower, lower.substring(0, split));
+		String normal = NameNormalizer.normalize(name);
+		int split = normal.indexOf(" // ");
+		return split < 0 ? Set.of(normal) : Set.of(normal, normal.substring(0, split));
 	}
 }

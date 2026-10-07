@@ -2,111 +2,81 @@ package io.eregion.deck;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.TestInstance;
 
 import io.eregion.deck.DeckLegality.Line;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * Runs every case in shared/legality-cases.json. The web app's legality.ts runs the same file, so the two
+ * implementations are held to the same results and the same wording.
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DeckLegalityTest {
 
-	private static Line card(String name, String board, int quantity, String identity, String typeLine, String oracle) {
-		return new Line(UUID.nameUUIDFromBytes(name.getBytes()), name, board, quantity, identity, typeLine, oracle);
+	private static final Path CASES = Path.of("..", "shared", "legality-cases.json");
+
+	private static Line line(JsonNode node) {
+		String name = node.get("name").asString();
+		return new Line(UUID.nameUUIDFromBytes(name.getBytes()), name, node.get("board").asString(), node.get("quantity").asInt(),
+				node.get("colorIdentity").asString(), node.get("typeLine").asString(), node.get("oracleText").asString(),
+				node.get("commanderLegality").asString());
 	}
 
-	private static Line commander(String identity) {
-		return card("Boss", "commander", 1, identity, "Legendary Creature - Human", "");
-	}
-
-	/** A deck of 99 different cards inside white. */
-	private static List<Line> legalDeck() {
+	private static List<Line> build(JsonNode testCase) {
 		List<Line> lines = new ArrayList<>();
-		lines.add(commander("WU"));
-		for (int i = 0; i < 99; i++) {
-			lines.add(card("Card " + i, "main", 1, "W", "Instant", ""));
+		for (JsonNode node : testCase.get("lines")) {
+			// Lines with the same name are the same card, so the id comes from the name alone.
+			lines.add(line(node));
+		}
+		String identity = testCase.get("fillerIdentity").asString();
+		for (int i = 0; i < testCase.get("filler").asInt(); i++) {
+			lines.add(new Line(UUID.nameUUIDFromBytes(("Filler " + i).getBytes()), "Filler " + i, "main", 1, identity, "Instant", "", "legal"));
 		}
 		return lines;
 	}
 
-	@Test
-	void aFullSingletonDeckInsideTheColorsIsLegal() {
-		assertThat(DeckLegality.issues(legalDeck())).isEmpty();
+	@TestFactory
+	Stream<DynamicTest> sharedCases() throws IOException {
+		JsonNode root = JsonMapper.builder().build().readTree(Files.readString(CASES));
+		List<DynamicTest> tests = new ArrayList<>();
+		for (JsonNode testCase : root.get("cases")) {
+			List<String> expected = new ArrayList<>();
+			testCase.get("issues").forEach(issue -> expected.add(issue.asString()));
+			tests.add(DynamicTest.dynamicTest(testCase.get("name").asString(), () -> assertThat(DeckLegality.issues(build(testCase))).isEqualTo(expected)));
+		}
+		return tests.stream();
 	}
 
 	@Test
-	void wrongSizeIsReportedEitherWay() {
-		var shortDeck = legalDeck().subList(0, 99);
-		var longDeck = new ArrayList<>(legalDeck());
-		longDeck.add(card("Extra", "main", 1, "", "Instant", ""));
-
-		assertThat(DeckLegality.issues(shortDeck)).contains("1 card short of 100.");
-		assertThat(DeckLegality.issues(longDeck)).contains("1 card over 100.");
-	}
-
-	@Test
-	void boardsOtherThanMainAndCommanderDoNotCount() {
-		var lines = new ArrayList<>(legalDeck());
-		lines.add(card("Maybe", "maybe", 1, "R", "Instant", ""));
-
-		assertThat(DeckLegality.issues(lines)).isEmpty();
-	}
-
-	@Test
-	void noCommanderAndNonLeadersAreReported() {
-		assertThat(DeckLegality.issues(legalDeck().subList(1, 100))).contains("No commander chosen.");
-
-		var lines = new ArrayList<>(legalDeck());
-		lines.set(0, card("Elf", "commander", 1, "G", "Creature - Elf", ""));
-		assertThat(DeckLegality.issues(lines)).anyMatch(issue -> issue.contains("cannot be a commander"));
-	}
-
-	@Test
-	void twoCommandersNeedPartner() {
-		var lines = new ArrayList<>(legalDeck().subList(0, 99));
-		lines.set(0, card("A", "commander", 1, "W", "Legendary Creature - Human", "Partner"));
-		lines.add(card("B", "commander", 1, "W", "Legendary Creature - Human", "Partner"));
-		assertThat(DeckLegality.issues(lines)).isEmpty();
-
-		lines.set(lines.size() - 1, card("B", "commander", 1, "W", "Legendary Creature - Human", ""));
-		assertThat(DeckLegality.issues(lines)).anyMatch(issue -> issue.startsWith("Only one commander"));
-	}
-
-	@Test
-	void duplicatesAreIllegalExceptBasicsAndAnyNumberCards() {
-		var lines = new ArrayList<>(legalDeck().subList(0, 98));
-		lines.add(card("Sol Ring", "main", 2, "", "Artifact", ""));
-		assertThat(DeckLegality.issues(lines)).contains("Only one copy of each card is allowed: Sol Ring (2).");
-
-		var basics = new ArrayList<>(legalDeck().subList(0, 90));
-		basics.add(card("Plains", "main", 10, "W", "Basic Land - Plains", ""));
-		assertThat(DeckLegality.issues(basics)).isEmpty();
-
-		var rats = new ArrayList<>(legalDeck().subList(0, 90));
-		rats.add(card("Rats", "main", 10, "B", "Creature - Rat", "A deck can have any number of cards named Rats."));
-		assertThat(DeckLegality.issues(rats)).anyMatch(issue -> issue.contains("Outside")).noneMatch(issue -> issue.contains("Only one copy"));
-	}
-
-	@Test
-	void cardsOutsideTheCommandersColorsAreNamed() {
-		var lines = new ArrayList<>(legalDeck().subList(0, 99));
-		lines.add(card("Lightning Bolt", "main", 1, "R", "Instant", ""));
-
-		assertThat(DeckLegality.issues(lines)).contains("Outside the commander's colors: Lightning Bolt.");
-	}
-
-	@Test
-	void colorlessCardsFitAnyCommander() {
-		var lines = new ArrayList<>(legalDeck().subList(0, 99));
-		lines.add(card("Rock", "main", 1, "", "Artifact", ""));
-
-		assertThat(DeckLegality.issues(lines)).isEmpty();
+	void theSharedFileHasEnoughCases() throws IOException {
+		assertThat(JsonMapper.builder().build().readTree(Files.readString(CASES)).get("cases").size()).isGreaterThan(30);
 	}
 
 	@Test
 	void identityListsTheCommandersColorsInGameOrder() {
-		assertThat(DeckLegality.identity(List.of(card("A", "commander", 1, "GUB", "Legendary Creature", ""), card("B", "main", 1, "R", "Instant", "")))).isEqualTo("UBG");
+		assertThat(DeckLegality.identity(List.of(
+				new Line(UUID.randomUUID(), "A", "commander", 1, "GUB", "Legendary Creature", "", "legal"),
+				new Line(UUID.randomUUID(), "B", "main", 1, "R", "Instant", "", "legal")))).isEqualTo("UBG");
 		assertThat(DeckLegality.identity(List.of())).isEmpty();
+	}
+
+	@Test
+	void copyLimitsReadTheCardText() {
+		assertThat(DeckLegality.copyLimit(new Line(UUID.randomUUID(), "X", "main", 1, "", "Creature", "A deck can have up to nine cards named X.", "legal"))).isEqualTo(9);
+		assertThat(DeckLegality.copyLimit(new Line(UUID.randomUUID(), "X", "main", 1, "", "Basic Land", "", "legal"))).isEqualTo(Integer.MAX_VALUE);
+		assertThat(DeckLegality.copyLimit(new Line(UUID.randomUUID(), "X", "main", 1, "", "Creature", "", "legal"))).isEqualTo(1);
 	}
 }

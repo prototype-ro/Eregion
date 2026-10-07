@@ -60,6 +60,7 @@ public final class DeckDtos {
 			String colors,
 			String colorIdentity,
 			String oracleText,
+			String commanderLegality,
 			String rarity,
 			String artist,
 			String imageSmall,

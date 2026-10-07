@@ -15,7 +15,7 @@ public class CardRepository {
 	private static final String COLUMNS = """
 			id, scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors, color_identity,
 			oracle_text, set_code, set_name, collector_number, rarity, artist, price_usd,
-			image_small, image_normal, image_art_crop
+			image_small, image_normal, image_art_crop, commander_legality
 			""";
 
 	private final JdbcClient jdbc;
@@ -61,12 +61,13 @@ public class CardRepository {
 				.list());
 	}
 
+	/** Cards whose full name, or front face, matches any of these names once case, accents and quotes are ignored. */
 	public List<Card> findByNames(java.util.Collection<String> names) {
 		if (names.isEmpty()) {
 			return List.of();
 		}
-		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE lower(name) IN (:names) OR lower(split_part(name, ' // ', 1)) IN (:names)")
-				.param("names", names.stream().map(n -> n.toLowerCase(java.util.Locale.ROOT)).toList())
+		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE eregion_norm(name) IN (:names) OR eregion_norm(split_part(name, ' // ', 1)) IN (:names)")
+				.param("names", names.stream().map(NameNormalizer::normalize).distinct().toList())
 				.query(CardRepository::map)
 				.list();
 	}
@@ -75,8 +76,8 @@ public class CardRepository {
 	public List<java.util.UUID> staleForPrices(int hours, int limit) {
 		return jdbc.sql("""
 				SELECT scryfall_id FROM cards
-				 WHERE price_updated_at IS NULL OR price_updated_at < now() - make_interval(hours => :hours)
-				 ORDER BY price_updated_at NULLS FIRST
+				 WHERE price_updated_at IS NULL OR commander_legality = 'unknown' OR price_updated_at < now() - make_interval(hours => :hours)
+				 ORDER BY (commander_legality = 'unknown') DESC, price_updated_at NULLS FIRST
 				 LIMIT :limit
 				""")
 				.param("hours", hours)
@@ -97,10 +98,10 @@ public class CardRepository {
 		return jdbc.sql("""
 				INSERT INTO cards (scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors,
 				                   color_identity, oracle_text, set_code, set_name, collector_number, rarity,
-				                   artist, price_usd, price_updated_at, image_small, image_normal, image_art_crop)
+				                   artist, price_usd, price_updated_at, image_small, image_normal, image_art_crop, commander_legality)
 				VALUES (:scryfallId, :name, :manaCost, :manaValue, :typeLine, :primaryType, :colors,
 				        :colorIdentity, :oracleText, :setCode, :setName, :collectorNumber, :rarity,
-				        :artist, :priceUsd, now(), :imageSmall, :imageNormal, :imageArtCrop)
+				        :artist, :priceUsd, now(), :imageSmall, :imageNormal, :imageArtCrop, :commanderLegality)
 				ON CONFLICT (lower(name)) DO UPDATE SET
 				    scryfall_id = EXCLUDED.scryfall_id,
 				    mana_cost = EXCLUDED.mana_cost,
@@ -119,7 +120,8 @@ public class CardRepository {
 				    price_updated_at = now(),
 				    image_small = EXCLUDED.image_small,
 				    image_normal = EXCLUDED.image_normal,
-				    image_art_crop = EXCLUDED.image_art_crop
+				    image_art_crop = EXCLUDED.image_art_crop,
+				    commander_legality = EXCLUDED.commander_legality
 				RETURNING """ + " " + COLUMNS)
 				.param("scryfallId", card.scryfallId())
 				.param("name", card.name())
@@ -139,6 +141,7 @@ public class CardRepository {
 				.param("imageSmall", card.imageSmall())
 				.param("imageNormal", card.imageNormal())
 				.param("imageArtCrop", card.imageArtCrop())
+				.param("commanderLegality", card.commanderLegality())
 				.query(CardRepository::map)
 				.single();
 	}
@@ -163,6 +166,7 @@ public class CardRepository {
 				io.eregion.common.Sql.nullableDouble(rs, "price_usd"),
 				rs.getString("image_small"),
 				rs.getString("image_normal"),
-				rs.getString("image_art_crop"));
+				rs.getString("image_art_crop"),
+				rs.getString("commander_legality"));
 	}
 }

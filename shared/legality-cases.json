@@ -1,0 +1,993 @@
+{
+ "note": "Both DeckLegality (Java) and legality.ts (TypeScript) are tested against these cases. filler adds that many different one copy cards of fillerIdentity.",
+ "cases": [
+  {
+   "name": "a full singleton deck inside the colors is legal",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 99,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "one card short",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "1 card short of 100."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "several cards short",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "5 cards short of 100."
+   ],
+   "filler": 94,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "one card over",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "1 card over 100."
+   ],
+   "filler": 100,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "no commander",
+   "lines": [],
+   "issues": [
+    "No commander chosen."
+   ],
+   "filler": 100,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "maybeboard and considering do not count",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Maybe",
+     "board": "maybe",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Think",
+     "board": "considering",
+     "quantity": 1,
+     "colorIdentity": "B",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 99,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a creature that is not legendary cannot lead",
+   "lines": [
+    {
+     "name": "Elf",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "G",
+     "typeLine": "Creature — Elf",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Elf cannot be a commander."
+   ],
+   "filler": 99,
+   "fillerIdentity": "G"
+  },
+  {
+   "name": "a planeswalker that says it can be your commander can lead",
+   "lines": [
+    {
+     "name": "Walker",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Planeswalker — Walker",
+     "oracleText": "Walker can be your commander.",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 99,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a legendary artifact cannot lead",
+   "lines": [
+    {
+     "name": "Relic",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "",
+     "typeLine": "Legendary Artifact",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Relic cannot be a commander."
+   ],
+   "filler": 99,
+   "fillerIdentity": ""
+  },
+  {
+   "name": "two plain partners may lead together",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "two commanders without partner may not",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "A and B cannot be commanders together. Pairs need partner, friends forever, a background or a Doctor and its companion."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "partner with names its mate",
+   "lines": [
+    {
+     "name": "Pir, Imaginative Rascal",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner with Toothy, Imaginary Friend",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Toothy, Imaginary Friend",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner with Pir, Imaginative Rascal",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "partner with does not pair with another partner",
+   "lines": [
+    {
+     "name": "Pir, Imaginative Rascal",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner with Toothy, Imaginary Friend",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Thrasios",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "GU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Pir, Imaginative Rascal and Thrasios cannot be commanders together. Pairs need partner, friends forever, a background or a Doctor and its companion."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "partner with a double faced mate matches its front face",
+   "lines": [
+    {
+     "name": "Front Half",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner with Mate",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Mate // Back",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner with Front Half",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "partner survivors pairs with the same variant",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner—Survivors",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner—Survivors",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a partner variant does not pair with a plain partner",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner—Survivors",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "A and B cannot be commanders together. Pairs need partner, friends forever, a background or a Doctor and its companion."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "friends forever pairs",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Friends forever (You can have two commanders if both have friends forever.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Friends forever",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a background goes with a commander that chooses one",
+   "lines": [
+    {
+     "name": "Chooser",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Choose a Background (You can have a Background as a second commander.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Acolyte",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Enchantment — Background",
+     "oracleText": "Commander creatures you own have a thing.",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a background does not go with a commander that does not choose one",
+   "lines": [
+    {
+     "name": "Plain",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Acolyte",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Enchantment — Background",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Plain and Acolyte cannot be commanders together. Pairs need partner, friends forever, a background or a Doctor and its companion."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a Doctor goes with a Doctor's companion",
+   "lines": [
+    {
+     "name": "The Doctor",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Time Lord Doctor",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Friend",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Doctor's companion",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "three commanders are too many",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "C",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "A deck has at most two commanders, and only as a valid pair."
+   ],
+   "filler": 97,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "two copies of one card",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Sol Ring",
+     "board": "main",
+     "quantity": 2,
+     "colorIdentity": "",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Only one copy of each card is allowed: Sol Ring (2)."
+   ],
+   "filler": 97,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "basic lands are unlimited",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Plains",
+     "board": "main",
+     "quantity": 30,
+     "colorIdentity": "W",
+     "typeLine": "Basic Land — Plains",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 69,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a card that allows any number is unlimited",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Rats",
+     "board": "main",
+     "quantity": 30,
+     "colorIdentity": "",
+     "typeLine": "Creature — Rat",
+     "oracleText": "A deck can have any number of cards named Rats.",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 69,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a card that allows up to seven",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Dwarves",
+     "board": "main",
+     "quantity": 7,
+     "colorIdentity": "",
+     "typeLine": "Creature — Dwarf",
+     "oracleText": "A deck can have up to seven cards named Dwarves.",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 92,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "one more than allowed",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Dwarves",
+     "board": "main",
+     "quantity": 8,
+     "colorIdentity": "",
+     "typeLine": "Creature — Dwarf",
+     "oracleText": "A deck can have up to seven cards named Dwarves.",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "More copies than allowed: Dwarves (8, at most 7)."
+   ],
+   "filler": 91,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "up to nine",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Wraith",
+     "board": "main",
+     "quantity": 10,
+     "colorIdentity": "",
+     "typeLine": "Creature — Wraith",
+     "oracleText": "A deck can have up to nine cards named Wraith.",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "More copies than allowed: Wraith (10, at most 9)."
+   ],
+   "filler": 89,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "cards outside the colors are named in order",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Zap",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Bolt",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Blue Thing",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "UB",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Outside the commander's colors: Blue Thing, Bolt, Zap."
+   ],
+   "filler": 96,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "colorless cards fit any commander",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Rock",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a pair shares its colors",
+   "lines": [
+    {
+     "name": "A",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "Partner (You can have two commanders if both have partner.)",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Dimir",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "UB",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Outside the commander's colors: Dimir."
+   ],
+   "filler": 97,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a long list is shortened",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "F",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "E",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "D",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "C",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "B",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "A",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    }
+   ],
+   "issues": [
+    "Outside the commander's colors: A, B, C, D and 2 more."
+   ],
+   "filler": 93,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a banned card is named",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Ancestral Recall",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "U",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "banned"
+    }
+   ],
+   "issues": [
+    "Banned in Commander: Ancestral Recall."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a card that is not legal is named",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Silver Border",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "not_legal"
+    }
+   ],
+   "issues": [
+    "Not legal in Commander: Silver Border."
+   ],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "an unknown legality is not held against the card",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Mystery",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "W",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "unknown"
+    }
+   ],
+   "issues": [],
+   "filler": 98,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "a banned commander is named",
+   "lines": [
+    {
+     "name": "Banned Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "banned"
+    }
+   ],
+   "issues": [
+    "Banned in Commander: Banned Boss."
+   ],
+   "filler": 99,
+   "fillerIdentity": "W"
+  },
+  {
+   "name": "several problems are listed together in order",
+   "lines": [
+    {
+     "name": "Boss",
+     "board": "commander",
+     "quantity": 1,
+     "colorIdentity": "WU",
+     "typeLine": "Legendary Creature — Human",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Sol Ring",
+     "board": "main",
+     "quantity": 2,
+     "colorIdentity": "",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "legal"
+    },
+    {
+     "name": "Bolt",
+     "board": "main",
+     "quantity": 1,
+     "colorIdentity": "R",
+     "typeLine": "Instant",
+     "oracleText": "",
+     "commanderLegality": "banned"
+    }
+   ],
+   "issues": [
+    "Only one copy of each card is allowed: Sol Ring (2).",
+    "Outside the commander's colors: Bolt.",
+    "Banned in Commander: Bolt."
+   ],
+   "filler": 96,
+   "fillerIdentity": "W"
+  }
+ ]
+}

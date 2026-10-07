@@ -66,6 +66,7 @@ function lineFromCard(card: Card, board: Board, quantity = 1): DeckCardLine {
     colors: card.colors,
     colorIdentity: card.colorIdentity,
     oracleText: card.oracleText,
+    commanderLegality: card.commanderLegality,
     rarity: card.rarity,
     artist: card.artist,
     imageSmall: card.imageSmall,
