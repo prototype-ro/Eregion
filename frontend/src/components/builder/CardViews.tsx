@@ -7,8 +7,8 @@ import type { DeckCardLine } from "@/lib/types";
 import { DotsButton, type ViewProps } from "./CardList";
 
 const CARD_RATIO = "aspect-[488/680]";
-/** How much of each card shows in a stack: enough for the title bar. */
-const STRIP = 40;
+/** The title bar is about this share of a card's width, so a stack keeps showing just the titles at any size. */
+const STRIP_RATIO = 0.19;
 
 function Empty() {
   return <p className="max-w-[420px] py-6 text-lg leading-normal text-muted">Nothing here yet. Search above to add cards.</p>;
@@ -42,12 +42,13 @@ function Badges({ line, isNew }: { line: DeckCardLine; isNew: boolean }) {
  * Clicking a card that is buried under others brings it to the front, drawn over its neighbors
  * without moving anything. Clicking it again puts it back.
  */
-export function CardStacks({ groups, selectedKey, newKeys, checkCollection, onSelect, onMenu }: ViewProps) {
+export function CardStacks({ groups, selectedKey, newKeys, checkCollection, cardSize, onSelect, onMenu }: ViewProps) {
   const [raised, setRaised] = useState<string | null>(null);
   if (groups.length === 0) return <Empty />;
+  const strip = Math.round(cardSize * STRIP_RATIO);
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-x-8 gap-y-12">
+    <div className="grid gap-x-8 gap-y-12" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize}px, 1fr))` }}>
       {groups.map((group) => (
         <section key={group.title} aria-label={group.title}>
           <GroupHeader group={group} />
@@ -59,7 +60,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, onSe
               return (
                 <li
                   key={key}
-                  style={last ? undefined : { height: STRIP }}
+                  style={last ? undefined : { height: strip }}
                   className={`${front ? "relative z-20" : last ? "" : "overflow-hidden"}`}
                   onContextMenu={(event) => {
                     event.preventDefault();
@@ -81,7 +82,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, onSe
                       } ${selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""}`}
                     >
                       <div className={`relative w-full overflow-hidden rounded-[10px] bg-surface ${CARD_RATIO}`}>
-                        {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="260px" className={`object-cover ${art(line, checkCollection)}`} />}
+                        {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="400px" className={`object-cover ${art(line, checkCollection)}`} />}
                       </div>
                     </button>
                     <span className="pointer-events-none absolute top-1 right-1 flex items-center gap-1">
@@ -101,8 +102,8 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, onSe
   );
 }
 
-/** Every card as a full image. */
-export function CardGallery({ groups, selectedKey, newKeys, checkCollection, onSelect, onMenu }: ViewProps) {
+/** Every card as a full image. The image already shows the title, so the name is only in the accessible label. */
+export function CardGallery({ groups, selectedKey, newKeys, checkCollection, cardSize, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) return <Empty />;
 
   return (
@@ -110,13 +111,14 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, onS
       {groups.map((group) => (
         <section key={group.title} aria-label={group.title}>
           <GroupHeader group={group} />
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-x-5 gap-y-7">
+          <ul className="grid gap-5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize}px, 1fr))` }}>
             {group.lines.map((line) => {
               const key = lineKey(line);
+              const needs = checkCollection && line.owned < line.quantity;
               return (
                 <li
                   key={key}
-                  className="flex flex-col gap-1.5"
+                  className="group/card relative"
                   onMouseEnter={() => onSelect(line)}
                   onContextMenu={(event) => {
                     event.preventDefault();
@@ -126,25 +128,20 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, onS
                   <button
                     type="button"
                     onClick={() => onSelect(line)}
-                    aria-label={line.name}
+                    aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}${needs ? ", not owned" : ""}`}
                     className={`relative block w-full rounded-[14px] ${selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""}`}
                   >
                     <div className={`relative w-full overflow-hidden rounded-[14px] bg-surface ${CARD_RATIO}`}>
-                      {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="260px" className={`object-cover ${art(line, checkCollection)}`} />}
+                      {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="400px" className={`object-cover ${art(line, checkCollection)}`} />}
                     </div>
-                    <span className="absolute top-2 right-2 flex gap-1">
-                      <Badges line={line} isNew={newKeys.has(key)} />
-                    </span>
                   </button>
-                  <div className="flex items-center justify-between gap-1 pl-1">
-                    <p className="flex min-w-0 items-center gap-2 text-sm">
-                      <span className="truncate">{line.name}</span>
-                      {checkCollection && line.owned < line.quantity && (
-                        <span className="shrink-0 rounded-full border border-add-line px-2 py-0.5 text-xs text-add-text">Need</span>
-                      )}
-                    </p>
-                    <DotsButton line={line} onMenu={onMenu} className="-mr-1" />
-                  </div>
+                  <span className="pointer-events-none absolute top-2 right-2 flex items-center gap-1">
+                    <Badges line={line} isNew={newKeys.has(key)} />
+                    {needs && <span className="rounded-full border border-add-line bg-bg px-2 py-0.5 text-xs text-add-text">Need</span>}
+                    <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100">
+                      <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
+                    </span>
+                  </span>
                 </li>
               );
             })}

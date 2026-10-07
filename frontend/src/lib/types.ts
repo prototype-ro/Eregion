@@ -75,6 +75,7 @@ export interface DeckCardLine {
   primaryType: string;
   typeLine: string;
   colors: string;
+  colorIdentity: string;
   oracleText: string;
   rarity: string;
   artist: string;

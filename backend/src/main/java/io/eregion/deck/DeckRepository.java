@@ -268,7 +268,7 @@ public class DeckRepository {
 	 */
 	public List<DeckCardLine> versionLines(UUID versionId, UUID userId) {
 		return jdbc.sql("""
-				SELECT c.id AS card_id, c.name, c.mana_cost, c.mana_value, c.primary_type, c.type_line, c.colors,
+				SELECT c.id AS card_id, c.name, c.mana_cost, c.mana_value, c.primary_type, c.type_line, c.colors, c.color_identity,
 				       c.oracle_text,
 				       COALESCE(p.rarity, c.rarity) AS rarity,
 				       COALESCE(p.artist, c.artist) AS artist,
@@ -350,6 +350,7 @@ public class DeckRepository {
 				rs.getString("primary_type"),
 				rs.getString("type_line"),
 				rs.getString("colors"),
+				rs.getString("color_identity"),
 				rs.getString("oracle_text"),
 				rs.getString("rarity"),
 				rs.getString("artist"),

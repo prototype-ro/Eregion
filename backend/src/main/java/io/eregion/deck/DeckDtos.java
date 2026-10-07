@@ -57,6 +57,7 @@ public final class DeckDtos {
 			String primaryType,
 			String typeLine,
 			String colors,
+			String colorIdentity,
 			String oracleText,
 			String rarity,
 			String artist,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
+import { checkLegality } from "@/lib/legality";
 import { computeStats } from "@/lib/stats";
 import type { Board, Card, DeckCardLine, Printing, Timeline, VersionDetail } from "@/lib/types";
 import { CardList } from "./CardList";
@@ -35,6 +36,10 @@ const VIEWS: Array<[ViewMode, string]> = [
 
 const MAX_QUANTITY = 99;
 const VIEW_KEY = "eregion-deck-view";
+const SIZE_KEY = "eregion-card-size";
+const SIZE_MIN = 120;
+const SIZE_MAX = 360;
+const SIZE_DEFAULT = 210;
 const TIMELINE_KEY = "eregion-timeline-open";
 const COLLECTION_KEY = "eregion-collection-check";
 
@@ -47,6 +52,7 @@ function lineFromCard(card: Card, board: Board, quantity = 1): DeckCardLine {
     primaryType: card.primaryType,
     typeLine: card.typeLine,
     colors: card.colors,
+    colorIdentity: card.colorIdentity,
     oracleText: card.oracleText,
     rarity: card.rarity,
     artist: card.artist,
@@ -103,6 +109,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const [tab, setTab] = useState<Tab>("main");
   const [group, setGroup] = useState<GroupMode>("type");
   const [view, setView] = useState<ViewMode>("list");
+  const [cardSize, setCardSize] = useState(SIZE_DEFAULT);
   const [timelineOpen, setTimelineOpen] = useState(true);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
@@ -125,6 +132,8 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
     try {
       const storedView = localStorage.getItem(VIEW_KEY);
       if (storedView === "list" || storedView === "stacks" || storedView === "gallery") setView(storedView);
+      const storedSize = Number(localStorage.getItem(SIZE_KEY));
+      if (Number.isFinite(storedSize) && storedSize >= SIZE_MIN && storedSize <= SIZE_MAX) setCardSize(storedSize);
       if (localStorage.getItem(TIMELINE_KEY) === "closed") setTimelineOpen(false);
       if (localStorage.getItem(COLLECTION_KEY) === "on") setCheckCollection(true);
     } catch {
@@ -145,6 +154,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   );
 
   const stats = useMemo(() => computeStats(withOwned), [withOwned]);
+  const legality = useMemo(() => checkLegality(withOwned), [withOwned]);
   const savedStats = useMemo(() => (version ? computeStats(baseWithOwned) : null), [version, baseWithOwned]);
 
   const baseKeys = useMemo(() => new Set(baseLines.map(lineKey)), [baseLines]);
@@ -172,6 +182,11 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
       .reduce((sum, line) => sum + line.quantity, 0);
 
   const versionSummary = timeline.branches.flatMap((branch) => branch.versions).find((v) => v.versionNumber === version?.versionNumber);
+
+  function chooseSize(next: number) {
+    setCardSize(next);
+    remember(SIZE_KEY, String(next));
+  }
 
   function chooseView(next: ViewMode) {
     setView(next);
@@ -323,6 +338,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
     onSelect: (line: DeckCardLine) => setSelectedKey(lineKey(line)),
     onMenu: (line: DeckCardLine, x: number, y: number) => setMenu({ line, x, y }),
     checkCollection,
+    cardSize,
   };
 
   return (
@@ -351,6 +367,27 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
           <p className="text-base text-muted">
             <span className="text-4xl font-medium tracking-[-0.03em] text-ink">{stats.totalCards}</span> of 100 cards
           </p>
+          <details className="group/legal relative text-right">
+            <summary
+              className={`inline-flex min-h-9 cursor-pointer list-none items-center rounded-full border px-4 text-sm font-medium ${
+                legality.legal ? "border-accent-text text-accent-text" : "border-add-line text-add-text"
+              }`}
+            >
+              {legality.legal ? "Legal in Commander" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"} for Commander`}
+            </summary>
+            <div className="absolute right-0 z-30 mt-2 w-[min(360px,90vw)] rounded-2xl border border-line bg-bg p-4 text-left text-sm shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+              {legality.legal ? (
+                <p>100 cards, one commander, one copy of each card, all inside the commander&apos;s colors.</p>
+              ) : (
+                <ul className="list-disc space-y-1.5 pl-5">
+                  {legality.issues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 text-muted">The banned list is not checked.</p>
+            </div>
+          </details>
           <div className="flex flex-wrap items-center justify-end gap-2.5">
             <label className="sr-only" htmlFor="version-note">
               Version note
@@ -512,6 +549,22 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
             </span>
             Check collection
           </button>
+          {view !== "list" && (
+            <label className="flex min-h-11 items-center gap-3 text-sm text-muted">
+              Size
+              <input
+                type="range"
+                min={SIZE_MIN}
+                max={SIZE_MAX}
+                step={10}
+                value={cardSize}
+                onChange={(event) => chooseSize(Number(event.target.value))}
+                aria-label="Card size"
+                aria-valuetext={`${cardSize} pixels wide`}
+                className="w-32 accent-[var(--accent-text)]"
+              />
+            </label>
+          )}
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted">View</span>
             <div className="flex gap-1 rounded-full border border-line p-1">

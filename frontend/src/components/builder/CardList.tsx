@@ -13,6 +13,8 @@ export interface ViewProps {
   onMenu: (line: DeckCardLine, x: number, y: number) => void;
   /** When on, cards you do not own are flagged. When off, nothing about the collection shows. */
   checkCollection: boolean;
+  /** Minimum card width in pixels for the stacks and gallery views. */
+  cardSize: number;
 }
 
 export const dotsClass =

@@ -13,13 +13,13 @@ final class Lines {
 
 	static DeckCardLine line(String name, String type, double manaValue, String board, int quantity, int owned) {
 		UUID id = UUID.nameUUIDFromBytes(name.getBytes(StandardCharsets.UTF_8));
-		return new DeckCardLine(id, name, "", manaValue, type, type, "", "", "", "", "", "", "", id, "TST", "Test", "1", null,
+		return new DeckCardLine(id, name, "", manaValue, type, type, "", "", "", "", "", "", "", "", id, "TST", "Test", "1", null,
 				board, quantity, owned, java.util.List.of());
 	}
 
 	static DeckCardLine priced(String name, String type, double manaValue, int quantity, double price) {
 		UUID id = UUID.nameUUIDFromBytes(name.getBytes(StandardCharsets.UTF_8));
-		return new DeckCardLine(id, name, "", manaValue, type, type, "", "", "", "", "", "", "", id, "TST", "Test", "1", price,
+		return new DeckCardLine(id, name, "", manaValue, type, type, "", "", "", "", "", "", "", "", id, "TST", "Test", "1", price,
 				"main", quantity, quantity, java.util.List.of());
 	}
 
