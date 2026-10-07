@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Timeline, VersionSummary } from "@/lib/types";
 
 const COLUMN = 76; // horizontal space per version
@@ -14,6 +14,7 @@ interface Node {
   version: VersionSummary;
   lane: number;
   branchName: string;
+  head: boolean;
   x: number;
   y: number;
 }
@@ -22,24 +23,34 @@ interface Props {
   timeline: Timeline;
   /** The version being shown in the builder. */
   current: number | null;
+  /** The version shown on Explore, when the deck is public. */
+  published: number | null;
   onSelect: (versionNumber: number) => void;
 }
 
+interface Hover {
+  node: Node;
+  left: number;
+  top: number;
+}
+
+const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
 /**
- * A deck's history drawn as a multiverse timeline. Each branch is a horizontal lane of
- * dots, one per saved version. A branch curves away from the version it split from, so
- * the original line stays straight and new directions fan out below it. Click any dot to
- * open that version.
+ * A deck's history drawn as a multiverse timeline. Each branch is a horizontal lane of dots, one per
+ * saved version. A branch curves away from the version it split from, and a dashed curve joins a merge
+ * to the branch it brought in. Hover or focus a dot for its note, date and what changed, and click it to open that version.
  */
-export function VersionTimeline({ timeline, current, onSelect }: Props) {
+export function VersionTimeline({ timeline, current, published, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<Hover | null>(null);
 
   const { nodes, edges, width, height, lanes } = useMemo(() => {
     const placed: Node[] = [];
     timeline.branches.forEach((branch, lane) => {
-      for (const version of branch.versions) {
-        placed.push({ version, lane, branchName: branch.name, x: 0, y: PAD_TOP + lane * LANE });
-      }
+      branch.versions.forEach((version, index) => {
+        placed.push({ version, lane, branchName: branch.name, head: index === branch.versions.length - 1, x: 0, y: PAD_TOP + lane * LANE });
+      });
     });
     // Versions are numbered in the order they were made, so one shared column per number
     // keeps parallel branches readable as a single timeline.
@@ -49,17 +60,17 @@ export function VersionTimeline({ timeline, current, onSelect }: Props) {
     });
 
     const byNumber = new Map(placed.map((node) => [node.version.versionNumber, node]));
-    const paths: Array<{ d: string; lane: number; key: string }> = [];
+    const paths: Array<{ d: string; lane: number; key: string; merge: boolean }> = [];
+    const curve = (from: Node, to: Node) => {
+      if (from.lane === to.lane) return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+      const mid = from.x + (to.x - from.x) * 0.5;
+      return `M ${from.x} ${from.y} C ${mid} ${from.y}, ${mid} ${to.y}, ${to.x} ${to.y}`;
+    };
     for (const node of placed) {
-      const parentNumber = node.version.parentVersion;
-      const parent = parentNumber === null ? undefined : byNumber.get(parentNumber);
-      if (!parent) continue;
-      const sameLane = parent.lane === node.lane;
-      const mid = parent.x + (node.x - parent.x) * 0.5;
-      const d = sameLane
-        ? `M ${parent.x} ${parent.y} L ${node.x} ${node.y}`
-        : `M ${parent.x} ${parent.y} C ${mid} ${parent.y}, ${mid} ${node.y}, ${node.x} ${node.y}`;
-      paths.push({ d, lane: node.lane, key: `${parent.version.versionNumber}-${node.version.versionNumber}` });
+      const parent = node.version.parentVersion === null ? undefined : byNumber.get(node.version.parentVersion);
+      if (parent) paths.push({ d: curve(parent, node), lane: node.lane, key: `${parent.version.versionNumber}-${node.version.versionNumber}`, merge: false });
+      const merged = node.version.mergeParent === null ? undefined : byNumber.get(node.version.mergeParent);
+      if (merged) paths.push({ d: curve(merged, node), lane: merged.lane, key: `m${merged.version.versionNumber}-${node.version.versionNumber}`, merge: true });
     }
 
     return {
@@ -84,73 +95,118 @@ export function VersionTimeline({ timeline, current, onSelect }: Props) {
     return <p className="py-6 text-muted">No versions yet. Save the first one to start the timeline.</p>;
   }
 
-  return (
-    <div ref={scroller} className="overflow-x-auto pb-2" tabIndex={-1}>
-      <div className="relative" style={{ width, height, minWidth: "100%" }}>
-        <svg width={width} height={height} className="absolute inset-0" aria-hidden="true">
-          {edges.map((edge) => {
-            const active = currentNode !== null && edge.lane === currentNode.lane;
-            return (
-              <path
-                key={edge.key}
-                d={edge.d}
-                fill="none"
-                strokeWidth={active ? 3 : 2}
-                strokeLinecap="round"
-                style={{ stroke: active ? "var(--accent-text)" : "var(--muted)", opacity: active ? 1 : 0.55 }}
-              />
-            );
-          })}
-        </svg>
+  function show(node: Node, element: HTMLElement) {
+    const box = element.getBoundingClientRect();
+    setHover({ node, left: Math.min(Math.max(box.left + box.width / 2, 150), window.innerWidth - 150), top: box.bottom + 14 });
+  }
 
-        {/* Branch names live in a gutter that stays put while a long history scrolls. */}
-        <div className="sticky left-0 z-10 h-full w-[132px] bg-surface">
-          {lanes.map((branch, lane) => {
-            if (!nodes.some((node) => node.lane === lane)) return null;
-            const active = currentNode !== null && currentNode.lane === lane;
+  const tip = hover?.node.version;
+
+  return (
+    <div>
+      <div ref={scroller} onScroll={() => setHover(null)} className="overflow-x-auto pb-2" tabIndex={-1}>
+        <div className="relative" style={{ width, height, minWidth: "100%" }}>
+          <svg width={width} height={height} className="absolute inset-0" aria-hidden="true">
+            {edges.map((edge) => {
+              const active = currentNode !== null && edge.lane === currentNode.lane;
+              return (
+                <path
+                  key={edge.key}
+                  d={edge.d}
+                  fill="none"
+                  strokeWidth={active && !edge.merge ? 3 : 2}
+                  strokeLinecap="round"
+                  strokeDasharray={edge.merge ? "2 7" : undefined}
+                  style={{ stroke: active ? "var(--accent-text)" : "var(--muted)", opacity: edge.merge ? 0.9 : active ? 1 : 0.55 }}
+                />
+              );
+            })}
+          </svg>
+
+          {/* Branch names live in a gutter that stays put while a long history scrolls. */}
+          <div className="sticky left-0 z-10 h-full w-[132px] bg-surface">
+            {lanes.map((branch, lane) => {
+              if (!nodes.some((node) => node.lane === lane)) return null;
+              const active = currentNode !== null && currentNode.lane === lane;
+              return (
+                <p
+                  key={branch.id}
+                  title={branch.name}
+                  className={`absolute left-0 max-w-[124px] -translate-y-1/2 truncate rounded-full border px-3 py-1 text-xs ${
+                    active ? "border-accent-text text-ink" : "border-line text-muted"
+                  }`}
+                  style={{ top: PAD_TOP + lane * LANE }}
+                >
+                  {branch.main && branch.name !== "main" ? `${branch.name} (main)` : branch.name}
+                </p>
+              );
+            })}
+          </div>
+
+          {nodes.map((node) => {
+            const number = node.version.versionNumber;
+            const selected = number === current;
+            const isPublished = number === published;
+            const inCurrentBranch = currentNode !== null && node.lane === currentNode.lane;
             return (
-              <p
-                key={branch.id}
-                title={branch.name}
-                className={`absolute left-0 max-w-[124px] -translate-y-1/2 truncate rounded-full border px-3 py-1 text-xs ${
-                  active ? "border-accent-text text-ink" : "border-line text-muted"
-                }`}
-                style={{ top: PAD_TOP + lane * LANE }}
+              <button
+                key={number}
+                type="button"
+                onClick={() => onSelect(number)}
+                onMouseEnter={(event) => show(node, event.currentTarget)}
+                onMouseLeave={() => setHover(null)}
+                onFocus={(event) => show(node, event.currentTarget)}
+                onBlur={() => setHover(null)}
+                aria-label={`Version ${number} on ${node.branchName}${node.version.note ? `, ${node.version.note}` : ""}${isPublished ? ", public" : ""}${node.version.mergeParent !== null ? `, merged v${node.version.mergeParent}` : ""}`}
+                aria-current={selected ? "true" : undefined}
+                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center"
+                style={{ left: node.x, top: node.y, width: HIT, height: HIT }}
               >
-                {branch.name}
-              </p>
+                <span
+                  className={`block rounded-full border-2 transition-all duration-200 group-hover:scale-125 ${
+                    selected ? "h-[22px] w-[22px] border-accent-text bg-accent-text" : "h-4 w-4 border-ink bg-bg"
+                  } ${inCurrentBranch && !selected ? "border-accent-text" : ""} ${node.version.mergeParent !== null && !selected ? "ring-2 ring-accent-text ring-offset-2 ring-offset-surface" : ""}`}
+                />
+                {isPublished && (
+                  <span aria-hidden="true" className="absolute -top-3 rounded-full bg-accent px-1.5 text-[10px] leading-4 font-bold text-on-accent">
+                    public
+                  </span>
+                )}
+                <span className={`absolute top-full mt-0.5 bg-surface px-1 font-mono text-[11px] ${selected ? "text-ink" : "text-muted"}`}>v{number}</span>
+              </button>
             );
           })}
         </div>
-
-        {nodes.map((node) => {
-          const selected = node.version.versionNumber === current;
-          const inCurrentBranch = currentNode !== null && node.lane === currentNode.lane;
-          return (
-            <button
-              key={node.version.versionNumber}
-              type="button"
-              onClick={() => onSelect(node.version.versionNumber)}
-              aria-label={`Version ${node.version.versionNumber} on ${node.branchName}${node.version.note ? `, ${node.version.note}` : ""}`}
-              aria-current={selected ? "true" : undefined}
-              title={`v${node.version.versionNumber}${node.version.note ? `: ${node.version.note}` : ""}`}
-              className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center"
-              style={{ left: node.x, top: node.y, width: HIT, height: HIT }}
-            >
-              <span
-                className={`block rounded-full border-2 transition-all duration-200 group-hover:scale-125 ${
-                  selected ? "h-[22px] w-[22px] border-accent-text bg-accent-text" : "h-4 w-4 border-ink bg-bg"
-                } ${inCurrentBranch && !selected ? "border-accent-text" : ""}`}
-              />
-              <span
-                className={`absolute top-full mt-0.5 bg-surface px-1 font-mono text-[11px] ${selected ? "text-ink" : "text-muted"}`}
-              >
-                v{node.version.versionNumber}
-              </span>
-            </button>
-          );
-        })}
       </div>
+
+      <p className="flex flex-wrap gap-x-6 gap-y-1 px-1 pt-2 text-xs text-muted" aria-hidden="true">
+        <span>Filled dot: open version</span>
+        <span>Ringed dot: a merge</span>
+        <span>Dotted line: what a merge brought in</span>
+      </p>
+
+      {hover && tip && (
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-40 w-[280px] -translate-x-1/2 rounded-2xl border border-line bg-bg p-4 text-sm shadow-2xl"
+          style={{ left: hover.left, top: hover.top }}
+        >
+          <p className="font-medium">
+            v{tip.versionNumber} on {hover.node.branchName}
+            {hover.node.head ? <span className="ml-2 font-mono text-xs font-normal text-muted">latest</span> : null}
+          </p>
+          <p className={`mt-1 ${tip.note ? "" : "text-muted"}`}>{tip.note || "No note"}</p>
+          <p className="mt-2 font-mono text-xs text-muted">
+            {when(tip.createdAt)}, {tip.cardCount} cards, MV {tip.averageManaValue.toFixed(2)}
+          </p>
+          {tip.parentVersion !== null && (
+            <p className="mt-1 font-mono text-xs text-muted">
+              <span className="text-accent-text">+{tip.added}</span> <span>-{tip.removed}</span> vs v{tip.parentVersion}
+            </p>
+          )}
+          {tip.mergeParent !== null && <p className="mt-1 text-xs text-accent-text">Merged in v{tip.mergeParent}</p>}
+        </div>
+      )}
     </div>
   );
 }

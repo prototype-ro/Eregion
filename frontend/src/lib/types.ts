@@ -125,13 +125,19 @@ export interface VersionSummary {
   averageManaValue: number;
   branchId: string;
   parentVersion: number | null;
+  /** For a merge version: the newest version of the branch that was merged in. */
+  mergeParent: number | null;
+  /** Cards added to and removed from the parent version. */
+  added: number;
+  removed: number;
 }
 
-/** One line of development. It split off from forkedFromVersion, or is the original line when null. */
+/** One line of development. It split off from forkedFromVersion. main is the line others merge into. */
 export interface Branch {
   id: string;
   name: string;
   forkedFromVersion: number | null;
+  main: boolean;
   versions: VersionSummary[];
 }
 
@@ -237,4 +243,31 @@ export interface CustomPrinting {
   createdAt: string;
   /** How many saved deck versions use it. */
   usedIn: number;
+}
+
+/** One side of a merge conflict. A null quantity means the card is not in that version. */
+export interface MergeSide {
+  quantity: number | null;
+  printing: string;
+  tags: string[];
+}
+
+export interface MergeConflict {
+  cardId: string;
+  name: string;
+  board: Board;
+  base: MergeSide;
+  ours: MergeSide;
+  theirs: MergeSide;
+}
+
+export interface MergePreview {
+  sourceBranch: string;
+  sourceVersion: number;
+  mainVersion: number;
+  baseVersion: number | null;
+  upToDate: boolean;
+  /** What main would gain and lose, leaving conflicts out. */
+  changes: DeckDiff;
+  conflicts: MergeConflict[];
 }

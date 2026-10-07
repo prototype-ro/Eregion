@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
-import type { Board, Card, DeckCardLine, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
+import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
 import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
@@ -20,6 +21,8 @@ import { PrintingPicker } from "./PrintingPicker";
 import { StatsSection } from "./StatsSection";
 import { TagEditor } from "./TagEditor";
 import { BranchesDialog } from "./BranchesDialog";
+import { MergeDialog } from "./MergeDialog";
+import { VersionActions } from "./VersionActions";
 import { VersionTimeline } from "./VersionTimeline";
 
 type Tab = "main" | "maybe" | "considering";
@@ -138,6 +141,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
+  const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
+  const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -191,6 +196,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const tagSuggestions = useMemo(() => allTags(lines), [lines]);
 
   const dirty = signature(lines) !== signature(baseLines);
+
+  // Leaving the page with unsaved edits would lose them, so let the browser ask first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const hasCommander = lines.some((line) => line.board === "commander");
 
   // Saving from anything but the newest version of a line has to start a new branch.
@@ -225,6 +238,24 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       remember(COLLECTION_KEY, on ? "off" : "on");
       return !on;
     });
+  }
+
+  /** Opens another version, asking first when that would throw away unsaved edits. */
+  function selectVersion(versionNumber: number) {
+    if (versionNumber === version?.versionNumber) return;
+    if (dirty) setPendingVersion(versionNumber);
+    else onSelectVersion(versionNumber);
+  }
+
+  async function publishVersion(versionNumber: number) {
+    try {
+      const changed = await api<DeckDetail>(`/api/decks/${deck.id}/visibility`, { method: "PUT", body: { visibility: "public", versionNumber } });
+      setVisibility(changed.visibility);
+      setPublishedVersion(changed.publishedVersion);
+      setToast(`Version ${versionNumber} is public`);
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : "Could not publish that version.");
+    }
   }
 
   function toggleTimeline() {
@@ -588,7 +619,20 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         </div>
         {timelineOpen && (
           <div id="timeline-body" className="pt-2 pb-2">
-            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} onSelect={onSelectVersion} />
+            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} />
+            {version && (
+              <VersionActions
+                deckId={deck.id}
+                version={version}
+                published={visibility === "public" ? publishedVersion : null}
+                dirty={dirty}
+                branchHead={timeline.branches.find((branch) => branch.id === version.branchId)?.versions.at(-1)?.versionNumber ?? null}
+                onOpen={onSelectVersion}
+                onReload={onReload}
+                onPublish={(n) => void publishVersion(n)}
+                onToast={setToast}
+              />
+            )}
           </div>
         )}
       </section>
@@ -716,6 +760,40 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       {/* Overlays */}
+      <MergeDialog
+        open={mergeBranch !== null}
+        onClose={() => setMergeBranch(null)}
+        deckId={deck.id}
+        branch={mergeBranch}
+        onMerged={(merged, deleted) => {
+          setMergeBranch(null);
+          setBranchesOpen(false);
+          setToast(deleted ? "Merged, and the branch was deleted" : "Merged into main");
+          onSelectVersion(merged.versionNumber);
+        }}
+      />
+      <Dialog open={pendingVersion !== null} onClose={() => setPendingVersion(null)} label="Unsaved changes" size="sm">
+        <div className="flex flex-col gap-5">
+          <h2 className="font-display text-[44px] leading-none">Unsaved changes</h2>
+          <p className="text-[15px] leading-snug text-muted">Opening version {pendingVersion} throws away the edits you have not saved.</p>
+          <div className="flex flex-wrap gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                const target = pendingVersion;
+                setPendingVersion(null);
+                if (target !== null) onSelectVersion(target);
+              }}
+              className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent"
+            >
+              Discard and open v{pendingVersion}
+            </button>
+            <button type="button" onClick={() => setPendingVersion(null)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+              Keep editing
+            </button>
+          </div>
+        </div>
+      </Dialog>
       <BranchesDialog
         open={branchesOpen}
         onClose={() => setBranchesOpen(false)}
@@ -723,11 +801,13 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
        
         timeline={timeline}
         currentBranchId={version?.branchId ?? null}
+        locked={dirty}
+        onMerge={setMergeBranch}
         onChanged={(next, deletedId) => {
           if (deletedId !== null && deletedId === version?.branchId) {
             // The open version went with its branch: move to the end of the first line.
             setBranchesOpen(false);
-            const first = next.branches.find((branch) => branch.forkedFromVersion === null) ?? next.branches[0];
+            const first = next.branches.find((branch) => branch.main) ?? next.branches[0];
             const tip = first?.versions[first.versions.length - 1];
             if (tip) onSelectVersion(tip.versionNumber);
           } else {

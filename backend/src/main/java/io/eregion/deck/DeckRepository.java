@@ -30,17 +30,18 @@ public class DeckRepository {
 
 	/** A version plus where it sits in the branch graph. head is true when nothing newer is on its branch. */
 	public record VersionRow(UUID id, int number, String note, Instant createdAt, UUID branchId, String branchName,
-			Integer parentVersion, boolean head) {
+			Integer parentVersion, boolean head, UUID parentId, boolean main) {
 	}
 
 	public record CustomOwner(UUID userId, UUID cardId) {
 	}
 
-	public record BranchRow(UUID id, String name, Integer forkedFromVersion) {
+	public record BranchRow(UUID id, String name, Integer forkedFromVersion, boolean main) {
 	}
 
 	private static final String VERSION_SELECT = """
 			SELECT v.id, v.version_number, v.note, v.created_at, v.branch_id, b.name AS branch_name,
+			       v.parent_version_id, b.is_main,
 			       (SELECT p.version_number FROM deck_versions p WHERE p.id = v.parent_version_id) AS parent_number,
 			       (v.version_number = (SELECT MAX(x.version_number) FROM deck_versions x
 			                             WHERE x.branch_id = v.branch_id)) AS is_head
@@ -140,7 +141,7 @@ public class DeckRepository {
 	public void delete(UUID deckId) {
 		// Versions point at each other and at branches, so clear those links before the cascade.
 		jdbc.sql("UPDATE decks SET visibility = 'private', published_version_id = NULL, published_at = NULL WHERE id = :id").param("id", deckId).update();
-		jdbc.sql("UPDATE deck_versions SET parent_version_id = NULL WHERE deck_id = :id").param("id", deckId).update();
+		jdbc.sql("UPDATE deck_versions SET parent_version_id = NULL, merge_parent_version_id = NULL WHERE deck_id = :id").param("id", deckId).update();
 		jdbc.sql("UPDATE deck_branches SET forked_from_version_id = NULL WHERE deck_id = :id").param("id", deckId).update();
 		jdbc.sql("DELETE FROM decks WHERE id = :id").param("id", deckId).update();
 	}
@@ -157,6 +158,90 @@ public class DeckRepository {
 				.param("fork", forkedFromVersionId)
 				.query(UUID.class)
 				.single();
+	}
+
+	public UUID insertMainBranch(UUID deckId, String name) {
+		return jdbc.sql("INSERT INTO deck_branches (deck_id, name, is_main) VALUES (:deck, :name, TRUE) RETURNING id")
+				.param("deck", deckId)
+				.param("name", name)
+				.query(UUID.class)
+				.single();
+	}
+
+	public Optional<UUID> findMainBranchId(UUID deckId) {
+		return jdbc.sql("SELECT id FROM deck_branches WHERE deck_id = :deck AND is_main")
+				.param("deck", deckId)
+				.query(UUID.class)
+				.optional();
+	}
+
+	/** The newest version on a branch. */
+	public Optional<VersionRow> branchHead(UUID branchId) {
+		return jdbc.sql(VERSION_SELECT + " WHERE v.branch_id = :branch ORDER BY v.version_number DESC LIMIT 1")
+				.param("branch", branchId)
+				.query(DeckRepository::mapVersion)
+				.optional();
+	}
+
+	public int versionCount(UUID deckId) {
+		return jdbc.sql("SELECT COUNT(*) FROM deck_versions WHERE deck_id = :deck").param("deck", deckId).query(Integer.class).single();
+	}
+
+	public int branchVersionCount(UUID branchId) {
+		return jdbc.sql("SELECT COUNT(*) FROM deck_versions WHERE branch_id = :b").param("b", branchId).query(Integer.class).single();
+	}
+
+	/** True when this exact version is the one shown on Explore. */
+	public boolean isPublished(UUID deckId, UUID versionId) {
+		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :deck AND published_version_id = :v)")
+				.param("deck", deckId).param("v", versionId).query(Boolean.class).single();
+	}
+
+	/**
+	 * Takes one version out of the history. Whatever pointed at it (child versions, merge links and branch
+	 * fork points) now points at its parent instead, so the line stays connected. The caller decides
+	 * whether the deletion is allowed.
+	 */
+	public void deleteVersion(UUID versionId, UUID parentId) {
+		// Detach it first: its children are about to take its parent, and a parent can have only one child per branch.
+		jdbc.sql("UPDATE deck_versions SET parent_version_id = NULL WHERE id = :v").param("v", versionId).update();
+		jdbc.sql("UPDATE deck_versions SET parent_version_id = :parent WHERE parent_version_id = :v")
+				.param("parent", parentId).param("v", versionId).update();
+		jdbc.sql("UPDATE deck_versions SET merge_parent_version_id = :parent WHERE merge_parent_version_id = :v")
+				.param("parent", parentId).param("v", versionId).update();
+		jdbc.sql("UPDATE deck_branches SET forked_from_version_id = :parent WHERE forked_from_version_id = :v")
+				.param("parent", parentId).param("v", versionId).update();
+		jdbc.sql("DELETE FROM deck_versions WHERE id = :v").param("v", versionId).update();
+	}
+
+	public void deleteEmptyBranch(UUID branchId) {
+		jdbc.sql("DELETE FROM deck_branches WHERE id = :id").param("id", branchId).update();
+	}
+
+	public void updateNote(UUID versionId, String note) {
+		jdbc.sql("UPDATE deck_versions SET note = :note WHERE id = :id").param("id", versionId).param("note", note).update();
+	}
+
+	/** A version and every version it grew from, through parents and merges, with their numbers. */
+	public Map<UUID, Integer> ancestors(UUID versionId) {
+		Map<UUID, Integer> result = new HashMap<>();
+		jdbc.sql("""
+				WITH RECURSIVE a(id) AS (
+				    SELECT CAST(:v AS uuid)
+				    UNION
+				    SELECT p.pid FROM a
+				      JOIN deck_versions x ON x.id = a.id
+				      CROSS JOIN LATERAL (VALUES (x.parent_version_id), (x.merge_parent_version_id)) AS p(pid)
+				     WHERE p.pid IS NOT NULL)
+				SELECT v.id, v.version_number FROM a JOIN deck_versions v ON v.id = a.id
+				""")
+				.param("v", versionId)
+				.query((rs, n) -> {
+					result.put(rs.getObject("id", UUID.class), rs.getInt("version_number"));
+					return null;
+				})
+				.list();
+		return result;
 	}
 
 	public void renameBranch(UUID branchId, String name) {
@@ -198,7 +283,7 @@ public class DeckRepository {
 
 	public List<BranchRow> branches(UUID deckId) {
 		return jdbc.sql("""
-				SELECT b.id, b.name,
+				SELECT b.id, b.name, b.is_main,
 				       (SELECT fv.version_number FROM deck_versions fv WHERE fv.id = b.forked_from_version_id) AS forked_from
 				  FROM deck_branches b
 				 WHERE b.deck_id = :deck
@@ -208,7 +293,8 @@ public class DeckRepository {
 				.query((rs, n) -> new BranchRow(
 						rs.getObject("id", UUID.class),
 						rs.getString("name"),
-						(Integer) rs.getObject("forked_from")))
+						(Integer) rs.getObject("forked_from"),
+						rs.getBoolean("is_main")))
 				.list();
 	}
 
@@ -222,17 +308,19 @@ public class DeckRepository {
 	// ---- versions ----
 
 	public int nextVersionNumber(UUID deckId) {
-		return jdbc.sql("SELECT COALESCE(MAX(version_number), 0) + 1 FROM deck_versions WHERE deck_id = :deck")
+		// A counter that only goes up, so a deleted number is never handed out again.
+		return jdbc.sql("UPDATE decks SET next_version_number = next_version_number + 1 WHERE id = :deck RETURNING next_version_number - 1")
 				.param("deck", deckId)
 				.query(Integer.class)
 				.single();
 	}
 
-	public UUID insertVersion(UUID deckId, int number, String note, UUID branchId, UUID parentVersionId) {
+	public UUID insertVersion(UUID deckId, int number, String note, UUID branchId, UUID parentVersionId, UUID mergeParentId) {
 		return jdbc.sql("""
-				INSERT INTO deck_versions (deck_id, version_number, note, branch_id, parent_version_id)
-				VALUES (:deck, :number, :note, :branch, :parent) RETURNING id
+				INSERT INTO deck_versions (deck_id, version_number, note, branch_id, parent_version_id, merge_parent_version_id)
+				VALUES (:deck, :number, :note, :branch, :parent, :mergeParent) RETURNING id
 				""")
+				.param("mergeParent", mergeParentId)
 				.param("deck", deckId)
 				.param("number", number)
 				.param("note", note)
@@ -287,6 +375,15 @@ public class DeckRepository {
 		return jdbc.sql("""
 				SELECT v.version_number, v.note, v.created_at, v.branch_id,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = v.parent_version_id) AS parent_number,
+				       (SELECT m.version_number FROM deck_versions m WHERE m.id = v.merge_parent_version_id) AS merge_number,
+				       (SELECT COUNT(*) FROM deck_version_cards n
+				         WHERE n.version_id = v.id AND v.parent_version_id IS NOT NULL
+				           AND NOT EXISTS (SELECT 1 FROM deck_version_cards o WHERE o.version_id = v.parent_version_id
+				                            AND o.card_id = n.card_id AND o.board = n.board)) AS added,
+				       (SELECT COUNT(*) FROM deck_version_cards o
+				         WHERE o.version_id = v.parent_version_id
+				           AND NOT EXISTS (SELECT 1 FROM deck_version_cards n WHERE n.version_id = v.id
+				                            AND n.card_id = o.card_id AND n.board = o.board)) AS removed,
 				       COALESCE(SUM(dc.quantity) FILTER (WHERE dc.board IN ('commander', 'main')), 0) AS card_count,
 				       COALESCE(SUM(c.mana_value * dc.quantity)
 				                FILTER (WHERE dc.board IN ('commander', 'main') AND c.primary_type <> 'Land'), 0) AS mv_sum,
@@ -310,7 +407,10 @@ public class DeckRepository {
 							rs.getInt("card_count"),
 							average,
 							rs.getObject("branch_id", UUID.class),
-							(Integer) rs.getObject("parent_number"));
+							(Integer) rs.getObject("parent_number"),
+							(Integer) rs.getObject("merge_number"),
+							rs.getInt("added"),
+							rs.getInt("removed"));
 				})
 				.list();
 	}
@@ -411,7 +511,9 @@ public class DeckRepository {
 				rs.getObject("branch_id", UUID.class),
 				rs.getString("branch_name"),
 				(Integer) rs.getObject("parent_number"),
-				rs.getBoolean("is_head"));
+				rs.getBoolean("is_head"),
+				rs.getObject("parent_version_id", UUID.class),
+				rs.getBoolean("is_main"));
 	}
 
 	private static DeckCardLine mapLine(ResultSet rs, int rowNum) throws SQLException {

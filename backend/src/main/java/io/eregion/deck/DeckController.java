@@ -23,6 +23,9 @@ import io.eregion.deck.DeckDtos.CreateDeckRequest;
 import io.eregion.deck.DeckDtos.DeckDetail;
 import io.eregion.deck.DeckDtos.DeckDiff;
 import io.eregion.deck.DeckDtos.DeckSummary;
+import io.eregion.deck.DeckDtos.MergePreview;
+import io.eregion.deck.DeckDtos.MergeRequest;
+import io.eregion.deck.DeckDtos.NoteRequest;
 import io.eregion.deck.DeckDtos.RenameBranchRequest;
 import io.eregion.deck.DeckDtos.SaveVersionRequest;
 import io.eregion.deck.DeckDtos.Timeline;
@@ -97,6 +100,29 @@ public class DeckController {
 	@DeleteMapping("/{deckId}/branches/{branchId}")
 	public Timeline deleteBranch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID branchId) {
 		return service.deleteBranch(deckId, CurrentUser.id(jwt), branchId);
+	}
+
+	/** What merging a branch into main would do, without doing it. */
+	@GetMapping("/{deckId}/branches/{branchId}/merge")
+	public MergePreview mergePreview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID branchId) {
+		return service.mergePreview(deckId, CurrentUser.id(jwt), branchId);
+	}
+
+	@PostMapping("/{deckId}/merge")
+	@ResponseStatus(HttpStatus.CREATED)
+	public VersionDetail merge(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody MergeRequest request) {
+		return service.merge(deckId, CurrentUser.id(jwt), request);
+	}
+
+	@PatchMapping("/{deckId}/versions/{number}")
+	public Timeline updateNote(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number,
+			@Valid @RequestBody NoteRequest request) {
+		return service.updateNote(deckId, CurrentUser.id(jwt), number, request.note());
+	}
+
+	@DeleteMapping("/{deckId}/versions/{number}")
+	public Timeline deleteVersion(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number) {
+		return service.deleteVersion(deckId, CurrentUser.id(jwt), number);
 	}
 
 	@GetMapping("/{deckId}/versions/{number}")

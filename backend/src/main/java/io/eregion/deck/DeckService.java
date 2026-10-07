@@ -22,6 +22,10 @@ import io.eregion.deck.DeckDtos.DeckDiff;
 import io.eregion.deck.DeckDtos.DeckSummary;
 import io.eregion.deck.DeckDtos.SaveVersionRequest;
 import io.eregion.deck.DeckDtos.Timeline;
+import io.eregion.deck.DeckDtos.MergeConflict;
+import io.eregion.deck.DeckDtos.MergePreview;
+import io.eregion.deck.DeckDtos.MergeRequest;
+import io.eregion.deck.DeckDtos.MergeSide;
 import io.eregion.deck.DeckDtos.VersionDetail;
 import io.eregion.deck.DeckDtos.VisibilityRequest;
 import io.eregion.deck.DeckDtos.VersionSummary;
@@ -53,11 +57,10 @@ public class DeckService {
 	public DeckDetail create(UUID userId, CreateDeckRequest request) {
 		String format = request.format() == null || request.format().isBlank() ? "commander" : request.format().trim();
 		UUID deckId = decks.insertDeck(userId, request.name().trim(), format);
-		decks.insertBranch(deckId, MAIN_BRANCH, null);
+		UUID main = decks.insertMainBranch(deckId, MAIN_BRANCH);
 		if (request.cards() != null && !request.cards().isEmpty()) {
 			List<DeckCardInput> cards = prepare(userId, request.cards());
-			UUID main = decks.findBranchId(deckId, MAIN_BRANCH).orElseThrow();
-			write(deckId, request.note(), cards, main, null);
+			write(deckId, request.note(), cards, main, null, null);
 		}
 		return get(deckId, userId);
 	}
@@ -128,20 +131,154 @@ public class DeckService {
 	public Timeline deleteBranch(UUID deckId, UUID userId, UUID branchId) {
 		owned(deckId, userId);
 		BranchRow branch = requireBranch(deckId, branchId);
-		if (branch.forkedFromVersion() == null) {
-			throw ApiException.conflict("The first branch cannot be deleted");
+		if (branch.main()) {
+			throw ApiException.conflict("The main branch cannot be deleted");
 		}
-		List<String> children = decks.branchesForkedFrom(branchId);
+		checkBranchDeletable(deckId, branch);
+		decks.deleteBranch(branchId);
+		decks.touch(deckId);
+		return timeline(deckId, userId);
+	}
+
+	/** Rewrites a version's note. Notes are labels, so they can change after saving. */
+	@Transactional
+	public Timeline updateNote(UUID deckId, UUID userId, int number, String note) {
+		owned(deckId, userId);
+		decks.updateNote(requireVersion(deckId, number).id(), note == null ? "" : note.trim());
+		return timeline(deckId, userId);
+	}
+
+	/**
+	 * Deletes one version. The history closes up around it: versions and branches that grew from it now
+	 * grow from its parent. The public version, the last version of the deck and the last version of
+	 * the main branch cannot be deleted. A branch left with no versions goes with it.
+	 */
+	@Transactional
+	public Timeline deleteVersion(UUID deckId, UUID userId, int number) {
+		owned(deckId, userId);
+		VersionRow version = requireVersion(deckId, number);
+		if (decks.isPublished(deckId, version.id())) {
+			throw ApiException.conflict("Version " + number + " is the public version. Publish another version or make the deck private first");
+		}
+		if (decks.versionCount(deckId) <= 1) {
+			throw ApiException.conflict("A deck needs at least one version");
+		}
+		int onBranch = decks.branchVersionCount(version.branchId());
+		if (version.main() && onBranch <= 1) {
+			throw ApiException.conflict("Version " + number + " is the only version on the main branch");
+		}
+		decks.deleteVersion(version.id(), version.parentId());
+		if (onBranch <= 1) {
+			decks.deleteEmptyBranch(version.branchId());
+		}
+		decks.touch(deckId);
+		return timeline(deckId, userId);
+	}
+
+	// ---- merging ----
+
+	/** Everything a merge needs: the two heads, the version they share, and the three sets of cards. */
+	private record MergeContext(BranchRow source, VersionRow main, VersionRow theirs, Integer baseNumber, boolean upToDate,
+			List<DeckCardLine> base, List<DeckCardLine> ours, List<DeckCardLine> theirLines, UUID mainBranchId) {
+	}
+
+	private MergeContext mergeContext(UUID deckId, UUID userId, UUID sourceBranchId) {
+		BranchRow source = requireBranch(deckId, sourceBranchId);
+		UUID mainId = decks.findMainBranchId(deckId).orElseThrow(() -> ApiException.notFound("Main branch"));
+		if (source.main()) {
+			throw ApiException.badRequest("Choose a branch other than main to merge into main");
+		}
+		VersionRow ours = decks.branchHead(mainId).orElseThrow(() -> ApiException.conflict("The main branch has no versions yet"));
+		VersionRow theirs = decks.branchHead(sourceBranchId).orElseThrow(() -> ApiException.conflict("That branch has no versions"));
+
+		Map<UUID, Integer> fromMain = decks.ancestors(ours.id());
+		Map<UUID, Integer> fromSource = decks.ancestors(theirs.id());
+		boolean upToDate = fromMain.containsKey(theirs.id());
+		// The newest version both lines share. Numbers only go up, so the highest number is the latest.
+		Map.Entry<UUID, Integer> base = fromMain.entrySet().stream()
+				.filter(entry -> fromSource.containsKey(entry.getKey()))
+				.max(Map.Entry.comparingByValue())
+				.orElse(null);
+		List<DeckCardLine> baseLines = base == null ? List.of() : decks.versionLines(base.getKey(), userId);
+		return new MergeContext(source, ours, theirs, base == null ? null : base.getValue(), upToDate, baseLines,
+				decks.versionLines(ours.id(), userId), decks.versionLines(theirs.id(), userId), mainId);
+	}
+
+	/** Shows what merging a branch into main would change and which cards need a choice. Changes nothing. */
+	@Transactional(readOnly = true)
+	public MergePreview mergePreview(UUID deckId, UUID userId, UUID sourceBranchId) {
+		owned(deckId, userId);
+		MergeContext ctx = mergeContext(deckId, userId, sourceBranchId);
+		Merger.Result result = Merger.merge(ctx.base(), ctx.ours(), ctx.theirLines(), Map.of());
+		DeckDiff changes = DeckDiffer.diff(ctx.main().number(), ctx.ours(), ctx.theirs().number(), result.merged());
+		List<MergeConflict> conflicts = result.conflicts().stream()
+				.map(c -> new MergeConflict(c.cardId(), c.name(), c.board(), side(c.base()), side(c.ours()), side(c.theirs())))
+				.toList();
+		return new MergePreview(ctx.source().name(), ctx.theirs().number(), ctx.main().number(), ctx.baseNumber(), ctx.upToDate(),
+				changes, conflicts);
+	}
+
+	/**
+	 * Merges a branch into main as a new main version that records both parents. Cards that only one
+	 * side changed merge by themselves. Conflicts need a choice in resolutions. The branch can be deleted afterwards.
+	 */
+	@Transactional
+	public VersionDetail merge(UUID deckId, UUID userId, MergeRequest request) {
+		owned(deckId, userId);
+		MergeContext ctx = mergeContext(deckId, userId, request.sourceBranchId());
+		if (ctx.main().number() != request.expectedMainVersion() || ctx.theirs().number() != request.expectedSourceVersion()) {
+			throw ApiException.conflict("The branches changed since the preview. Open the merge again");
+		}
+		if (ctx.upToDate()) {
+			throw ApiException.conflict("Main already has everything on " + ctx.source().name());
+		}
+		boolean deleteAfter = Boolean.TRUE.equals(request.deleteBranch());
+		if (deleteAfter) {
+			checkBranchDeletable(deckId, ctx.source());
+		}
+
+		Map<String, String> resolutions = request.resolutions() == null ? Map.of() : request.resolutions();
+		for (String choice : resolutions.values()) {
+			if (!Merger.OURS.equals(choice) && !Merger.THEIRS.equals(choice)) {
+				throw ApiException.badRequest("A choice must be 'ours' or 'theirs'");
+			}
+		}
+		Merger.Result result = Merger.merge(ctx.base(), ctx.ours(), ctx.theirLines(), resolutions);
+		if (!result.conflicts().isEmpty()) {
+			throw ApiException.badRequest(result.conflicts().size() + " card(s) need a choice: "
+					+ result.conflicts().stream().limit(5).map(Merger.Conflict::name).collect(java.util.stream.Collectors.joining(", ")));
+		}
+		if (result.merged().isEmpty()) {
+			throw ApiException.badRequest("The merge would leave an empty deck");
+		}
+
+		List<DeckCardInput> inputs = result.merged().stream()
+				.map(line -> new DeckCardInput(line.cardId(), line.quantity(), line.board(), line.printingId(), line.tags(), line.customPrintingId()))
+				.toList();
+		String note = request.note() == null || request.note().isBlank() ? "Merged " + ctx.source().name() + " into main" : request.note();
+		VersionRow saved = write(deckId, note, prepare(userId, inputs), ctx.mainBranchId(), ctx.main().id(), ctx.theirs().id());
+		if (deleteAfter) {
+			decks.deleteBranch(ctx.source().id());
+		}
+		return detail(saved, userId);
+	}
+
+	private void checkBranchDeletable(UUID deckId, BranchRow branch) {
+		if (branch.main()) {
+			throw ApiException.conflict("The main branch cannot be deleted");
+		}
+		List<String> children = decks.branchesForkedFrom(branch.id());
 		if (!children.isEmpty()) {
 			throw ApiException.conflict("Other branches split off from '" + branch.name() + "': " + String.join(", ", children)
 					+ ". Delete those first");
 		}
-		if (decks.publishesFrom(deckId, branchId)) {
+		if (decks.publishesFrom(deckId, branch.id())) {
 			throw ApiException.conflict("The public version is on this branch. Publish another version or make the deck private first");
 		}
-		decks.deleteBranch(branchId);
-		decks.touch(deckId);
-		return timeline(deckId, userId);
+	}
+
+	private static MergeSide side(Merger.Side side) {
+		return new MergeSide(side.quantity(), side.printing(), side.tags());
 	}
 
 	private BranchRow requireBranch(UUID deckId, UUID branchId) {
@@ -176,14 +313,14 @@ public class DeckService {
 			parentId = fork.parentVersionId();
 		}
 		else if (plan instanceof First) {
-			branchId = decks.findBranchId(deckId, MAIN_BRANCH).orElseGet(() -> decks.insertBranch(deckId, MAIN_BRANCH, null));
+			branchId = decks.findMainBranchId(deckId).orElseGet(() -> decks.insertMainBranch(deckId, MAIN_BRANCH));
 			parentId = null;
 		}
 		else {
 			throw new IllegalStateException("Unhandled save plan " + plan);
 		}
 
-		VersionRow saved = write(deckId, request.note(), cards, branchId, parentId);
+		VersionRow saved = write(deckId, request.note(), cards, branchId, parentId, null);
 		return detail(saved, userId);
 	}
 
@@ -204,7 +341,7 @@ public class DeckService {
 					.filter(version -> version.branchId().equals(branch.id()))
 					.sorted((a, b) -> Integer.compare(a.versionNumber(), b.versionNumber()))
 					.toList();
-			branches.add(new BranchDto(branch.id(), branch.name(), branch.forkedFromVersion(), inBranch));
+			branches.add(new BranchDto(branch.id(), branch.name(), branch.forkedFromVersion(), branch.main(), inBranch));
 		}
 		return new Timeline(List.copyOf(branches));
 	}
@@ -242,9 +379,16 @@ public class DeckService {
 	}
 
 	/** Stores the cards as the next full snapshot on the given branch. */
-	private VersionRow write(UUID deckId, String note, List<DeckCardInput> cards, UUID branchId, UUID parentId) {
+	private VersionRow write(UUID deckId, String note, List<DeckCardInput> cards, UUID branchId, UUID parentId, UUID mergeParentId) {
 		int number = decks.nextVersionNumber(deckId);
-		UUID versionId = decks.insertVersion(deckId, number, note == null ? "" : note.trim(), branchId, parentId);
+		UUID versionId;
+		try {
+			versionId = decks.insertVersion(deckId, number, note == null ? "" : note.trim(), branchId, parentId, mergeParentId);
+		}
+		catch (DuplicateKeyException ex) {
+			// Another save or merge got there first: this version already has a child on its branch.
+			throw ApiException.conflict("This branch changed while you were working. Reload the deck, then save again or save as a new branch");
+		}
 		decks.insertVersionCards(versionId, cards);
 		decks.touch(deckId);
 		return decks.findVersion(deckId, number).orElseThrow();

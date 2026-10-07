@@ -107,11 +107,14 @@ public final class DeckDtos {
 			int cardCount,
 			double averageManaValue,
 			UUID branchId,
-			Integer parentVersion) {
+			Integer parentVersion,
+			Integer mergeParent,
+			int added,
+			int removed) {
 	}
 
-	/** One line of development. forkedFromVersion is where it split off, null for main. */
-	public record BranchDto(UUID id, String name, Integer forkedFromVersion, List<VersionSummary> versions) {
+	/** One line of development. forkedFromVersion is where it split off. main is the line other branches merge into. */
+	public record BranchDto(UUID id, String name, Integer forkedFromVersion, boolean main, List<VersionSummary> versions) {
 	}
 
 	public record Timeline(List<BranchDto> branches) {
@@ -191,5 +194,47 @@ public final class DeckDtos {
 			List<PrintingChange> printings,
 			List<TagChange> tags,
 			StatsChange stats) {
+	}
+
+	// ---- editing the timeline ----
+
+	public record NoteRequest(@Size(max = 200) String note) {
+	}
+
+	/** One side of a merge conflict. A null quantity means the card is not in that version. */
+	public record MergeSide(Integer quantity, String printing, List<String> tags) {
+	}
+
+	public record MergeConflict(UUID cardId, String name, String board, MergeSide base, MergeSide ours, MergeSide theirs) {
+		public String key() {
+			return cardId + "|" + board;
+		}
+	}
+
+	/**
+	 * What merging a branch into main would do. changes lists what main would gain or lose, leaving out
+	 * conflicts, which wait for a choice. baseVersion is the version both lines grew from.
+	 */
+	public record MergePreview(
+			String sourceBranch,
+			int sourceVersion,
+			int mainVersion,
+			Integer baseVersion,
+			boolean upToDate,
+			DeckDiff changes,
+			List<MergeConflict> conflicts) {
+	}
+
+	/**
+	 * Merges a branch into main. The expected versions are the heads that were previewed, so a merge
+	 * never applies to lines that changed in the meantime. resolutions maps "cardId|board" to "ours" or "theirs".
+	 */
+	public record MergeRequest(
+			@NotNull UUID sourceBranchId,
+			@NotNull Integer expectedMainVersion,
+			@NotNull Integer expectedSourceVersion,
+			Map<String, String> resolutions,
+			@Size(max = 200) String note,
+			Boolean deleteBranch) {
 	}
 }

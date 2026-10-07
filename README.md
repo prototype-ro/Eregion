@@ -50,6 +50,9 @@ cd frontend && npm run build     # type check and production build
 | `GET /api/decks/{id}/timeline` | Every branch with its versions, for the multiverse timeline |
 | `PATCH /api/decks/{id}/branches/{branchId}` | Rename a branch |
 | `DELETE /api/decks/{id}/branches/{branchId}` | Delete a branch and its versions. Refused for the first branch, a branch others split from, or one holding the public version |
+| `GET /api/decks/{id}/branches/{branchId}/merge` | Preview merging a branch into main: the shared version, what main would gain or lose, and cards both lines changed differently (conflicts) |
+| `POST /api/decks/{id}/merge` | Merge a branch into main as a new main version that records both parents. Needs a choice (`ours` or `theirs`) for each conflict, and the heads that were previewed. Can delete the branch afterwards |
+| `PATCH /api/decks/{id}/versions/{n}`, `DELETE /api/decks/{id}/versions/{n}` | Edit a version's note, or delete a version. History closes up around a deleted version. The public version, the last version of a deck and the only version on main cannot be deleted |
 | `GET /api/decks/{id}/diff?from=7&to=8` | Added, removed and changed cards plus stat deltas |
 | `PUT /api/decks/{id}/visibility` | Publish one saved version of a deck (`public` plus `versionNumber`) or make it private again. Only the chosen version is ever shown to others |
 | `GET /api/explore?commander=&q=&limit=&offset=` | Public decks, newest first, optionally only those with a given commander card |
@@ -79,3 +82,11 @@ Authenticated routes read the `eregion_session` cookie, or an `Authorization: Be
 ### Custom art
 
 Custom printings are images a player uploads for a card. A deck line can pin one instead of a Scryfall printing (`customPrintingId`), and the picker shows them in a Custom section above the Scryfall printings. On the Collection page, "Import custom art" takes many files named after their cards (`Sol Ring - foil proxy.png`) and can add the cards to the collection. Images are checked by their first bytes (SVG and HTML are refused), stored in Postgres, and served with `nosniff` and a sandbox CSP. Deleting art leaves saved versions intact: their lines fall back to the card's default printing.
+
+### Versions, branches and merging
+
+- Versions are full snapshots. Their numbers only go up, so a deleted number is never reused.
+- Each deck has one main branch. Other branches fork from any version and can be merged back into main.
+- A merge is a three way merge from the newest version both lines share. A card only one line changed takes that change. A card both lines changed differently is a conflict that needs a choice. A line is the copies, printing, custom art and tags of a card on a board together.
+- A merge version records the branch it brought in as a second parent, so merging the same branch again only brings what changed since.
+- A version has at most one child on its branch, so two tabs saving at once cannot fork a line silently: one save wins and the other gets a conflict.

@@ -13,6 +13,9 @@ interface Props {
   timeline: Timeline;
   /** The branch of the version open in the builder. */
   currentBranchId: string | null;
+  /** Merging opens a new main version, which would replace unsaved edits. */
+  locked: boolean;
+  onMerge: (branch: Branch) => void;
   /** Called with the fresh timeline after a rename or delete. */
   onChanged: (timeline: Timeline, deletedBranchId: string | null) => void;
 }
@@ -28,14 +31,14 @@ export function BranchesDialog(props: Props) {
   );
 }
 
-function Body({ onClose, deckId, timeline, currentBranchId, onChanged }: Props) {
+function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onChanged }: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const root = timeline.branches.find((branch) => branch.forkedFromVersion === null) ?? timeline.branches[0];
+  const root = timeline.branches.find((branch) => branch.main) ?? timeline.branches[0];
 
   async function run(action: () => Promise<Timeline>, deletedId: string | null) {
     setBusy(true);
@@ -61,7 +64,7 @@ function Body({ onClose, deckId, timeline, currentBranchId, onChanged }: Props) 
     <div className="flex flex-col gap-6">
       <h2 className="font-display text-[44px] leading-none">Branches</h2>
       <p className="text-[15px] leading-snug text-muted">
-        Each branch is its own line of versions. Deleting one removes its versions for good. The first branch stays, and a branch that others split from cannot be deleted until they are gone.
+        Each branch is its own line of versions. Deleting one removes its versions for good. Merge a branch into main to bring its changes across. The main branch stays, and a branch that others split from cannot be deleted until they are gone.
       </p>
 
       {error && (
@@ -142,6 +145,17 @@ function Body({ onClose, deckId, timeline, currentBranchId, onChanged }: Props) 
                   >
                     Rename
                   </button>
+                  {!isRoot && (
+                    <button
+                      type="button"
+                      onClick={() => onMerge(branch)}
+                      disabled={locked}
+                      title={locked ? "Save or discard your changes first" : undefined}
+                      className="press min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent disabled:opacity-40"
+                    >
+                      Merge into {root?.name ?? "main"}
+                    </button>
+                  )}
                   {!isRoot && root && tip && head(root) && (
                     <Link
                       href={`/decks/${deckId}/diff?from=${head(root).versionNumber}&to=${tip.versionNumber}`}
