@@ -60,6 +60,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
               return (
                 <li
                   key={key}
+                  data-line-key={key}
                   style={last ? undefined : { height: strip }}
                   className={`${front ? "relative z-20" : last ? "" : "overflow-hidden"}`}
                   onContextMenu={(event) => {
@@ -121,6 +122,7 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
               return (
                 <li
                   key={key}
+                  data-line-key={key}
                   className="group/card relative"
                   onMouseEnter={() => onSelect(line)}
                   onContextMenu={(event) => {

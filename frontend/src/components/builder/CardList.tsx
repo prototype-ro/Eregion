@@ -45,6 +45,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, onSelect, onMen
   const needs = checkCollection && line.owned < line.quantity;
   return (
     <li
+      data-line-key={lineKey(line)}
       className={`group/row flex items-center rounded-xl pr-1 ${selected ? "bg-surface" : ""} hover:bg-surface focus-within:bg-surface`}
       onMouseEnter={() => onSelect(line)}
       onContextMenu={(event) => {

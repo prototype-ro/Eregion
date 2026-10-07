@@ -103,8 +103,11 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       <button role="menuitem" className={item} onClick={act(() => onPeek(line))}>
         Show all details
       </button>
-      <button role="menuitem" className={item} onClick={act(() => onPrinting(line))}>
+      <button role="menuitem" className={`${item} justify-between`} onClick={act(() => onPrinting(line))}>
         Change printing
+        <kbd className="rounded-md border border-line px-1.5 font-mono text-xs text-muted" aria-label="shortcut: P">
+          P
+        </kbd>
       </button>
       <button role="menuitem" className={item} onClick={act(() => onTags(line))}>
         Edit tags

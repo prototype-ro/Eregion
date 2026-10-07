@@ -210,6 +210,36 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
   const dirty = signature(lines) !== signature(baseLines);
 
+  // Press P with the pointer over a card to change its printing. The pointer position is tracked so the
+  // card under it is found when the key goes down, whichever view is showing.
+  useEffect(() => {
+    let x = -1;
+    let y = -1;
+    const track = (event: PointerEvent) => {
+      x = event.clientX;
+      y = event.clientY;
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "p" || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      // Leave it alone while a dialog or the card menu is open.
+      if (document.querySelector("dialog[open], [role=menu]")) return;
+      if (x < 0) return;
+      const card = document.elementsFromPoint(x, y).find((element) => element.closest("[data-line-key]"))?.closest<HTMLElement>("[data-line-key]");
+      const key = card?.dataset.lineKey;
+      if (!key) return;
+      event.preventDefault();
+      setPrintingKey(key);
+    };
+    window.addEventListener("pointermove", track, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointermove", track);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   // Leaving the page with unsaved edits would lose them, so let the browser ask first.
   useEffect(() => {
     if (!dirty) return;
