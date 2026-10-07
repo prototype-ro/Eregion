@@ -6,7 +6,6 @@ import { Suspense, useEffect, useState } from "react";
 import { DiffView } from "@/components/DiffView";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
 import type { DeckDetail, DeckDiff, Timeline, VersionSummary } from "@/lib/types";
 
 const select =
@@ -52,17 +51,12 @@ function Diff() {
 
   // Load the version list once and default to "previous to latest".
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
     (async () => {
       try {
         const [deck, list, tl] = await Promise.all([
-          api<DeckDetail>(`/api/decks/${id}`, { token }),
-          api<VersionSummary[]>(`/api/decks/${id}/versions`, { token }),
-          api<Timeline>(`/api/decks/${id}/timeline`, { token }),
+          api<DeckDetail>(`/api/decks/${id}`),
+          api<VersionSummary[]>(`/api/decks/${id}/versions`),
+          api<Timeline>(`/api/decks/${id}/timeline`),
         ]);
         setDeckName(deck.name);
         setVersions(list);
@@ -81,7 +75,6 @@ function Diff() {
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          clearToken();
           router.replace("/login");
           return;
         }
@@ -92,10 +85,9 @@ function Diff() {
 
   // Recompute the diff whenever the picked versions change.
   useEffect(() => {
-    const token = getToken();
-    if (from === null || to === null || !token) return;
+    if (from === null || to === null) return;
     let cancelled = false;
-    api<DeckDiff>(`/api/decks/${id}/diff?from=${from}&to=${to}`, { token })
+    api<DeckDiff>(`/api/decks/${id}/diff?from=${from}&to=${to}`)
       .then((result) => {
         if (!cancelled) {
           setDiff(result);

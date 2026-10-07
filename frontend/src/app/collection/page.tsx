@@ -8,7 +8,6 @@ import { ImportDialog, type ImportedCard } from "@/components/builder/ImportDial
 import { CollectionSearch } from "@/components/collection/CollectionSearch";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
 import { formatPrice } from "@/lib/links";
 import type { Card } from "@/lib/types";
 
@@ -34,7 +33,6 @@ const stepper =
 
 export default function CollectionPage() {
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -44,18 +42,11 @@ export default function CollectionPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const stored = getToken();
-    if (!stored) {
-      router.replace("/login");
-      return;
-    }
-    setToken(stored);
     try {
-      setEntries(await api<Entry[]>("/api/collection", { token: stored }));
+      setEntries(await api<Entry[]>("/api/collection"));
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearToken();
         router.replace("/login");
         return;
       }
@@ -98,7 +89,6 @@ export default function CollectionPage() {
 
   /** Change a quantity right away on screen, then tell the server. If that fails, put the real data back. */
   async function setQuantity(card: Card, quantity: number) {
-    if (!token) return;
     const next = Math.max(0, Math.min(MAX, quantity));
     setEntries((previous) => {
       const list = previous ?? [];
@@ -108,7 +98,7 @@ export default function CollectionPage() {
         : [...list, { card, quantity: next }];
     });
     try {
-      await api(`/api/collection/${card.id}`, { method: "PUT", token, body: { quantity: next } });
+      await api(`/api/collection/${card.id}`, { method: "PUT", body: { quantity: next } });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save that change.");
       await load();
@@ -116,11 +106,9 @@ export default function CollectionPage() {
   }
 
   async function importCards(cards: ImportedCard[], replace: boolean) {
-    if (!token) return;
     try {
       const result = await api<{ updated: number }>("/api/collection/bulk", {
         method: "POST",
-        token,
         body: {
           mode: replace ? "replace" : "add",
           entries: cards.map((item) => ({ cardId: item.card.id, quantity: item.quantity })),
@@ -177,24 +165,22 @@ export default function CollectionPage() {
           </div>
         </dl>
 
-        {token && (
-          <div className="flex flex-wrap items-end gap-3 pb-8">
-            <div className="min-w-[260px] flex-1">
-              <CollectionSearch token={token} quantities={quantities} onAdd={(card) => void setQuantity(card, (quantities.get(card.id) ?? 0) + 1)} />
-            </div>
-            <button type="button" onClick={() => setImportOpen(true)} className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium">
-              Import list
-            </button>
-            <button
-              type="button"
-              onClick={download}
-              disabled={totals.unique === 0}
-              className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium disabled:opacity-40"
-            >
-              Download list
-            </button>
+        <div className="flex flex-wrap items-end gap-3 pb-8">
+          <div className="min-w-[260px] flex-1">
+            <CollectionSearch quantities={quantities} onAdd={(card) => void setQuantity(card, (quantities.get(card.id) ?? 0) + 1)} />
           </div>
-        )}
+          <button type="button" onClick={() => setImportOpen(true)} className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium">
+            Import list
+          </button>
+          <button
+            type="button"
+            onClick={download}
+            disabled={totals.unique === 0}
+            className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium disabled:opacity-40"
+          >
+            Download list
+          </button>
+        </div>
 
         {entries === null && !error && <p className="text-muted">Loading your collection.</p>}
 
@@ -317,17 +303,14 @@ export default function CollectionPage() {
         )}
       </main>
 
-      {token && (
-        <ImportDialog
-          open={importOpen}
-          token={token}
-          onClose={() => setImportOpen(false)}
-          onImport={(cards, replace) => void importCards(cards, replace)}
-          title="Import your cards"
-          addLabel="Add to my collection"
-          replaceLabel="Replace my whole collection"
-        />
-      )}
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={(cards, replace) => void importCards(cards, replace)}
+        title="Import your cards"
+        addLabel="Add to my collection"
+        replaceLabel="Replace my whole collection"
+      />
 
       {toast && (
         <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">

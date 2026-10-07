@@ -1,5 +1,3 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -13,18 +11,20 @@ export class ApiError extends Error {
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
-  token?: string | null;
 }
 
-/** Thin typed wrapper over fetch. Errors arrive as RFC 9457 problem details from the backend. */
-export async function api<T>(path: string, { method = "GET", body, token }: RequestOptions = {}): Promise<T> {
+/**
+ * Thin typed wrapper over fetch. Requests go to this site's own /api path, which Next forwards to the
+ * backend, so the login cookie is first party and never visible to scripts. Errors arrive
+ * as RFC 9457 problem details from the backend.
+ */
+export async function api<T>(path: string, { method = "GET", body }: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (token) headers.Authorization = `Bearer ${token}`;
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(path, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),

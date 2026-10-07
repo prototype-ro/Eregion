@@ -8,11 +8,6 @@ export interface User {
   displayName: string;
 }
 
-export interface AuthResponse {
-  token: string;
-  user: User;
-}
-
 export interface Card {
   id: string;
   scryfallId: string;

@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -26,8 +27,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 /**
- * Stateless auth: the API issues HS256 JWTs itself and validates them with the
- * Spring Security resource server. No sessions, no CSRF cookies.
+ * Stateless auth: the API issues HS256 JWTs itself and validates them with the Spring Security
+ * resource server. The browser holds the token in an httpOnly cookie (see SessionCookie), and
+ * SameOriginFilter protects cookie requests against cross-site forgery. No server sessions.
  */
 @Configuration
 public class SecurityConfig {
@@ -77,7 +79,10 @@ public class SecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/auth/**", "/error").permitAll()
 						.anyRequest().authenticated())
-				.oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
+				.addFilterBefore(new SameOriginFilter(corsProperties.allowedOrigins()), BearerTokenAuthenticationFilter.class)
+				.oauth2ResourceServer(oauth -> oauth
+						.bearerTokenResolver(new SessionTokenResolver())
+						.jwt(Customizer.withDefaults()));
 		return http.build();
 	}
 }

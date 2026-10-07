@@ -7,16 +7,15 @@ import type { Card } from "@/lib/types";
 import { useCardSearch } from "@/lib/useCardSearch";
 
 interface Props {
-  token: string;
   /** How many copies of each card are owned right now, by card id. */
   quantities: Map<string, number>;
   onAdd: (card: Card) => void;
 }
 
 /** Find any card and add a copy of it to the collection. The same search as the deck builder uses. */
-export function CollectionSearch({ token, quantities, onAdd }: Props) {
+export function CollectionSearch({ quantities, onAdd }: Props) {
   const [query, setQuery] = useState("");
-  const { results, loading, error, searchable } = useCardSearch(query, token);
+  const { results, loading, error, searchable } = useCardSearch(query);
 
   return (
     <div

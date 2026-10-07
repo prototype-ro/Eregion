@@ -6,7 +6,6 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CardArt } from "@/components/CardArt";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { Card, PublicDeck } from "@/lib/types";
 
@@ -26,7 +25,6 @@ function Explore() {
   const params = useSearchParams();
   const commanderId = params.get("commander");
 
-  const [token, setToken] = useState<string | null>(null);
   const [commander, setCommander] = useState<Card | null>(null);
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
@@ -37,9 +35,6 @@ function Explore() {
   const latest = useRef(0);
 
   useEffect(() => {
-    const stored = getToken();
-    if (!stored) router.replace("/login");
-    else setToken(stored);
   }, [router]);
 
   // Wait a moment after typing before asking the server.
@@ -51,7 +46,6 @@ function Explore() {
   const fail = useCallback(
     (err: unknown) => {
       if (err instanceof ApiError && err.status === 401) {
-        clearToken();
         router.replace("/login");
         return;
       }
@@ -71,31 +65,30 @@ function Explore() {
   );
 
   useEffect(() => {
-    if (!token) return;
     const request = ++latest.current;
     setError(null);
-    api<PublicDeck[]>(url(0), { token })
+    api<PublicDeck[]>(url(0))
       .then((list) => {
         if (request !== latest.current) return;
         setDecks(list);
         setMore(list.length === PAGE);
       })
       .catch(fail);
-  }, [token, url, fail]);
+  }, [url, fail]);
 
   useEffect(() => {
-    if (!token || !commanderId) {
+    if (!commanderId) {
       setCommander(null);
       return;
     }
-    api<Card>(`/api/cards/${commanderId}`, { token }).then(setCommander).catch(() => setCommander(null));
-  }, [token, commanderId]);
+    api<Card>(`/api/cards/${commanderId}`).then(setCommander).catch(() => setCommander(null));
+  }, [commanderId]);
 
   async function loadMore() {
-    if (!token || !decks) return;
+    if (!decks) return;
     setLoadingMore(true);
     try {
-      const next = await api<PublicDeck[]>(url(decks.length), { token });
+      const next = await api<PublicDeck[]>(url(decks.length));
       setDecks([...decks, ...next]);
       setMore(next.length === PAGE);
     } catch (err) {

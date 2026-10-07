@@ -114,7 +114,6 @@ interface Props {
   /** The version opened in the builder. Null for a deck with no saved version yet. */
   version: VersionDetail | null;
   timeline: Timeline;
-  token: string;
   /** How many copies of each card the user owns, by card id. */
   owned: Map<string, number>;
   /** Called with the new version number after a successful save. */
@@ -124,7 +123,7 @@ interface Props {
   onReload: () => void;
 }
 
-export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, onSelectVersion, onReload }: Props) {
+export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectVersion, onReload }: Props) {
   const baseLines = useMemo(() => version?.cards ?? [], [version]);
 
   const [lines, setLines] = useState<DeckCardLine[]>(baseLines);
@@ -372,7 +371,6 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
     try {
       const saved = await api<VersionDetail>(`/api/decks/${deck.id}/versions`, {
         method: "POST",
-        token,
         body: {
           note: note.trim(),
           cards: lines.map((line) => ({
@@ -666,7 +664,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
 
       <div className="flex flex-wrap items-end gap-3 py-7">
         <div className="min-w-[260px] flex-1">
-          <CardSearch token={token} inDeck={inDeck} owned={owned} showCollection={checkCollection} onAdd={addCard} onSetCommander={setCommander} />
+          <CardSearch inDeck={inDeck} owned={owned} showCollection={checkCollection} onAdd={addCard} onSetCommander={setCommander} />
         </div>
         <button
           type="button"
@@ -705,7 +703,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         open={branchesOpen}
         onClose={() => setBranchesOpen(false)}
         deckId={deck.id}
-        token={token}
+       
         timeline={timeline}
         currentBranchId={version?.branchId ?? null}
         onChanged={(next, deletedId) => {
@@ -725,7 +723,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         open={visibilityOpen}
         onClose={() => setVisibilityOpen(false)}
         deckId={deck.id}
-        token={token}
+       
         timeline={timeline}
         visibility={visibility}
         publishedVersion={publishedVersion}
@@ -759,9 +757,9 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
           setPrintingKey(lineKey(line));
         }}
       />
-      <PrintingPicker line={lineByKey(printingKey)} token={token} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} />
+      <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} />
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
-      <ImportDialog open={importOpen} token={token} onClose={() => setImportOpen(false)} onImport={importCards} />
+      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={importCards} />
 
       {toast && (
         <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">

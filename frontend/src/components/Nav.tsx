@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountLinks } from "./AccountLinks";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Wordmark({ className = "" }: { className?: string }) {
@@ -35,18 +36,7 @@ export function Nav({ active }: { active?: "decks" | "explore" | "collection" })
       </nav>
       <div className="flex items-center gap-2.5">
         <ThemeToggle />
-        <Link
-          href="/login"
-          className="pill inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-ink px-5 text-sm font-medium"
-        >
-          Sign in
-        </Link>
-        <Link
-          href="/register"
-          className="press inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
-        >
-          Start a deck
-        </Link>
+        <AccountLinks />
       </div>
     </header>
   );

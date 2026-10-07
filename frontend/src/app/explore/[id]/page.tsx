@@ -9,7 +9,6 @@ import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
 import { GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { exploreCommanderUrl, formatPrice, sortColors } from "@/lib/links";
@@ -23,7 +22,6 @@ const noMenu = () => {};
 export default function PublicDeckPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
   const [detail, setDetail] = useState<PublicDeckDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("list");
@@ -33,17 +31,10 @@ export default function PublicDeckPage() {
   const [copying, setCopying] = useState(false);
 
   useEffect(() => {
-    const stored = getToken();
-    if (!stored) {
-      router.replace("/login");
-      return;
-    }
-    setToken(stored);
-    api<PublicDeckDetail>(`/api/explore/${id}`, { token: stored })
+    api<PublicDeckDetail>(`/api/explore/${id}`)
       .then(setDetail)
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) {
-          clearToken();
           router.replace("/login");
           return;
         }
@@ -58,12 +49,11 @@ export default function PublicDeckPage() {
 
   /** Starts a private deck of your own from this version. */
   async function copy() {
-    if (!detail || !token) return;
+    if (!detail) return;
     setCopying(true);
     try {
       const deck = await api<DeckDetail>("/api/decks", {
         method: "POST",
-        token,
         body: {
           name: `${detail.deck.name} (copy)`.slice(0, 80),
           note: `Copied from ${detail.deck.ownerName}'s deck, version ${detail.deck.versionNumber}`,

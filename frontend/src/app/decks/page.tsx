@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { CardArt } from "@/components/CardArt";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
 import type { DeckDetail, DeckSummary } from "@/lib/types";
 
 export default function DecksPage() {
@@ -17,17 +16,11 @@ export default function DecksPage() {
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
     try {
-      setDecks(await api<DeckSummary[]>("/api/decks", { token }));
+      setDecks(await api<DeckSummary[]>("/api/decks"));
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearToken();
         router.replace("/login");
         return;
       }
@@ -45,7 +38,7 @@ export default function DecksPage() {
     if (!trimmed) return;
     setCreating(true);
     try {
-      await api<DeckDetail>("/api/decks", { method: "POST", body: { name: trimmed }, token: getToken() });
+      await api<DeckDetail>("/api/decks", { method: "POST", body: { name: trimmed } });
       setName("");
       await load();
     } catch (err) {

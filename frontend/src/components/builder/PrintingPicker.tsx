@@ -9,13 +9,12 @@ import type { DeckCardLine, Printing } from "@/lib/types";
 
 interface Props {
   line: DeckCardLine | null;
-  token: string;
   onClose: () => void;
   onChoose: (line: DeckCardLine, printing: Printing) => void;
 }
 
 /** Every English paper printing of a card, newest first. Picking one changes the art and price for that card. */
-export function PrintingPicker({ line, token, onClose, onChoose }: Props) {
+export function PrintingPicker({ line, onClose, onChoose }: Props) {
   const [printings, setPrintings] = useState<Printing[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cardId = line?.cardId ?? null;
@@ -25,7 +24,7 @@ export function PrintingPicker({ line, token, onClose, onChoose }: Props) {
     let cancelled = false;
     setPrintings(null);
     setError(null);
-    api<Printing[]>(`/api/cards/${cardId}/printings`, { token })
+    api<Printing[]>(`/api/cards/${cardId}/printings`)
       .then((list) => {
         if (!cancelled) setPrintings(list);
       })
@@ -35,7 +34,7 @@ export function PrintingPicker({ line, token, onClose, onChoose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [cardId, token]);
+  }, [cardId]);
 
   return (
     <Dialog open={line !== null} onClose={onClose} label="Choose a printing" size="lg">

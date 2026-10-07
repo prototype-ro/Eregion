@@ -6,7 +6,6 @@ import { useCardSearch } from "@/lib/useCardSearch";
 import type { Card } from "@/lib/types";
 
 interface Props {
-  token: string;
   /** Ids of cards already in the deck, so results can offer "Add another". */
   inDeck: Set<string>;
   owned: Map<string, number>;
@@ -16,9 +15,9 @@ interface Props {
   onSetCommander: (card: Card) => void;
 }
 
-export function CardSearch({ token, inDeck, owned, showCollection, onAdd, onSetCommander }: Props) {
+export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommander }: Props) {
   const [query, setQuery] = useState("");
-  const { results, loading, error, searchable } = useCardSearch(query, token);
+  const { results, loading, error, searchable } = useCardSearch(query);
 
   return (
     <div

@@ -18,7 +18,7 @@ cd backend
 
 # 3. Frontend (http://localhost:3000)
 cd frontend
-cp ../.env.example .env.local   # only NEXT_PUBLIC_API_URL is used here
+cp ../.env.example .env.local   # only BACKEND_URL is used here
 npm install
 npm run dev
 ```
@@ -36,7 +36,8 @@ cd frontend && npm run build     # type check and production build
 
 | Route | What it does |
 |---|---|
-| `POST /api/auth/register`, `POST /api/auth/login` | Returns `{ token, user }` |
+| `POST /api/auth/register`, `POST /api/auth/login` | Returns the user and sets the login token in an httpOnly cookie |
+| `POST /api/auth/logout` | Expires the cookie |
 | `GET /api/me` | Current user |
 | `GET /api/cards/search?q=` | Search by name. Looks in our catalog first, then Scryfall for anything missing, and saves what it finds. Needs login. |
 | `POST /api/cards/resolve` | Turn pasted card names into catalog cards in bulk (75 per Scryfall request, fuzzy fallback for typos). Powers list import. |
@@ -56,7 +57,14 @@ cd frontend && npm run build     # type check and production build
 | `GET /api/collection`, `PUT /api/collection/{cardId}` | Cards you own, and set how many of one card |
 | `POST /api/collection/bulk` | Add many cards at once (`mode`: `add` or `replace`). Powers list import on the collection screen. |
 
-Authenticated routes take `Authorization: Bearer <token>`. Errors are RFC 9457 problem details.
+Authenticated routes read the `eregion_session` cookie, or an `Authorization: Bearer <token>` header for tools. Errors are RFC 9457 problem details.
+
+### Login security
+
+- The token lives in an httpOnly, SameSite=Lax cookie (Secure when `EREGION_COOKIE_SECURE=true`), so page scripts cannot read it. Nothing about the session is kept in `localStorage`.
+- The browser only talks to the Next site. Next forwards `/api/*` to the backend (`BACKEND_URL`), so the cookie is first party and needs no cross-site settings.
+- Requests that change data and use the cookie must carry an `Origin` from `EREGION_CORS_ORIGINS`, which stops cross-site forgery. Requests with an Authorization header skip this because a forged request cannot add that header.
+- Signing in, signing up and signing out ignore any token, so an expired cookie cannot lock someone out.
 
 ## Design notes
 

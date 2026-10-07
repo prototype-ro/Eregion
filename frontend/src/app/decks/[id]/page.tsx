@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { DeckBuilder } from "@/components/builder/DeckBuilder";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
 import type { DeckDetail, Timeline, VersionDetail } from "@/lib/types";
 
 interface CollectionEntry {
@@ -27,36 +26,28 @@ export default function DeckPage() {
   const search = useSearchParams();
   const requested = search.get("v");
 
-  const [token, setToken] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const stored = getToken();
-    if (!stored) {
-      router.replace("/login");
-      return;
-    }
-    setToken(stored);
     try {
       const [deck, timeline, collection] = await Promise.all([
-        api<DeckDetail>(`/api/decks/${id}`, { token: stored }),
-        api<Timeline>(`/api/decks/${id}/timeline`, { token: stored }),
-        api<CollectionEntry[]>("/api/collection", { token: stored }),
+        api<DeckDetail>(`/api/decks/${id}`),
+        api<Timeline>(`/api/decks/${id}/timeline`),
+        api<CollectionEntry[]>("/api/collection"),
       ]);
 
       // The URL picks the version. Without one, open the most recently saved.
       const wanted = requested === null ? null : Number(requested);
       let version: VersionDetail | null = deck.latest;
       if (wanted !== null && Number.isInteger(wanted) && wanted !== deck.latest?.versionNumber) {
-        version = await api<VersionDetail>(`/api/decks/${id}/versions/${wanted}`, { token: stored });
+        version = await api<VersionDetail>(`/api/decks/${id}/versions/${wanted}`);
       }
 
       setLoaded({ deck, version, timeline, owned: new Map(collection.map((entry) => [entry.card.id, entry.quantity])) });
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearToken();
         router.replace("/login");
         return;
       }
@@ -87,14 +78,14 @@ export default function DeckPage() {
         </div>
       )}
       {!error && !loaded && <p className="py-16 text-muted">Loading the deck.</p>}
-      {loaded && token && (
+      {loaded && (
         // Remounting per version resets the draft to that version's snapshot.
         <DeckBuilder
           key={loaded.version?.versionNumber ?? 0}
           deck={loaded.deck}
           version={loaded.version}
           timeline={loaded.timeline}
-          token={token}
+         
           owned={loaded.owned}
           onSaved={openVersion}
           onSelectVersion={openVersion}

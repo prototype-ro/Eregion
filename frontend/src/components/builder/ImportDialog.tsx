@@ -14,7 +14,6 @@ export interface ImportedCard {
 
 interface Props {
   open: boolean;
-  token: string;
   onClose: () => void;
   /** Wording, so the same dialog can import into a deck or into the collection. */
   title?: string;
@@ -32,7 +31,6 @@ type Step = { kind: "edit" } | { kind: "working"; count: number } | { kind: "rev
 /** Import a decklist by pasting it or loading a text or CSV file. Names are matched on Scryfall. */
 export function ImportDialog({
   open,
-  token,
   onClose,
   onImport,
   title = "Import a list",
@@ -84,7 +82,6 @@ export function ImportDialog({
       for (let start = 0; start < names.length; start += CHUNK) {
         const result = await api<ResolveResult>("/api/cards/resolve", {
           method: "POST",
-          token,
           body: { names: names.slice(start, start + CHUNK) },
         });
         result.matches.forEach((match) => matches.set(match.requested.toLowerCase(), match.card));

@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { setToken } from "@/lib/auth";
-import type { AuthResponse } from "@/lib/types";
+import type { User } from "@/lib/types";
 
 const input =
   "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none";
@@ -27,11 +26,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const body = isRegister
         ? { email: data.get("email"), password: data.get("password"), displayName: data.get("displayName") }
         : { email: data.get("email"), password: data.get("password") };
-      const result = await api<AuthResponse>(isRegister ? "/api/auth/register" : "/api/auth/login", {
+      // The server answers with the user and sets the httpOnly login cookie itself.
+      await api<User>(isRegister ? "/api/auth/register" : "/api/auth/login", {
         method: "POST",
         body,
       });
-      setToken(result.token);
       router.push("/decks");
     } catch (err) {
       if (err instanceof ApiError) {

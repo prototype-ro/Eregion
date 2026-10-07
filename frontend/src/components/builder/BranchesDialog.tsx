@@ -10,7 +10,6 @@ interface Props {
   open: boolean;
   onClose: () => void;
   deckId: string;
-  token: string;
   timeline: Timeline;
   /** The branch of the version open in the builder. */
   currentBranchId: string | null;
@@ -29,7 +28,7 @@ export function BranchesDialog(props: Props) {
   );
 }
 
-function Body({ onClose, deckId, token, timeline, currentBranchId, onChanged }: Props) {
+function Body({ onClose, deckId, timeline, currentBranchId, onChanged }: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -54,9 +53,9 @@ function Body({ onClose, deckId, token, timeline, currentBranchId, onChanged }: 
   }
 
   const rename = (branch: Branch) =>
-    run(() => api<Timeline>(`/api/decks/${deckId}/branches/${branch.id}`, { method: "PATCH", token, body: { name: draft } }), null);
+    run(() => api<Timeline>(`/api/decks/${deckId}/branches/${branch.id}`, { method: "PATCH", body: { name: draft } }), null);
   const remove = (branch: Branch) =>
-    run(() => api<Timeline>(`/api/decks/${deckId}/branches/${branch.id}`, { method: "DELETE", token }), branch.id);
+    run(() => api<Timeline>(`/api/decks/${deckId}/branches/${branch.id}`, { method: "DELETE" }), branch.id);
 
   return (
     <div className="flex flex-col gap-6">

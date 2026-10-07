@@ -9,7 +9,6 @@ interface Props {
   open: boolean;
   onClose: () => void;
   deckId: string;
-  token: string;
   timeline: Timeline;
   visibility: Visibility;
   publishedVersion: number | null;
@@ -27,7 +26,7 @@ export function VisibilityDialog(props: Props) {
   );
 }
 
-function Form({ onClose, deckId, token, timeline, visibility, publishedVersion, currentVersion, onChanged }: Props) {
+function Form({ onClose, deckId, timeline, visibility, publishedVersion, currentVersion, onChanged }: Props) {
   const versions = timeline.branches
     .flatMap((branch) => branch.versions.map((version) => ({ ...version, branch: branch.name })))
     .sort((a, b) => b.versionNumber - a.versionNumber);
@@ -46,7 +45,6 @@ function Form({ onClose, deckId, token, timeline, visibility, publishedVersion, 
     try {
       const deck = await api<DeckDetail>(`/api/decks/${deckId}/visibility`, {
         method: "PUT",
-        token,
         body: { visibility: choice, versionNumber: choice === "public" ? versionNumber : undefined },
       });
       onChanged(deck);
