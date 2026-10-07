@@ -1,19 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { lineKey, type LineGroup } from "@/lib/groups";
-import type { Board, DeckCardLine } from "@/lib/types";
-
-export interface ViewProps {
-  groups: LineGroup[];
-  selectedKey: string | null;
-  /** Keys (card and board) of lines that are not in the opened version. */
-  newKeys: Set<string>;
-  onSelect: (line: DeckCardLine) => void;
-  onQuantity: (line: DeckCardLine, delta: number) => void;
-  onRemove: (line: DeckCardLine) => void;
-  onMove: (line: DeckCardLine, board: Board) => void;
-}
+import type { DeckCardLine } from "@/lib/types";
+import { DotsButton, type ViewProps } from "./CardList";
 
 const CARD_RATIO = "aspect-[488/680]";
 /** How much of each card shows in a stack: enough for the title bar. */
@@ -32,25 +23,29 @@ function GroupHeader({ group }: { group: LineGroup }) {
   );
 }
 
-/** Dim cards you do not own, so what is missing reads at a glance. */
-function art(line: DeckCardLine) {
-  return line.owned >= line.quantity ? "" : "grayscale opacity-60";
+/** With the collection check on, cards you do not own are dimmed so what is missing reads at a glance. */
+function art(line: DeckCardLine, checkCollection: boolean) {
+  return checkCollection && line.owned < line.quantity ? "grayscale opacity-60" : "";
 }
 
 function Badges({ line, isNew }: { line: DeckCardLine; isNew: boolean }) {
   return (
     <>
-      {line.quantity > 1 && (
-        <span className="rounded-full bg-bg px-2 py-0.5 font-mono text-xs text-ink">{line.quantity}x</span>
-      )}
+      {line.quantity > 1 && <span className="rounded-full bg-bg px-2 py-0.5 font-mono text-xs text-ink">{line.quantity}x</span>}
       {isNew && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent">New</span>}
     </>
   );
 }
 
-/** Piles of overlapping cards. Each card shows its title bar, the last one shows in full. */
-export function CardStacks({ groups, selectedKey, newKeys, onSelect }: ViewProps) {
+/**
+ * Piles of overlapping cards. Each card shows its title bar and the last one shows in full.
+ * Clicking a card that is buried under others brings it to the front, drawn over its neighbors
+ * without moving anything. Clicking it again puts it back.
+ */
+export function CardStacks({ groups, selectedKey, newKeys, checkCollection, onSelect, onMenu }: ViewProps) {
+  const [raised, setRaised] = useState<string | null>(null);
   if (groups.length === 0) return <Empty />;
+
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-x-8 gap-y-12">
       {groups.map((group) => (
@@ -60,32 +55,42 @@ export function CardStacks({ groups, selectedKey, newKeys, onSelect }: ViewProps
             {group.lines.map((line, index) => {
               const last = index === group.lines.length - 1;
               const key = lineKey(line);
+              const front = raised === `${group.title}|${key}`;
               return (
-                <li key={key} style={last ? undefined : { height: STRIP }} className={last ? "" : "overflow-hidden"}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(line)}
-                    onMouseEnter={() => onSelect(line)}
-                    aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}`}
-                    className={`group relative block w-full rounded-[10px] text-left ${
-                      selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""
-                    }`}
-                  >
-                    <div className={`relative w-full overflow-hidden rounded-[10px] bg-surface ${CARD_RATIO}`}>
-                      {line.imageNormal && (
-                        <Image
-                          src={line.imageNormal}
-                          alt=""
-                          fill
-                          sizes="260px"
-                          className={`object-cover ${art(line)}`}
-                        />
-                      )}
-                    </div>
-                    <span className="absolute top-1.5 right-1.5 flex gap-1">
+                <li
+                  key={key}
+                  style={last ? undefined : { height: STRIP }}
+                  className={`${front ? "relative z-20" : last ? "" : "overflow-hidden"}`}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    onMenu(line, event.clientX, event.clientY);
+                  }}
+                >
+                  <div className="group/stack relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelect(line);
+                        setRaised(front ? null : `${group.title}|${key}`);
+                      }}
+                      onMouseEnter={() => onSelect(line)}
+                      aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}`}
+                      aria-pressed={front}
+                      className={`block w-full rounded-[10px] text-left ${
+                        front ? "shadow-[0_18px_40px_rgba(0,0,0,0.55)]" : ""
+                      } ${selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""}`}
+                    >
+                      <div className={`relative w-full overflow-hidden rounded-[10px] bg-surface ${CARD_RATIO}`}>
+                        {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="260px" className={`object-cover ${art(line, checkCollection)}`} />}
+                      </div>
+                    </button>
+                    <span className="pointer-events-none absolute top-1 right-1 flex items-center gap-1">
                       <Badges line={line} isNew={newKeys.has(key)} />
+                      <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100">
+                        <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
+                      </span>
                     </span>
-                  </button>
+                  </div>
                 </li>
               );
             })}
@@ -96,10 +101,9 @@ export function CardStacks({ groups, selectedKey, newKeys, onSelect }: ViewProps
   );
 }
 
-/** Every card as a full image, with the same quick edits as the list. */
-export function CardGallery({ groups, selectedKey, newKeys, onSelect, onQuantity, onRemove, onMove }: ViewProps) {
+/** Every card as a full image. */
+export function CardGallery({ groups, selectedKey, newKeys, checkCollection, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) return <Empty />;
-  const small = "flex h-11 w-11 items-center justify-center rounded-full border border-line text-lg leading-none";
 
   return (
     <div className="flex flex-col gap-12">
@@ -109,53 +113,37 @@ export function CardGallery({ groups, selectedKey, newKeys, onSelect, onQuantity
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-x-5 gap-y-7">
             {group.lines.map((line) => {
               const key = lineKey(line);
-              const isCommander = line.board === "commander";
               return (
-                <li key={key} className="group/card flex flex-col gap-2.5" onMouseEnter={() => onSelect(line)}>
+                <li
+                  key={key}
+                  className="flex flex-col gap-1.5"
+                  onMouseEnter={() => onSelect(line)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    onMenu(line, event.clientX, event.clientY);
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => onSelect(line)}
                     aria-label={line.name}
-                    className={`relative block w-full rounded-[14px] ${
-                      selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""
-                    }`}
+                    className={`relative block w-full rounded-[14px] ${selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""}`}
                   >
                     <div className={`relative w-full overflow-hidden rounded-[14px] bg-surface ${CARD_RATIO}`}>
-                      {line.imageNormal && (
-                        <Image src={line.imageNormal} alt="" fill sizes="260px" className={`object-cover ${art(line)}`} />
-                      )}
+                      {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="260px" className={`object-cover ${art(line, checkCollection)}`} />}
                     </div>
                     <span className="absolute top-2 right-2 flex gap-1">
                       <Badges line={line} isNew={newKeys.has(key)} />
                     </span>
                   </button>
-                  <div className="flex items-center justify-between gap-2 px-1">
-                    <p className="truncate text-sm">{line.name}</p>
-                    {line.owned < line.quantity && (
-                      <span className="shrink-0 rounded-full border border-add-line px-2 py-0.5 text-xs text-add-text">Need</span>
-                    )}
-                  </div>
-                  <div className="hidden flex-wrap gap-2 group-focus-within/card:flex group-hover/card:flex">
-                    {!isCommander && (
-                      <>
-                        <button type="button" aria-label={`Remove one ${line.name}`} onClick={() => onQuantity(line, -1)} className={small}>
-                          -
-                        </button>
-                        <button type="button" aria-label={`Add one ${line.name}`} onClick={() => onQuantity(line, 1)} className={small}>
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onMove(line, line.board === "main" ? "maybe" : "main")}
-                          className="min-h-11 rounded-full border border-line px-4 text-sm"
-                        >
-                          {line.board === "main" ? "Maybeboard" : "Mainboard"}
-                        </button>
-                      </>
-                    )}
-                    <button type="button" onClick={() => onRemove(line)} className="min-h-11 rounded-full border border-line px-4 text-sm">
-                      Remove
-                    </button>
+                  <div className="flex items-center justify-between gap-1 pl-1">
+                    <p className="flex min-w-0 items-center gap-2 text-sm">
+                      <span className="truncate">{line.name}</span>
+                      {checkCollection && line.owned < line.quantity && (
+                        <span className="shrink-0 rounded-full border border-add-line px-2 py-0.5 text-xs text-add-text">Need</span>
+                      )}
+                    </p>
+                    <DotsButton line={line} onMenu={onMenu} className="-mr-1" />
                   </div>
                 </li>
               );

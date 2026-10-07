@@ -2,6 +2,8 @@ package io.eregion.deck;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -52,9 +54,9 @@ public class DeckService {
 		UUID deckId = decks.insertDeck(userId, request.name().trim(), format);
 		decks.insertBranch(deckId, MAIN_BRANCH, null);
 		if (request.cards() != null && !request.cards().isEmpty()) {
-			validate(request.cards());
+			List<DeckCardInput> cards = prepare(request.cards());
 			UUID main = decks.findBranchId(deckId, MAIN_BRANCH).orElseThrow();
-			write(deckId, request.note(), request.cards(), main, null);
+			write(deckId, request.note(), cards, main, null);
 		}
 		return get(deckId, userId);
 	}
@@ -80,7 +82,7 @@ public class DeckService {
 	@Transactional
 	public VersionDetail saveVersion(UUID deckId, UUID userId, SaveVersionRequest request) {
 		owned(deckId, userId);
-		validate(request.cards());
+		List<DeckCardInput> cards = prepare(request.cards());
 
 		VersionRow base = request.fromVersion() == null ? null : requireVersion(deckId, request.fromVersion());
 		Plan plan = SavePlanner.plan(
@@ -111,7 +113,7 @@ public class DeckService {
 			throw new IllegalStateException("Unhandled save plan " + plan);
 		}
 
-		VersionRow saved = write(deckId, request.note(), request.cards(), branchId, parentId);
+		VersionRow saved = write(deckId, request.note(), cards, branchId, parentId);
 		return detail(saved, userId);
 	}
 
@@ -178,9 +180,14 @@ public class DeckService {
 		return decks.findVersion(deckId, number).orElseThrow();
 	}
 
-	private void validate(List<DeckCardInput> cards) {
+	/**
+	 * Checks a draft and returns it in storage form: pinned printings that are just the card's
+	 * default become null, and tags are trimmed and de-duplicated.
+	 */
+	private List<DeckCardInput> prepare(List<DeckCardInput> cards) {
 		Set<String> seen = new HashSet<>();
-		Set<UUID> ids = new HashSet<>();
+		Set<UUID> cardIds = new HashSet<>();
+		Set<UUID> printingIds = new HashSet<>();
 		int commanders = 0;
 
 		for (DeckCardInput card : cards) {
@@ -194,15 +201,47 @@ public class DeckService {
 					throw ApiException.badRequest("The commander quantity must be 1");
 				}
 			}
-			ids.add(card.cardId());
+			cardIds.add(card.cardId());
+			if (card.printingId() != null) {
+				printingIds.add(card.printingId());
+			}
 		}
-
 		if (commanders > 1) {
 			throw ApiException.badRequest("A deck can have only one commander");
 		}
-		Set<UUID> known = decks.existingCardIds(ids);
-		if (known.size() != ids.size()) {
-			throw ApiException.badRequest((ids.size() - known.size()) + " card id(s) are not in the catalog. Import them first.");
+
+		Map<UUID, UUID> defaults = decks.defaultPrintings(cardIds);
+		if (defaults.size() != cardIds.size()) {
+			throw ApiException.badRequest((cardIds.size() - defaults.size()) + " card id(s) are not in the catalog. Import them first.");
 		}
+		Map<UUID, UUID> owners = decks.printingOwners(printingIds);
+
+		List<DeckCardInput> prepared = new ArrayList<>(cards.size());
+		for (DeckCardInput card : cards) {
+			UUID printing = card.printingId();
+			if (printing != null && printing.equals(defaults.get(card.cardId()))) {
+				printing = null;
+			}
+			else if (printing != null && !card.cardId().equals(owners.get(printing))) {
+				throw ApiException.badRequest("That printing is not one of this card's printings");
+			}
+			prepared.add(new DeckCardInput(card.cardId(), card.quantity(), card.board(), printing, cleanTags(card.tags())));
+		}
+		return prepared;
+	}
+
+	/** Tags are trimmed, single-spaced and unique ignoring case. The first spelling wins. */
+	static List<String> cleanTags(List<String> tags) {
+		if (tags == null) {
+			return List.of();
+		}
+		Map<String, String> unique = new LinkedHashMap<>();
+		for (String tag : tags) {
+			String cleaned = tag == null ? "" : tag.trim().replaceAll("\\s+", " ");
+			if (!cleaned.isEmpty()) {
+				unique.putIfAbsent(cleaned.toLowerCase(java.util.Locale.ROOT), cleaned);
+			}
+		}
+		return List.copyOf(unique.values());
 	}
 }

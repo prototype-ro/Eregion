@@ -30,6 +30,7 @@ public final class StatsCalculator {
 		int owned = 0;
 		int nonLand = 0;
 		double manaValueSum = 0;
+		double price = 0;
 		int[] curve = new int[CURVE_BUCKETS];
 		Map<String, Integer> types = new LinkedHashMap<>();
 		TYPE_ORDER.forEach(type -> types.put(type, 0));
@@ -40,6 +41,7 @@ public final class StatsCalculator {
 			}
 			int quantity = line.quantity();
 			total += quantity;
+			price += (line.priceUsd() == null ? 0 : line.priceUsd()) * quantity;
 			owned += Math.min(quantity, line.owned());
 			types.merge(line.primaryType(), quantity, Integer::sum);
 
@@ -59,7 +61,7 @@ public final class StatsCalculator {
 		for (int count : curve) {
 			curveList.add(count);
 		}
-		return new DeckStats(total, average, List.copyOf(curveList), types, lands, owned, total - owned);
+		return new DeckStats(total, average, List.copyOf(curveList), types, lands, owned, total - owned, round2(price));
 	}
 
 	static double round2(double value) {

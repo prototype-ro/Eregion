@@ -19,10 +19,13 @@ public final class DeckDtos {
 
 	// ---- requests ----
 
+	/** One card in a draft. printingId pins a printing (null means the card's default). tags are free-form labels. */
 	public record DeckCardInput(
 			@NotNull UUID cardId,
 			@Min(1) @Max(99) int quantity,
-			@NotBlank String board) {
+			@NotBlank String board,
+			UUID printingId,
+			@Size(max = 12) List<@NotBlank @Size(max = 30) String> tags) {
 	}
 
 	public record CreateDeckRequest(
@@ -54,12 +57,21 @@ public final class DeckDtos {
 			String primaryType,
 			String typeLine,
 			String colors,
+			String oracleText,
+			String rarity,
+			String artist,
 			String imageSmall,
 			String imageNormal,
 			String imageArtCrop,
+			UUID printingId,
+			String setCode,
+			String setName,
+			String collectorNumber,
+			Double priceUsd,
 			String board,
 			int quantity,
-			int owned) {
+			int owned,
+			List<String> tags) {
 	}
 
 	public record DeckStats(
@@ -69,7 +81,8 @@ public final class DeckDtos {
 			Map<String, Integer> types,
 			int lands,
 			int owned,
-			int missing) {
+			int missing,
+			double totalPriceUsd) {
 	}
 
 	public record VersionDetail(

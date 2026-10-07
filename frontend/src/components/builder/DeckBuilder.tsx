@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { groupLines, lineKey, type GroupMode } from "@/lib/groups";
+import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
 import { computeStats } from "@/lib/stats";
-import type { Board, Card, DeckCardLine, Timeline, VersionDetail } from "@/lib/types";
+import type { Board, Card, DeckCardLine, Printing, Timeline, VersionDetail } from "@/lib/types";
 import { CardList } from "./CardList";
-import { CardGallery, CardStacks } from "./CardViews";
+import { CardMenu, type MenuTarget } from "./CardMenu";
+import { CardPeek } from "./CardPeek";
 import { CardPreview } from "./CardPreview";
 import { CardSearch } from "./CardSearch";
+import { CardGallery, CardStacks } from "./CardViews";
+import { ImportDialog, type ImportedCard } from "./ImportDialog";
+import { PrintingPicker } from "./PrintingPicker";
 import { StatsSection } from "./StatsSection";
+import { TagEditor } from "./TagEditor";
 import { VersionTimeline } from "./VersionTimeline";
 
 type Tab = "main" | "maybe" | "considering";
@@ -29,8 +34,10 @@ const VIEWS: Array<[ViewMode, string]> = [
 
 const MAX_QUANTITY = 99;
 const VIEW_KEY = "eregion-deck-view";
+const TIMELINE_KEY = "eregion-timeline-open";
+const COLLECTION_KEY = "eregion-collection-check";
 
-function lineFromCard(card: Card, board: Board): DeckCardLine {
+function lineFromCard(card: Card, board: Board, quantity = 1): DeckCardLine {
   return {
     cardId: card.id,
     name: card.name,
@@ -39,24 +46,41 @@ function lineFromCard(card: Card, board: Board): DeckCardLine {
     primaryType: card.primaryType,
     typeLine: card.typeLine,
     colors: card.colors,
+    oracleText: card.oracleText,
+    rarity: card.rarity,
+    artist: card.artist,
     imageSmall: card.imageSmall,
     imageNormal: card.imageNormal,
     imageArtCrop: card.imageArtCrop,
+    printingId: card.scryfallId,
+    setCode: card.setCode,
+    setName: card.setName,
+    collectorNumber: card.collectorNumber,
+    priceUsd: card.priceUsd,
     board,
-    quantity: 1,
+    quantity,
     owned: 0,
+    tags: [],
   };
 }
 
 /** Order-independent fingerprint of a card list, used to tell whether the draft changed. */
 const signature = (lines: DeckCardLine[]) =>
   lines
-    .map((line) => `${lineKey(line)}:${line.quantity}`)
+    .map((line) => `${lineKey(line)}:${line.quantity}:${line.printingId}:${[...line.tags].sort().join("|")}`)
     .sort()
     .join(",");
 
 const field =
   "min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none";
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked: the choice just is not remembered.
+  }
+}
 
 interface Props {
   deck: { id: string; name: string; format: string };
@@ -78,6 +102,9 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const [tab, setTab] = useState<Tab>("main");
   const [group, setGroup] = useState<GroupMode>("type");
   const [view, setView] = useState<ViewMode>("list");
+  const [timelineOpen, setTimelineOpen] = useState(true);
+  // Off by default: until the collection is filled in, flagging every card as missing is just noise.
+  const [checkCollection, setCheckCollection] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [branching, setBranching] = useState(false);
@@ -85,24 +112,30 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Remember the chosen view between visits.
+  const [menu, setMenu] = useState<MenuTarget | null>(null);
+  const [peekKey, setPeekKey] = useState<string | null>(null);
+  const [printingKey, setPrintingKey] = useState<string | null>(null);
+  const [tagKey, setTagKey] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Remember the chosen view and whether the timeline is open.
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(VIEW_KEY);
-      if (stored === "list" || stored === "stacks" || stored === "gallery") setView(stored);
+      const storedView = localStorage.getItem(VIEW_KEY);
+      if (storedView === "list" || storedView === "stacks" || storedView === "gallery") setView(storedView);
+      if (localStorage.getItem(TIMELINE_KEY) === "closed") setTimelineOpen(false);
+      if (localStorage.getItem(COLLECTION_KEY) === "on") setCheckCollection(true);
     } catch {
-      // Storage blocked: the view just resets next time.
+      // Storage blocked: defaults apply.
     }
   }, []);
 
-  function chooseView(next: ViewMode) {
-    setView(next);
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // Not persisted, that is fine.
-    }
-  }
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const withOwned = useMemo(() => lines.map((line) => ({ ...line, owned: owned.get(line.cardId) ?? 0 })), [lines, owned]);
   const baseWithOwned = useMemo(
@@ -117,6 +150,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const currentKeys = useMemo(() => new Set(lines.map(lineKey)), [lines]);
   const newKeys = useMemo(() => new Set(lines.filter((line) => !baseKeys.has(lineKey(line))).map(lineKey)), [lines, baseKeys]);
   const removed = useMemo(() => baseWithOwned.filter((line) => !currentKeys.has(lineKey(line))), [baseWithOwned, currentKeys]);
+  const tagSuggestions = useMemo(() => allTags(lines), [lines]);
 
   const dirty = signature(lines) !== signature(baseLines);
   const hasCommander = lines.some((line) => line.board === "commander");
@@ -127,8 +161,9 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const canSave = lines.length > 0 && !saving && (needsBranch ? branchName.trim() !== "" : dirty);
 
   const visible = withOwned.filter((line) => (tab === "main" ? line.board === "main" || line.board === "commander" : line.board === tab));
-  const groups = tab === "main" ? groupLines(visible, group) : groupLines(visible, "type");
-  const selected = withOwned.find((line) => lineKey(line) === selectedKey) ?? withOwned.find((line) => line.board === "commander") ?? null;
+  const groups = groupLines(visible, tab === "main" ? group : "type");
+  const lineByKey = (key: string | null) => withOwned.find((line) => lineKey(line) === key) ?? null;
+  const selected = lineByKey(selectedKey) ?? withOwned.find((line) => line.board === "commander") ?? null;
 
   const tabCount = (target: Tab) =>
     withOwned
@@ -136,6 +171,25 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
       .reduce((sum, line) => sum + line.quantity, 0);
 
   const versionSummary = timeline.branches.flatMap((branch) => branch.versions).find((v) => v.versionNumber === version?.versionNumber);
+
+  function chooseView(next: ViewMode) {
+    setView(next);
+    remember(VIEW_KEY, next);
+  }
+
+  function toggleCollectionCheck() {
+    setCheckCollection((on) => {
+      remember(COLLECTION_KEY, on ? "off" : "on");
+      return !on;
+    });
+  }
+
+  function toggleTimeline() {
+    setTimelineOpen((open) => {
+      remember(TIMELINE_KEY, open ? "closed" : "open");
+      return !open;
+    });
+  }
 
   // ---- editing ----
 
@@ -156,7 +210,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
     setTab("main");
   }
 
-  function changeQuantity(target: DeckCardLine, delta: number) {
+  const changeQuantity = useCallback((target: DeckCardLine, delta: number) => {
     setLines((previous) =>
       previous.flatMap((line) => {
         if (lineKey(line) !== lineKey(target)) return [line];
@@ -164,13 +218,13 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         return quantity <= 0 ? [] : [{ ...line, quantity }];
       }),
     );
-  }
+  }, []);
 
-  function removeLine(target: DeckCardLine) {
+  const removeLine = useCallback((target: DeckCardLine) => {
     setLines((previous) => previous.filter((line) => lineKey(line) !== lineKey(target)));
-  }
+  }, []);
 
-  function moveLine(target: DeckCardLine, board: Board) {
+  const moveLine = useCallback((target: DeckCardLine, board: Board) => {
     setLines((previous) => {
       const rest = previous.filter((line) => lineKey(line) !== lineKey(target));
       const index = rest.findIndex((line) => line.cardId === target.cardId && line.board === board);
@@ -179,6 +233,56 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         i === index ? { ...line, quantity: Math.min(MAX_QUANTITY, line.quantity + target.quantity) } : line,
       );
     });
+  }, []);
+
+  function setTags(target: DeckCardLine, tags: string[]) {
+    setLines((previous) => previous.map((line) => (lineKey(line) === lineKey(target) ? { ...line, tags } : line)));
+  }
+
+  function choosePrinting(target: DeckCardLine, printing: Printing) {
+    setLines((previous) =>
+      previous.map((line) =>
+        lineKey(line) === lineKey(target)
+          ? {
+              ...line,
+              printingId: printing.scryfallId,
+              setCode: printing.setCode,
+              setName: printing.setName,
+              collectorNumber: printing.collectorNumber,
+              rarity: printing.rarity || line.rarity,
+              artist: printing.artist || line.artist,
+              imageSmall: printing.imageSmall || line.imageSmall,
+              imageNormal: printing.imageNormal || line.imageNormal,
+              imageArtCrop: printing.imageArtCrop || line.imageArtCrop,
+              priceUsd: printing.priceUsd,
+            }
+          : line,
+      ),
+    );
+    setPrintingKey(null);
+  }
+
+  function importCards(cards: ImportedCard[], replace: boolean) {
+    const incoming = cards.map(({ card, quantity, board }) => lineFromCard(card, board, quantity));
+    setLines((previous) => {
+      const base = replace ? [] : previous;
+      let next = base;
+      for (const line of incoming) {
+        if (line.board === "commander") {
+          next = [...next.filter((existing) => existing.board !== "commander" && existing.cardId !== line.cardId), line];
+          continue;
+        }
+        const index = next.findIndex((existing) => lineKey(existing) === lineKey(line));
+        next =
+          index === -1
+            ? [...next, line]
+            : next.map((existing, i) =>
+                i === index ? { ...existing, quantity: Math.min(MAX_QUANTITY, existing.quantity + line.quantity) } : existing,
+              );
+      }
+      return next;
+    });
+    setToast(`Imported ${incoming.reduce((sum, line) => sum + line.quantity, 0)} cards`);
   }
 
   async function save() {
@@ -190,7 +294,13 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         token,
         body: {
           note: note.trim(),
-          cards: lines.map((line) => ({ cardId: line.cardId, quantity: line.quantity, board: line.board })),
+          cards: lines.map((line) => ({
+            cardId: line.cardId,
+            quantity: line.quantity,
+            board: line.board,
+            printingId: line.printingId,
+            tags: line.tags,
+          })),
           fromVersion: version?.versionNumber,
           branchName: needsBranch ? branchName.trim() : undefined,
         },
@@ -204,14 +314,14 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   }
 
   const inDeck = useMemo(() => new Set(lines.map((line) => line.cardId)), [lines]);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const viewProps = {
     groups,
     selectedKey,
     newKeys,
     onSelect: (line: DeckCardLine) => setSelectedKey(lineKey(line)),
-    onQuantity: changeQuantity,
-    onRemove: removeLine,
-    onMove: moveLine,
+    onMenu: (line: DeckCardLine, x: number, y: number) => setMenu({ line, x, y }),
+    checkCollection,
   };
 
   return (
@@ -309,21 +419,36 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         </p>
       )}
 
-      {/* Version timeline */}
-      <section aria-labelledby="timeline-heading" className="mb-10 rounded-card border border-line bg-surface px-6 pt-5 pb-6">
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
+      {/* Version timeline, collapsible */}
+      <section aria-labelledby="timeline-heading" className="mb-10 rounded-card border border-line bg-surface px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="timeline-heading" className="text-lg font-medium">
             Versions
           </h2>
-          {version && (
-            <p className="text-sm text-muted">
-              v{version.versionNumber} on {version.branchName}
-              {versionSummary ? `, ${versionSummary.cardCount} cards` : ""}
-              {version.note ? `, "${version.note}"` : ""}
-            </p>
-          )}
+          <div className="flex items-center gap-4">
+            {version && (
+              <p className="text-sm text-muted">
+                v{version.versionNumber} on {version.branchName}
+                {versionSummary ? `, ${versionSummary.cardCount} cards` : ""}
+                {version.note ? `, "${version.note}"` : ""}
+              </p>
+            )}
+            <button
+              type="button"
+              aria-expanded={timelineOpen}
+              aria-controls="timeline-body"
+              onClick={toggleTimeline}
+              className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
+            >
+              {timelineOpen ? "Hide timeline" : "Show timeline"}
+            </button>
+          </div>
         </div>
-        <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} onSelect={onSelectVersion} />
+        {timelineOpen && (
+          <div id="timeline-body" className="pt-2 pb-2">
+            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} onSelect={onSelectVersion} />
+          </div>
+        )}
       </section>
 
       {/* Toolbar */}
@@ -345,22 +470,38 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-2">
           {tab === "main" && (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted">Group by</span>
-              <div className="flex gap-1 rounded-full border border-line p-1">
-                {(["type", "mv"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={group === mode}
-                    onClick={() => setGroup(mode)}
-                    className={`min-h-9 rounded-full px-4 text-sm ${group === mode ? "bg-ink text-bg" : ""}`}
-                  >
-                    {mode === "type" ? "Type" : "Mana value"}
-                  </button>
+              <label htmlFor="group-by" className="text-sm text-muted">
+                Group by
+              </label>
+              <select
+                id="group-by"
+                value={group}
+                onChange={(event) => setGroup(event.target.value as GroupMode)}
+                className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+              >
+                {GROUP_MODES.map(([mode, label]) => (
+                  <option key={mode} value={mode}>
+                    {label}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           )}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={checkCollection}
+            onClick={toggleCollectionCheck}
+            className="flex min-h-11 items-center gap-3 text-sm"
+          >
+            <span
+              aria-hidden="true"
+              className={`relative h-6 w-11 rounded-full border transition-colors ${checkCollection ? "border-accent-text bg-accent" : "border-line bg-surface"}`}
+            >
+              <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-ink transition-all ${checkCollection ? "left-5.5" : "left-0.5"}`} />
+            </span>
+            Check collection
+          </button>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted">View</span>
             <div className="flex gap-1 rounded-full border border-line p-1">
@@ -380,14 +521,23 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         </div>
       </div>
 
-      <div className="py-7">
-        <CardSearch token={token} inDeck={inDeck} owned={owned} onAdd={addCard} onSetCommander={setCommander} />
+      <div className="flex flex-wrap items-end gap-3 py-7">
+        <div className="min-w-[260px] flex-1">
+          <CardSearch token={token} inDeck={inDeck} owned={owned} showCollection={checkCollection} onAdd={addCard} onSetCommander={setCommander} />
+        </div>
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium"
+        >
+          Import list
+        </button>
       </div>
 
       {/* Cards */}
       <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
         <div className="lg:sticky lg:top-6">
-          <CardPreview line={selected} />
+          <CardPreview line={selected} showCollection={checkCollection} />
         </div>
         <div>
           {view === "list" && <CardList {...viewProps} />}
@@ -397,8 +547,46 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
       </div>
 
       <div className="mt-16">
-        <StatsSection deckId={deck.id} stats={stats} saved={savedStats} savedVersion={version?.versionNumber ?? 0} removed={removed} />
+        <StatsSection
+          deckId={deck.id}
+          stats={stats}
+          saved={savedStats}
+          savedVersion={version?.versionNumber ?? 0}
+          removed={removed}
+          showCollection={checkCollection}
+        />
       </div>
+
+      {/* Overlays */}
+      <CardMenu
+        target={menu}
+        onClose={closeMenu}
+        onPeek={(line) => setPeekKey(lineKey(line))}
+        onPrinting={(line) => setPrintingKey(lineKey(line))}
+        onTags={(line) => setTagKey(lineKey(line))}
+        onQuantity={changeQuantity}
+        onMove={moveLine}
+        onRemove={removeLine}
+        onNotify={setToast}
+      />
+      <CardPeek
+        line={lineByKey(peekKey)}
+        showCollection={checkCollection}
+        onClose={() => setPeekKey(null)}
+        onChangePrinting={(line) => {
+          setPeekKey(null);
+          setPrintingKey(lineKey(line));
+        }}
+      />
+      <PrintingPicker line={lineByKey(printingKey)} token={token} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} />
+      <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
+      <ImportDialog open={importOpen} token={token} onClose={() => setImportOpen(false)} onImport={importCards} />
+
+      {toast && (
+        <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">
+          {toast}
+        </p>
+      )}
     </div>
   );
 }

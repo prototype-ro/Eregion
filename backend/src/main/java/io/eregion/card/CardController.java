@@ -25,14 +25,22 @@ public class CardController {
 	public record ImportRequest(@NotEmpty @Size(max = 100) List<@NotBlank @Size(max = 200) String> names) {
 	}
 
+	public record ResolveRequest(@NotEmpty @Size(max = 250) List<@NotBlank @Size(max = 200) String> names) {
+	}
+
 	private final CardRepository cards;
 	private final CardSearchService search;
 	private final CardImportService importer;
+	private final CardResolveService resolver;
+	private final PrintingService printings;
 
-	public CardController(CardRepository cards, CardSearchService search, CardImportService importer) {
+	public CardController(CardRepository cards, CardSearchService search, CardImportService importer,
+			CardResolveService resolver, PrintingService printings) {
 		this.cards = cards;
 		this.search = search;
 		this.importer = importer;
+		this.resolver = resolver;
+		this.printings = printings;
 	}
 
 	/** Searches our catalog and, when it has too few matches, Scryfall too. Saved cards come back with ids. */
@@ -47,6 +55,18 @@ public class CardController {
 	@GetMapping("/{id}")
 	public Card get(@PathVariable UUID id) {
 		return cards.findById(id).orElseThrow(() -> ApiException.notFound("Card"));
+	}
+
+	/** Every printing of a card, for the printing picker. Fetched from Scryfall the first time. */
+	@GetMapping("/{id}/printings")
+	public List<Printing> printings(@PathVariable UUID id) {
+		return printings.forCard(id);
+	}
+
+	/** Turns pasted card names into catalog cards, importing the ones we do not have yet. */
+	@PostMapping("/resolve")
+	public CardResolveService.Result resolve(@Valid @RequestBody ResolveRequest request) {
+		return resolver.resolve(request.names());
 	}
 
 	/** Authenticated. Pulls cards by exact name from Scryfall into our catalog. */

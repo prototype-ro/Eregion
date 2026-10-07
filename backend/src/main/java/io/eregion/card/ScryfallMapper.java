@@ -35,11 +35,51 @@ public final class ScryfallMapper {
 				colorString(source.color_identity()),
 				oracle,
 				orEmpty(source.set()),
+				orEmpty(source.set_name()),
+				orEmpty(source.collector_number()),
 				orEmpty(source.rarity()),
 				artist,
+				price(source.prices()),
 				images == null ? "" : orEmpty(images.small()),
 				images == null ? "" : orEmpty(images.normal()),
 				images == null ? "" : orEmpty(images.art_crop()));
+	}
+
+	/** One printing of a card, as returned for the printing picker. */
+	public static Printing toPrinting(ScryfallCard source, java.util.UUID cardId) {
+		Face front = source.card_faces() == null || source.card_faces().isEmpty() ? null : source.card_faces().get(0);
+		ImageUris images = source.image_uris() != null ? source.image_uris() : front == null ? null : front.image_uris();
+		return new Printing(
+				UUID.fromString(source.id()),
+				cardId,
+				orEmpty(source.set()),
+				orEmpty(source.set_name()),
+				orEmpty(source.collector_number()),
+				source.released_at() == null || source.released_at().isBlank() ? null : source.released_at(),
+				orEmpty(source.rarity()),
+				firstNonBlank(source.artist(), front == null ? null : front.artist(), ""),
+				images == null ? "" : orEmpty(images.small()),
+				images == null ? "" : orEmpty(images.normal()),
+				images == null ? "" : orEmpty(images.art_crop()),
+				price(source.prices()));
+	}
+
+	/** Regular price first, then foil or etched for cards that only exist in those finishes. */
+	static Double price(ScryfallCard.Prices prices) {
+		if (prices == null) {
+			return null;
+		}
+		for (String value : new String[] { prices.usd(), prices.usd_foil(), prices.usd_etched() }) {
+			if (value != null && !value.isBlank()) {
+				try {
+					return Double.valueOf(value);
+				}
+				catch (NumberFormatException ignored) {
+					// Try the next finish.
+				}
+			}
+		}
+		return null;
 	}
 
 	/**

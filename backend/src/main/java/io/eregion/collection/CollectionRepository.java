@@ -24,8 +24,8 @@ public class CollectionRepository {
 	public List<CollectionEntry> list(UUID userId) {
 		return jdbc.sql("""
 				SELECT c.id, c.scryfall_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.primary_type,
-				       c.colors, c.color_identity, c.oracle_text, c.set_code, c.rarity, c.artist,
-				       c.image_small, c.image_normal, c.image_art_crop, e.quantity
+				       c.colors, c.color_identity, c.oracle_text, c.set_code, c.set_name, c.collector_number,
+				       c.rarity, c.artist, c.price_usd, c.image_small, c.image_normal, c.image_art_crop, e.quantity
 				  FROM collection_entries e
 				  JOIN cards c ON c.id = e.card_id
 				 WHERE e.user_id = :user

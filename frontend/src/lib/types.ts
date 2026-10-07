@@ -25,11 +25,35 @@ export interface Card {
   colorIdentity: string;
   oracleText: string;
   setCode: string;
+  setName: string;
+  collectorNumber: string;
+  rarity: string;
+  artist: string;
+  priceUsd: number | null;
+  imageSmall: string;
+  imageNormal: string;
+  imageArtCrop: string;
+}
+
+/** One printing of a card: a set, a collector number, its own art and price. */
+export interface Printing {
+  scryfallId: string;
+  cardId: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  releasedAt: string | null;
   rarity: string;
   artist: string;
   imageSmall: string;
   imageNormal: string;
   imageArtCrop: string;
+  priceUsd: number | null;
+}
+
+export interface ResolveResult {
+  matches: Array<{ requested: string; card: Card }>;
+  notFound: string[];
 }
 
 export interface DeckSummary {
@@ -51,12 +75,22 @@ export interface DeckCardLine {
   primaryType: string;
   typeLine: string;
   colors: string;
+  oracleText: string;
+  rarity: string;
+  artist: string;
   imageSmall: string;
   imageNormal: string;
   imageArtCrop: string;
+  /** The printing shown: a pinned one, or the card's default. */
+  printingId: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  priceUsd: number | null;
   board: Board;
   quantity: number;
   owned: number;
+  tags: string[];
 }
 
 export interface DeckStats {
@@ -67,6 +101,7 @@ export interface DeckStats {
   lands: number;
   owned: number;
   missing: number;
+  totalPriceUsd: number;
 }
 
 export interface VersionDetail {

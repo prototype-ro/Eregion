@@ -18,12 +18,20 @@ public record ScryfallCard(
 		List<String> color_identity,
 		String oracle_text,
 		String set,
+		String set_name,
+		String collector_number,
+		String released_at,
 		String rarity,
 		String artist,
+		Prices prices,
 		ImageUris image_uris,
 		List<Face> card_faces) {
 
 	public record ImageUris(String small, String normal, String art_crop) {
+	}
+
+	/** Scryfall sends prices as strings, and null when there is no market price. */
+	public record Prices(String usd, String usd_foil, String usd_etched) {
 	}
 
 	public record Face(

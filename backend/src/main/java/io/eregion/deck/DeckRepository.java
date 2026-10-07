@@ -1,16 +1,17 @@
 package io.eregion.deck;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -190,12 +191,27 @@ public class DeckRepository {
 	}
 
 	public void insertVersionCards(UUID versionId, List<DeckCardInput> cards) {
-		List<Object[]> rows = new ArrayList<>(cards.size());
-		for (DeckCardInput card : cards) {
-			rows.add(new Object[] { versionId, card.cardId(), card.board(), card.quantity() });
-		}
 		template.batchUpdate(
-				"INSERT INTO deck_version_cards (version_id, card_id, board, quantity) VALUES (?, ?, ?, ?)", rows);
+				"INSERT INTO deck_version_cards (version_id, card_id, board, quantity, printing_id, tags)"
+						+ " VALUES (?, ?, ?, ?, ?, ?)",
+				new BatchPreparedStatementSetter() {
+					@Override
+					public void setValues(PreparedStatement ps, int i) throws SQLException {
+						DeckCardInput card = cards.get(i);
+						ps.setObject(1, versionId);
+						ps.setObject(2, card.cardId());
+						ps.setString(3, card.board());
+						ps.setInt(4, card.quantity());
+						ps.setObject(5, card.printingId());
+						List<String> tags = card.tags() == null ? List.of() : card.tags();
+						ps.setArray(6, ps.getConnection().createArrayOf("text", tags.toArray(new String[0])));
+					}
+
+					@Override
+					public int getBatchSize() {
+						return cards.size();
+					}
+				});
 	}
 
 	public Optional<VersionRow> findVersion(UUID deckId, int number) {
@@ -246,14 +262,28 @@ public class DeckRepository {
 				.list();
 	}
 
-	/** A version's cards, with how many copies the viewing user owns of each. */
+	/**
+	 * A version's cards, with how many copies the viewing user owns of each. A line that pins a
+	 * printing shows that printing's art, set and price. Otherwise it shows the card's default.
+	 */
 	public List<DeckCardLine> versionLines(UUID versionId, UUID userId) {
 		return jdbc.sql("""
 				SELECT c.id AS card_id, c.name, c.mana_cost, c.mana_value, c.primary_type, c.type_line, c.colors,
-				       c.image_small, c.image_normal, c.image_art_crop,
-				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned
+				       c.oracle_text,
+				       COALESCE(p.rarity, c.rarity) AS rarity,
+				       COALESCE(p.artist, c.artist) AS artist,
+				       COALESCE(p.image_small, c.image_small) AS image_small,
+				       COALESCE(p.image_normal, c.image_normal) AS image_normal,
+				       COALESCE(p.image_art_crop, c.image_art_crop) AS image_art_crop,
+				       COALESCE(p.scryfall_id, c.scryfall_id) AS printing_id,
+				       COALESCE(p.set_code, c.set_code) AS set_code,
+				       COALESCE(p.set_name, c.set_name) AS set_name,
+				       COALESCE(p.collector_number, c.collector_number) AS collector_number,
+				       CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END AS price_usd,
+				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned, dc.tags
 				  FROM deck_version_cards dc
 				  JOIN cards c ON c.id = dc.card_id
+				  LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
 				  LEFT JOIN collection_entries e ON e.card_id = c.id AND e.user_id = :user
 				 WHERE dc.version_id = :version
 				 ORDER BY CASE dc.board WHEN 'commander' THEN 0 WHEN 'main' THEN 1 WHEN 'maybe' THEN 2 ELSE 3 END,
@@ -265,14 +295,36 @@ public class DeckRepository {
 				.list();
 	}
 
-	public Set<UUID> existingCardIds(Collection<UUID> ids) {
-		if (ids.isEmpty()) {
-			return Set.of();
+	/** Default printing id of each known card, keyed by card id. Also tells which card ids exist. */
+	public Map<UUID, UUID> defaultPrintings(Collection<UUID> cardIds) {
+		if (cardIds.isEmpty()) {
+			return Map.of();
 		}
-		return new HashSet<>(jdbc.sql("SELECT id FROM cards WHERE id IN (:ids)")
-				.param("ids", ids)
-				.query(UUID.class)
-				.list());
+		Map<UUID, UUID> result = new HashMap<>();
+		jdbc.sql("SELECT id, scryfall_id FROM cards WHERE id IN (:ids)")
+				.param("ids", cardIds)
+				.query((rs, n) -> {
+					result.put(rs.getObject("id", UUID.class), rs.getObject("scryfall_id", UUID.class));
+					return null;
+				})
+				.list();
+		return result;
+	}
+
+	/** Which card each of these printing ids belongs to. Unknown printings are left out. */
+	public Map<UUID, UUID> printingOwners(Collection<UUID> printingIds) {
+		if (printingIds.isEmpty()) {
+			return Map.of();
+		}
+		Map<UUID, UUID> result = new HashMap<>();
+		jdbc.sql("SELECT scryfall_id, card_id FROM card_printings WHERE scryfall_id IN (:ids)")
+				.param("ids", printingIds)
+				.query((rs, n) -> {
+					result.put(rs.getObject("scryfall_id", UUID.class), rs.getObject("card_id", UUID.class));
+					return null;
+				})
+				.list();
+		return result;
 	}
 
 	private static VersionRow mapVersion(ResultSet rs, int rowNum) throws SQLException {
@@ -288,6 +340,8 @@ public class DeckRepository {
 	}
 
 	private static DeckCardLine mapLine(ResultSet rs, int rowNum) throws SQLException {
+		java.sql.Array tagArray = rs.getArray("tags");
+		List<String> tags = tagArray == null ? List.of() : List.of((String[]) tagArray.getArray());
 		return new DeckCardLine(
 				rs.getObject("card_id", UUID.class),
 				rs.getString("name"),
@@ -296,11 +350,20 @@ public class DeckRepository {
 				rs.getString("primary_type"),
 				rs.getString("type_line"),
 				rs.getString("colors"),
+				rs.getString("oracle_text"),
+				rs.getString("rarity"),
+				rs.getString("artist"),
 				rs.getString("image_small"),
 				rs.getString("image_normal"),
 				rs.getString("image_art_crop"),
+				rs.getObject("printing_id", UUID.class),
+				rs.getString("set_code"),
+				rs.getString("set_name"),
+				rs.getString("collector_number"),
+				io.eregion.common.Sql.nullableDouble(rs, "price_usd"),
 				rs.getString("board"),
 				rs.getInt("quantity"),
-				rs.getInt("owned"));
+				rs.getInt("owned"),
+				tags);
 	}
 }

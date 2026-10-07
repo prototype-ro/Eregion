@@ -21,12 +21,14 @@ export function computeStats(lines: DeckCardLine[]): DeckStats {
   let owned = 0;
   let nonLand = 0;
   let manaValueSum = 0;
+  let price = 0;
   const curve = new Array<number>(CURVE_BUCKETS).fill(0);
   const counts = new Map<string, number>();
 
   for (const line of lines) {
     if (!isCounted(line.board)) continue;
     total += line.quantity;
+    price += (line.priceUsd ?? 0) * line.quantity;
     owned += Math.min(line.quantity, line.owned);
     counts.set(line.primaryType, (counts.get(line.primaryType) ?? 0) + line.quantity);
 
@@ -56,5 +58,6 @@ export function computeStats(lines: DeckCardLine[]): DeckStats {
     lands,
     owned,
     missing: total - owned,
+    totalPriceUsd: round2(price),
   };
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPrice } from "@/lib/links";
 import type { DeckCardLine, DeckStats } from "@/lib/types";
 
 interface Props {
@@ -8,10 +9,11 @@ interface Props {
   saved: DeckStats | null;
   savedVersion: number;
   removed: DeckCardLine[];
+  showCollection: boolean;
 }
 
 /** The deck's numbers, in their own section under the cards so they read separately. */
-export function StatsSection({ deckId, stats, saved, savedVersion, removed }: Props) {
+export function StatsSection({ deckId, stats, saved, savedVersion, removed, showCollection }: Props) {
   const maxCurve = Math.max(...stats.curve, 1);
   const shift = saved ? Math.round((stats.averageManaValue - saved.averageManaValue) * 100) / 100 : 0;
 
@@ -35,12 +37,21 @@ export function StatsSection({ deckId, stats, saved, savedVersion, removed }: Pr
               </p>
             )}
           </div>
+          {showCollection && (
           <div>
             <p className="text-[15px] text-muted">Your collection</p>
             <p className="mt-2 text-[clamp(40px,4vw,64px)] leading-none font-medium tracking-[-0.04em] whitespace-nowrap">
               {stats.owned} of {stats.totalCards}
             </p>
             <p className="mt-2 text-sm text-muted">owned. {stats.missing} still needed.</p>
+          </div>
+          )}
+          <div>
+            <p className="text-[15px] text-muted">Deck value</p>
+            <p className="mt-2 text-[clamp(40px,4vw,64px)] leading-none font-medium tracking-[-0.04em] whitespace-nowrap">
+              {formatPrice(stats.totalPriceUsd)}
+            </p>
+            <p className="mt-2 text-sm text-muted">Scryfall market prices, refreshed daily.</p>
           </div>
         </div>
 

@@ -2,6 +2,7 @@ package io.eregion.deck;
 
 import static io.eregion.deck.Lines.line;
 import static io.eregion.deck.Lines.main;
+import static io.eregion.deck.Lines.priced;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -86,5 +87,16 @@ class StatsCalculatorTest {
 				main("Counterspell", "Instant", 2, 1)));
 
 		assertThat(stats.types().keySet()).containsExactly("Creature", "Instant", "Land");
+	}
+
+	@Test
+	void totalPriceCountsQuantityAndSkipsUnpricedAndBenchedCards() {
+		DeckStats stats = StatsCalculator.compute(List.of(
+				priced("Sol Ring", "Artifact", 1, 1, 1.50),
+				priced("Forest", "Land", 0, 4, 0.25),
+				main("Mystery Card", "Instant", 2, 1),
+				line("Mana Drain", "Instant", 2, "maybe", 1, 0)));
+
+		assertThat(stats.totalPriceUsd()).isEqualTo(2.5);
 	}
 }

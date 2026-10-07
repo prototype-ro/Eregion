@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Card } from "@/lib/types";
 
@@ -10,16 +10,19 @@ interface Props {
   /** Ids of cards already in the deck, so results can offer "Add another". */
   inDeck: Set<string>;
   owned: Map<string, number>;
+  /** Show whether each result is in your collection. */
+  showCollection: boolean;
   onAdd: (card: Card) => void;
   onSetCommander: (card: Card) => void;
 }
 
-export function CardSearch({ token, inDeck, owned, onAdd, onSetCommander }: Props) {
+export function CardSearch({ token, inDeck, owned, showCollection, onAdd, onSetCommander }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Card[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const input = useRef<HTMLInputElement>(null);
   const trimmed = query.trim();
   const searchable = trimmed.length >= 2;
 
@@ -59,8 +62,19 @@ export function CardSearch({ token, inDeck, owned, onAdd, onSetCommander }: Prop
       </label>
       <input
         id="card-search"
+        ref={input}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
+        onKeyDown={(event) => {
+          // Escape leaves the search: it empties the box, closes the results and drops focus.
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setQuery("");
+            setResults([]);
+            setError(null);
+            input.current?.blur();
+          }
+        }}
         autoComplete="off"
         placeholder="Search by card name"
         className="min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
@@ -105,13 +119,17 @@ export function CardSearch({ token, inDeck, owned, onAdd, onSetCommander }: Prop
                       {card.manaCost ? `, ${card.manaCost}` : ""}
                     </p>
                   </div>
-                  <p
-                    className={`hidden rounded-full border px-3 py-1 text-[13px] whitespace-nowrap sm:block ${
-                      have > 0 ? "border-line text-ink" : "border-add-line text-add-text"
-                    }`}
-                  >
-                    {have > 0 ? `Own ${have}` : "Not owned"}
-                  </p>
+                  {showCollection ? (
+                    <p
+                      className={`hidden rounded-full border px-3 py-1 text-[13px] whitespace-nowrap sm:block ${
+                        have > 0 ? "border-line text-ink" : "border-add-line text-add-text"
+                      }`}
+                    >
+                      {have > 0 ? `Own ${have}` : "Not owned"}
+                    </p>
+                  ) : (
+                    <span className="hidden sm:block" />
+                  )}
                   <div className="flex gap-2">
                     {card.typeLine.includes("Legendary") && card.typeLine.includes("Creature") && (
                       <button

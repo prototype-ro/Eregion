@@ -54,7 +54,8 @@ class ScryfallMapperTest {
 		ScryfallCard source = new ScryfallCard(
 				"d0d33d52-3d28-4635-b985-51e126289259", "Atraxa, Praetors' Voice", "{G}{W}{U}{B}", 4.0,
 				"Legendary Creature — Phyrexian Angel Horror", List.of("W", "U", "B", "G"),
-				List.of("W", "U", "B", "G"), "Flying", "c16", "mythic", "Victor Adame Minguez",
+				List.of("W", "U", "B", "G"), "Flying", "c16", "Commander 2016", "10", "2016-11-11", "mythic",
+				"Victor Adame Minguez", new ScryfallCard.Prices("12.50", null, null),
 				new ImageUris("small.jpg", "normal.jpg", "art.jpg"), null);
 
 		Card card = ScryfallMapper.toCard(source);
@@ -64,6 +65,33 @@ class ScryfallMapperTest {
 		assertThat(card.primaryType()).isEqualTo("Creature");
 		assertThat(card.colorIdentity()).isEqualTo("WUBG");
 		assertThat(card.imageArtCrop()).isEqualTo("art.jpg");
+		assertThat(card.priceUsd()).isEqualTo(12.5);
+		assertThat(card.setName()).isEqualTo("Commander 2016");
+		assertThat(card.collectorNumber()).isEqualTo("10");
+	}
+
+	@Test
+	void priceFallsBackToFoilThenNothing() {
+		assertThat(ScryfallMapper.price(new ScryfallCard.Prices(null, "3.20", null))).isEqualTo(3.2);
+		assertThat(ScryfallMapper.price(new ScryfallCard.Prices("", null, "9.99"))).isEqualTo(9.99);
+		assertThat(ScryfallMapper.price(new ScryfallCard.Prices(null, null, null))).isNull();
+		assertThat(ScryfallMapper.price(null)).isNull();
+	}
+
+	@Test
+	void mapsAPrintingFromAnyFace() {
+		ScryfallCard source = new ScryfallCard(
+				"22222222-2222-2222-2222-222222222222", "Sol Ring", "{1}", 1.0, "Artifact", List.of(), List.of(),
+				"{T}: Add {C}{C}.", "cmd", "Commander 2011", "250", "2011-06-17", "uncommon", "Mark Tedin",
+				new ScryfallCard.Prices("1.10", null, null), new ImageUris("s.jpg", "n.jpg", "a.jpg"), null);
+		java.util.UUID cardId = java.util.UUID.randomUUID();
+
+		Printing printing = ScryfallMapper.toPrinting(source, cardId);
+
+		assertThat(printing.cardId()).isEqualTo(cardId);
+		assertThat(printing.setCode()).isEqualTo("cmd");
+		assertThat(printing.releasedAt()).isEqualTo("2011-06-17");
+		assertThat(printing.priceUsd()).isEqualTo(1.1);
 	}
 
 	@Test
@@ -73,7 +101,8 @@ class ScryfallMapperTest {
 		Face back = new Face("Insectile Aberration", "", "Creature — Human Insect", "Flying", "Artist One", null);
 		ScryfallCard source = new ScryfallCard(
 				"11111111-1111-1111-1111-111111111111", "Delver of Secrets // Insectile Aberration", null, 1.0, null,
-				List.of(), List.of("U"), null, "isd", "common", null, null, List.of(front, back));
+				List.of(), List.of("U"), null, "isd", "Innistrad", "51", "2011-09-30", "common", null, null, null,
+				List.of(front, back));
 
 		Card card = ScryfallMapper.toCard(source);
 

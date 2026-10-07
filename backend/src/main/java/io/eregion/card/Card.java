@@ -14,8 +14,11 @@ public record Card(
 		String colorIdentity,
 		String oracleText,
 		String setCode,
+		String setName,
+		String collectorNumber,
 		String rarity,
 		String artist,
+		Double priceUsd,
 		String imageSmall,
 		String imageNormal,
 		String imageArtCrop) {

@@ -14,7 +14,8 @@ public class CardRepository {
 
 	private static final String COLUMNS = """
 			id, scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors, color_identity,
-			oracle_text, set_code, rarity, artist, image_small, image_normal, image_art_crop
+			oracle_text, set_code, set_name, collector_number, rarity, artist, price_usd,
+			image_small, image_normal, image_art_crop
 			""";
 
 	private final JdbcClient jdbc;
@@ -46,6 +47,30 @@ public class CardRepository {
 				.list();
 	}
 
+	public List<Card> findByNames(java.util.Collection<String> names) {
+		if (names.isEmpty()) {
+			return List.of();
+		}
+		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE lower(name) IN (:names) OR lower(split_part(name, ' // ', 1)) IN (:names)")
+				.param("names", names.stream().map(n -> n.toLowerCase(java.util.Locale.ROOT)).toList())
+				.query(CardRepository::map)
+				.list();
+	}
+
+	/** Scryfall ids of cards whose price has not been read in the last {@code hours} hours, never-read first. */
+	public List<java.util.UUID> staleForPrices(int hours, int limit) {
+		return jdbc.sql("""
+				SELECT scryfall_id FROM cards
+				 WHERE price_updated_at IS NULL OR price_updated_at < now() - make_interval(hours => :hours)
+				 ORDER BY price_updated_at NULLS FIRST
+				 LIMIT :limit
+				""")
+				.param("hours", hours)
+				.param("limit", limit)
+				.query(java.util.UUID.class)
+				.list();
+	}
+
 	public boolean existsByName(String name) {
 		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM cards WHERE lower(name) = lower(:name))")
 				.param("name", name)
@@ -57,11 +82,11 @@ public class CardRepository {
 	public Card upsert(Card card) {
 		return jdbc.sql("""
 				INSERT INTO cards (scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors,
-				                   color_identity, oracle_text, set_code, rarity, artist, image_small,
-				                   image_normal, image_art_crop)
+				                   color_identity, oracle_text, set_code, set_name, collector_number, rarity,
+				                   artist, price_usd, price_updated_at, image_small, image_normal, image_art_crop)
 				VALUES (:scryfallId, :name, :manaCost, :manaValue, :typeLine, :primaryType, :colors,
-				        :colorIdentity, :oracleText, :setCode, :rarity, :artist, :imageSmall,
-				        :imageNormal, :imageArtCrop)
+				        :colorIdentity, :oracleText, :setCode, :setName, :collectorNumber, :rarity,
+				        :artist, :priceUsd, now(), :imageSmall, :imageNormal, :imageArtCrop)
 				ON CONFLICT (lower(name)) DO UPDATE SET
 				    scryfall_id = EXCLUDED.scryfall_id,
 				    mana_cost = EXCLUDED.mana_cost,
@@ -72,8 +97,12 @@ public class CardRepository {
 				    color_identity = EXCLUDED.color_identity,
 				    oracle_text = EXCLUDED.oracle_text,
 				    set_code = EXCLUDED.set_code,
+				    set_name = EXCLUDED.set_name,
+				    collector_number = EXCLUDED.collector_number,
 				    rarity = EXCLUDED.rarity,
 				    artist = EXCLUDED.artist,
+				    price_usd = EXCLUDED.price_usd,
+				    price_updated_at = now(),
 				    image_small = EXCLUDED.image_small,
 				    image_normal = EXCLUDED.image_normal,
 				    image_art_crop = EXCLUDED.image_art_crop
@@ -88,8 +117,11 @@ public class CardRepository {
 				.param("colorIdentity", card.colorIdentity())
 				.param("oracleText", card.oracleText())
 				.param("setCode", card.setCode())
+				.param("setName", card.setName())
+				.param("collectorNumber", card.collectorNumber())
 				.param("rarity", card.rarity())
 				.param("artist", card.artist())
+				.param("priceUsd", card.priceUsd())
 				.param("imageSmall", card.imageSmall())
 				.param("imageNormal", card.imageNormal())
 				.param("imageArtCrop", card.imageArtCrop())
@@ -110,8 +142,11 @@ public class CardRepository {
 				rs.getString("color_identity"),
 				rs.getString("oracle_text"),
 				rs.getString("set_code"),
+				rs.getString("set_name"),
+				rs.getString("collector_number"),
 				rs.getString("rarity"),
 				rs.getString("artist"),
+				io.eregion.common.Sql.nullableDouble(rs, "price_usd"),
 				rs.getString("image_small"),
 				rs.getString("image_normal"),
 				rs.getString("image_art_crop"));
