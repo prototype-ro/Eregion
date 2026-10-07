@@ -42,6 +42,7 @@ cd frontend && npm run build     # type check and production build
 | `POST /api/cards/resolve` | Turn pasted card names into catalog cards in bulk (75 per Scryfall request, fuzzy fallback for typos). Powers list import. |
 | `GET /api/cards/{id}/printings` | Every English paper printing of a card, newest first, with set, art and price |
 | `POST /api/cards/import` | Import cards by exact name from Scryfall |
+| `GET /api/playstyles`, `POST /api/decks/generate` | The guided creator: pick a commander and up to two playstyles (optionally a price cap per card, or only cards you own) and get a saved first draft of 100 cards, tagged by job |
 | `GET /api/decks`, `POST /api/decks` | List and create decks |
 | `GET /api/decks/{id}` | Deck with its latest version and stats |
 | `POST /api/decks/{id}/versions` | Save a new full snapshot. Send `fromVersion` (the version the draft started from). Saving from the newest version of a branch extends it. Saving from an older one needs `branchName`, which starts a new branch. |
@@ -59,4 +60,5 @@ Authenticated routes take `Authorization: Bearer <token>`. Errors are RFC 9457 p
 - A deck is a multiverse of versions. It starts on a branch called `main`, and any version can be forked into a new branch. Version numbers are shared across the whole deck, so "v7" is never ambiguous. History is never rewritten: editing an old version can only start a new branch (`SavePlanner`, unit tested).
 - A card is identified inside a version by card and board together (`commander`, `main`, `maybe`, `considering`). Only commander and main count toward the 100 cards and the stats.
 - A deck line can pin a specific printing (art, set and price) and carry free-form tags. Tags drive the "Custom tag" grouping. Prices are Scryfall market prices in USD, refreshed by a background job (`PriceRefreshService`) for stale cards and pinned printings.
+- The guided creator (`DeckGenerator`) uses the usual Commander template (36 lands, 10 ramp, 9 draw, 8 removal, 3 wipes, the rest for the playstyle) and fills each slot with the most played matches from Scryfall, ranked by EDHREC popularity and limited to the commander's color identity. Slot filling is a pure function (`DeckPlanner`) and basic lands are split by color symbols (`Mana`), both unit tested.
 - The card catalog is filled on demand from Scryfall by exact name. Card art is placeholder art owned by Wizards of the Coast and the artists.

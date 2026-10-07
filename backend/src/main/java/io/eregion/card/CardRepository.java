@@ -32,17 +32,20 @@ public class CardRepository {
 	}
 
 	/** Prefix matches rank first, then any substring match, alphabetical within each group. */
-	public List<Card> search(String query, int limit) {
+	public List<Card> search(String query, int limit, boolean commandersOnly) {
 		String escaped = query.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 		return jdbc.sql("SELECT " + COLUMNS + """
 				 FROM cards
 				WHERE name ILIKE :contains
+				  AND (:commandersOnly = false OR (type_line ILIKE '%legendary%'
+				       AND (type_line ILIKE '%creature%' OR oracle_text ILIKE '%can be your commander%')))
 				ORDER BY (name ILIKE :prefix) DESC, name
 				LIMIT :limit
 				""")
 				.param("contains", "%" + escaped + "%")
 				.param("prefix", escaped + "%")
 				.param("limit", limit)
+				.param("commandersOnly", commandersOnly)
 				.query(CardRepository::map)
 				.list();
 	}

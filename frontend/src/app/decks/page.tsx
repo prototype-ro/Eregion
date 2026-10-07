@@ -62,6 +62,13 @@ export default function DecksPage() {
       <main className="pb-24">
         <h1 className="pt-16 pb-8 font-display text-[clamp(72px,13vw,200px)] leading-[0.9]">Your decks</h1>
 
+        <div className="mb-10 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Link href="/decks/new" className="press inline-flex min-h-14 items-center rounded-full bg-accent px-8 text-base font-bold text-on-accent">
+            Build a deck with the guided creator
+          </Link>
+          <p className="text-[15px] text-muted">Or start from an empty deck below.</p>
+        </div>
+
         <form onSubmit={createDeck} className="mb-10 flex max-w-[560px] flex-col gap-2 border-t border-line pt-6">
           <label htmlFor="deckName" className="text-sm text-muted">
             New deck name
