@@ -3,7 +3,9 @@ package io.eregion.common;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,6 +14,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 /** One error shape for the whole API: RFC 9457 problem details. */
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+	@ExceptionHandler(TooManyRequestsException.class)
+	public ResponseEntity<ProblemDetail> handleTooMany(TooManyRequestsException ex) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()))
+				.body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
+	}
 
 	@ExceptionHandler(ApiException.class)
 	public ProblemDetail handleApi(ApiException ex) {

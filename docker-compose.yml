@@ -16,5 +16,32 @@ services:
       timeout: 3s
       retries: 10
 
+  # The whole app, for trying a production-like setup: docker compose --profile app up --build
+  # It needs EREGION_JWT_SECRET (openssl rand -base64 48) and refuses to start without a real one.
+  backend:
+    profiles: ["app"]
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      EREGION_DB_URL: jdbc:postgresql://db:5432/eregion
+      EREGION_DB_USER: eregion
+      EREGION_DB_PASSWORD: eregion
+      EREGION_JWT_SECRET: ${EREGION_JWT_SECRET:?set EREGION_JWT_SECRET, for example with: openssl rand -base64 48}
+      EREGION_ENV: production
+      EREGION_CORS_ORIGINS: ${EREGION_PUBLIC_URL:-http://localhost:3000}
+      EREGION_TRUST_PROXY: "true"
+
+  frontend:
+    profiles: ["app"]
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      BACKEND_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+
 volumes:
   eregion-pgdata:

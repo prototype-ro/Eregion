@@ -96,3 +96,12 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 - A merge is a three way merge from the newest version both lines share. A card only one line changed takes that change. A card both lines changed differently is a conflict that needs a choice. A line is the copies, printing, custom art and tags of a card on a board together.
 - A merge version records the branch it brought in as a second parent, so merging the same branch again only brings what changed since.
 - A version has at most one child on its branch, so two tabs saving at once cannot fork a line silently: one save wins and the other gets a conflict.
+
+### Running it for real
+
+- `docker compose --profile app up --build` starts the database, the API and the site together. It needs `EREGION_JWT_SECRET` (for example `openssl rand -base64 48`). With `EREGION_ENV=production` the API refuses to start on a placeholder secret and always sets the login cookie as Secure, so put it behind HTTPS.
+- `GET /api/health` answers 200 when the API can reach its database, for load balancers and uptime checks.
+- Rate limits (sign in per network and per account, sign ups, card searches, list lookups, uploads) are kept in memory per server. Defaults and the settings that change them are in `.env.example`. Behind a proxy, set `EREGION_TRUST_PROXY=true` so limits count real visitors, not the proxy.
+- Passwords need 10 characters and may not be a common password, a run of keys, or contain the email name or display name.
+- The site sends a Content Security Policy, frame, referrer and permission headers, and HSTS in production.
+- CI (`.github/workflows/ci.yml`) runs the backend tests and the frontend type check, tests and build.

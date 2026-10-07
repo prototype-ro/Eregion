@@ -24,9 +24,11 @@ public class SessionCookie {
 	private final Duration lifetime;
 	private final boolean secure;
 
-	public SessionCookie(JwtProperties jwt, @Value("${eregion.auth.cookie-secure:false}") boolean secure) {
+	public SessionCookie(JwtProperties jwt, @Value("${eregion.auth.cookie-secure:false}") boolean secure,
+			@Value("${eregion.env:dev}") String environment) {
 		this.lifetime = Duration.ofMinutes(jwt.ttlMinutes());
-		this.secure = secure;
+		// Production always sends the cookie over HTTPS only, whatever the setting says.
+		this.secure = secure || "production".equalsIgnoreCase(environment);
 	}
 
 	public void write(HttpServletResponse response, String token) {

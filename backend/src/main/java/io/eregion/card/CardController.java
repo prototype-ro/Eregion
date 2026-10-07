@@ -3,6 +3,8 @@ package io.eregion.card;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,7 +14,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.eregion.card.CardImportService.ImportResult;
+import io.eregion.auth.CurrentUser;
 import io.eregion.common.ApiException;
+import io.eregion.ratelimit.RateLimits;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -33,20 +37,23 @@ public class CardController {
 	private final CardImportService importer;
 	private final CardResolveService resolver;
 	private final PrintingService printings;
+	private final RateLimits limits;
 
 	public CardController(CardRepository cards, CardSearchService search, CardImportService importer,
-			CardResolveService resolver, PrintingService printings) {
+			CardResolveService resolver, PrintingService printings, RateLimits limits) {
 		this.cards = cards;
 		this.search = search;
 		this.importer = importer;
 		this.resolver = resolver;
 		this.printings = printings;
+		this.limits = limits;
 	}
 
 	/** Searches our catalog and, when it has too few matches, Scryfall too. Saved cards come back with ids. */
 	@GetMapping("/search")
-	public List<Card> search(@RequestParam String q, @RequestParam(defaultValue = "20") int limit,
+	public List<Card> search(@AuthenticationPrincipal Jwt jwt, @RequestParam String q, @RequestParam(defaultValue = "20") int limit,
 			@RequestParam(defaultValue = "false") boolean commanders) {
+		limits.search(CurrentUser.id(jwt));
 		if (q.trim().length() < 2) {
 			throw ApiException.badRequest("Search needs at least 2 characters");
 		}
@@ -60,19 +67,22 @@ public class CardController {
 
 	/** Every printing of a card, for the printing picker. Fetched from Scryfall the first time. */
 	@GetMapping("/{id}/printings")
-	public List<Printing> printings(@PathVariable UUID id) {
+	public List<Printing> printings(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+		limits.search(CurrentUser.id(jwt));
 		return printings.forCard(id);
 	}
 
 	/** Turns pasted card names into catalog cards, importing the ones we do not have yet. */
 	@PostMapping("/resolve")
-	public CardResolveService.Result resolve(@Valid @RequestBody ResolveRequest request) {
+	public CardResolveService.Result resolve(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ResolveRequest request) {
+		limits.resolve(CurrentUser.id(jwt));
 		return resolver.resolve(request.names());
 	}
 
 	/** Authenticated. Pulls cards by exact name from Scryfall into our catalog. */
 	@PostMapping("/import")
-	public ImportResult importCards(@Valid @RequestBody ImportRequest request) {
+	public ImportResult importCards(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ImportRequest request) {
+		limits.resolve(CurrentUser.id(jwt));
 		return importer.importNames(request.names());
 	}
 }

@@ -28,6 +28,10 @@ public class AuthService {
 
 	public AuthResponse register(RegisterRequest request) {
 		String email = request.email().trim().toLowerCase(Locale.ROOT);
+		String weak = PasswordPolicy.problem(request.password(), email, request.displayName());
+		if (weak != null) {
+			throw ApiException.badRequest(weak);
+		}
 		try {
 			User user = users.insert(email, encoder.encode(request.password()), request.displayName().trim());
 			return new AuthResponse(tokens.issue(user), UserDto.from(user));

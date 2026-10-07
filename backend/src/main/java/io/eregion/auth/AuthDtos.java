@@ -13,7 +13,7 @@ public final class AuthDtos {
 
 	public record RegisterRequest(
 			@NotBlank @Email @Size(max = 254) String email,
-			@NotBlank @Size(min = 8, max = 72, message = "must be 8 to 72 characters") String password,
+			@NotBlank @Size(min = 10, max = 72, message = "must be 10 to 72 characters") String password,
 			@NotBlank @Size(max = 60) String displayName) {
 	}
 

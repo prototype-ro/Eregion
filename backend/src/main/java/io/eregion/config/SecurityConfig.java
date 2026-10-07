@@ -35,12 +35,21 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 public class SecurityConfig {
 
 	@Bean
-	SecretKey jwtSecretKey(JwtProperties properties) {
+	SecretKey jwtSecretKey(JwtProperties properties, @org.springframework.beans.factory.annotation.Value("${eregion.env:dev}") String environment) {
+		if ("production".equalsIgnoreCase(environment) && isPlaceholder(properties.secret())) {
+			throw new IllegalStateException("EREGION_JWT_SECRET is still the development default. Set a long random secret before running in production, for example the output of: openssl rand -base64 48");
+		}
 		byte[] bytes = properties.secret().getBytes(StandardCharsets.UTF_8);
 		if (bytes.length < 32) {
 			throw new IllegalStateException("eregion.jwt.secret must be at least 32 bytes");
 		}
 		return new SecretKeySpec(bytes, "HmacSHA256");
+	}
+
+	/** True for the secrets that ship in the repository, which anyone can read and use to forge a login. */
+	static boolean isPlaceholder(String secret) {
+		String lower = secret == null ? "" : secret.toLowerCase();
+		return lower.startsWith("dev-only") || lower.contains("change-me") || lower.contains("changeme");
 	}
 
 	@Bean
@@ -74,10 +83,13 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(HttpSecurity http, CorsProperties corsProperties) throws Exception {
 		http
 				.csrf(csrf -> csrf.disable())
+				.headers(headers -> headers
+						.referrerPolicy(referrer -> referrer.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+						.addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Permissions-Policy", "camera=(), microphone=(), geolocation=()")))
 				.cors(c -> c.configurationSource(corsSource(corsProperties)))
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/auth/**", "/error").permitAll()
+						.requestMatchers("/api/auth/**", "/api/health", "/error").permitAll()
 						.anyRequest().authenticated())
 				.addFilterBefore(new SameOriginFilter(corsProperties.allowedOrigins()), BearerTokenAuthenticationFilter.class)
 				.oauth2ResourceServer(oauth -> oauth

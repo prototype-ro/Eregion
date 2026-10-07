@@ -23,7 +23,7 @@ class SessionCookieTest {
 
 	@Test
 	void theLoginCookieCannotBeReadByScriptsOrSentFromOtherSites() {
-		String set = header(new SessionCookie(new JwtProperties("x".repeat(32), 60), true), false);
+		String set = header(new SessionCookie(new JwtProperties("x".repeat(32), 60), true, "dev"), false);
 
 		assertThat(set).contains("eregion_session=the-token").contains("HttpOnly").contains("Secure")
 				.contains("SameSite=Lax").contains("Path=/").contains("Max-Age=3600");
@@ -31,13 +31,18 @@ class SessionCookieTest {
 
 	@Test
 	void secureIsOptionalForLocalDevelopment() {
-		assertThat(header(new SessionCookie(new JwtProperties("x".repeat(32), 60), false), false)).doesNotContain("Secure");
+		assertThat(header(new SessionCookie(new JwtProperties("x".repeat(32), 60), false, "dev"), false)).doesNotContain("Secure");
 	}
 
 	@Test
 	void signingOutExpiresTheCookie() {
-		String set = header(new SessionCookie(new JwtProperties("x".repeat(32), 60), false), true);
+		String set = header(new SessionCookie(new JwtProperties("x".repeat(32), 60), false, "dev"), true);
 
 		assertThat(set).contains("eregion_session=;").contains("Max-Age=0").contains("HttpOnly");
+	}
+
+	@Test
+	void productionIsAlwaysSecureWhateverTheSetting() {
+		assertThat(header(new SessionCookie(new JwtProperties("x".repeat(32), 60), false, "production"), false)).contains("Secure");
 	}
 }

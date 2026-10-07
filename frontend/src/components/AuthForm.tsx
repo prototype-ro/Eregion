@@ -74,7 +74,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           required
           className={input}
         />
-        {isRegister && !fields.password && <p className="text-sm text-muted">At least 8 characters.</p>}
+        {isRegister && !fields.password && <p className="text-sm text-muted">At least 10 characters, and not a common password.</p>}
         {fields.password && <p className="text-sm text-add-text">{fields.password}</p>}
       </div>
 

@@ -3,6 +3,8 @@ package io.eregion.auth;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import io.eregion.ratelimit.RateLimits;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,24 +25,29 @@ public class AuthController {
 
 	private final AuthService auth;
 	private final SessionCookie cookie;
+	private final RateLimits limits;
 
-	public AuthController(AuthService auth, SessionCookie cookie) {
+	public AuthController(AuthService auth, SessionCookie cookie, RateLimits limits) {
 		this.auth = auth;
 		this.cookie = cookie;
+		this.limits = limits;
 	}
 
 	/** Creates the account and signs in. The token goes out in an httpOnly cookie, never in the body. */
 	@PostMapping("/auth/register")
 	@ResponseStatus(HttpStatus.CREATED)
-	public UserDto register(@Valid @RequestBody RegisterRequest request, HttpServletResponse response) {
+	public UserDto register(@Valid @RequestBody RegisterRequest request, HttpServletRequest http, HttpServletResponse response) {
+		limits.register(http);
 		AuthResponse session = auth.register(request);
 		cookie.write(response, session.token());
 		return session.user();
 	}
 
 	@PostMapping("/auth/login")
-	public UserDto login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+	public UserDto login(@Valid @RequestBody LoginRequest request, HttpServletRequest http, HttpServletResponse response) {
+		limits.loginAttempt(http, request.email());
 		AuthResponse session = auth.login(request);
+		limits.loginSucceeded(request.email());
 		cookie.write(response, session.token());
 		return session.user();
 	}

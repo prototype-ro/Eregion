@@ -25,6 +25,7 @@ import io.eregion.auth.CurrentUser;
 import io.eregion.card.CardRepository;
 import io.eregion.common.ApiException;
 import io.eregion.custom.CustomPrintingRepository.CustomPrinting;
+import io.eregion.ratelimit.RateLimits;
 import io.eregion.custom.CustomPrintingRepository.Image;
 
 /** A player's own card art, such as proxies, that can be used in place of a Scryfall printing. */
@@ -40,10 +41,12 @@ public class CustomPrintingController {
 
 	private final CustomPrintingRepository repository;
 	private final CardRepository cards;
+	private final RateLimits limits;
 
-	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards) {
+	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits) {
 		this.repository = repository;
 		this.cards = cards;
+		this.limits = limits;
 	}
 
 	/** All of the player's custom art, so a page can show which cards have some. */
@@ -62,6 +65,7 @@ public class CustomPrintingController {
 	public CustomPrinting upload(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID cardId,
 			@RequestParam("file") MultipartFile file, @RequestParam(defaultValue = "") String label) throws IOException {
 		UUID userId = CurrentUser.id(jwt);
+		limits.upload(userId);
 		cards.findById(cardId).orElseThrow(() -> ApiException.notFound("Card"));
 		if (file.isEmpty()) {
 			throw ApiException.badRequest("Choose an image file");
