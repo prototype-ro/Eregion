@@ -1,8 +1,5 @@
 import type { NextConfig } from "next";
 
-// Where the Spring Boot API runs. Only the Next server reads this.
-const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
-
 const dev = process.env.NODE_ENV !== "production";
 
 // What the browser may load. Scripts and styles need 'unsafe-inline' for the data Next puts in the page and
@@ -42,17 +39,11 @@ const nextConfig: NextConfig = {
     unoptimized: true,
     remotePatterns: [{ protocol: "https", hostname: "cards.scryfall.io" }],
   },
-  // The browser only ever talks to this site. Next forwards /api to the backend, which makes the
-  // httpOnly login cookie first party, so it needs no cross-site cookie settings.
-  async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
-  },
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
-  },
   experimental: {
     // Importing a long list can take a while on the backend. The default proxy limit is 30 seconds.
     proxyTimeout: 120_000,
+    // Custom art uploads can be 10 MB, and the proxy only passes on this much of a request body.
+    proxyClientMaxBodySize: "16mb",
   },
 };
 

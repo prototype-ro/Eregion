@@ -31,6 +31,7 @@ public class TokenService {
 				.issuedAt(now)
 				.expiresAt(now.plus(Duration.ofMinutes(properties.ttlMinutes())))
 				.claim("email", user.email())
+				.claim("tv", user.tokenVersion())
 				.build();
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 		return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

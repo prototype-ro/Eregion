@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CardArt } from "@/components/CardArt";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { loginUrl } from "@/lib/auth";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { Card, PublicDeck } from "@/lib/types";
 
@@ -46,7 +47,7 @@ function Explore() {
   const fail = useCallback(
     (err: unknown) => {
       if (err instanceof ApiError && err.status === 401) {
-        router.replace("/login");
+        router.replace(loginUrl());
         return;
       }
       setError(err instanceof ApiError ? err.message : "Could not load decks.");

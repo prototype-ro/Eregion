@@ -19,11 +19,16 @@ public class AuthService {
 	private final UserRepository users;
 	private final PasswordEncoder encoder;
 	private final TokenService tokens;
+	private final AccountService accounts;
+	/** Checked when the email is unknown, so a missing account takes as long to refuse as a wrong password does. */
+	private final String decoy;
 
-	public AuthService(UserRepository users, PasswordEncoder encoder, TokenService tokens) {
+	public AuthService(UserRepository users, PasswordEncoder encoder, TokenService tokens, AccountService accounts) {
 		this.users = users;
 		this.encoder = encoder;
 		this.tokens = tokens;
+		this.accounts = accounts;
+		this.decoy = encoder.encode("not-a-real-password");
 	}
 
 	public AuthResponse register(RegisterRequest request) {
@@ -34,6 +39,7 @@ public class AuthService {
 		}
 		try {
 			User user = users.insert(email, encoder.encode(request.password()), request.displayName().trim());
+			accounts.sendVerification(user);
 			return new AuthResponse(tokens.issue(user), UserDto.from(user));
 		}
 		catch (DuplicateKeyException ex) {
@@ -43,9 +49,12 @@ public class AuthService {
 
 	public AuthResponse login(LoginRequest request) {
 		String email = request.email().trim().toLowerCase(Locale.ROOT);
-		User user = users.findByEmail(email)
-				.filter(found -> encoder.matches(request.password(), found.passwordHash()))
-				.orElseThrow(() -> ApiException.unauthorized("Wrong email or password"));
+		User found = users.findByEmail(email).orElse(null);
+		boolean match = encoder.matches(request.password(), found == null ? decoy : found.passwordHash());
+		if (found == null || !match) {
+			throw ApiException.unauthorized("Wrong email or password");
+		}
+		User user = found;
 		return new AuthResponse(tokens.issue(user), UserDto.from(user));
 	}
 

@@ -182,6 +182,10 @@ public class DeckRepository {
 				.single();
 	}
 
+	public List<UUID> deckIds(UUID ownerId) {
+		return jdbc.sql("SELECT id FROM decks WHERE owner_id = :owner").param("owner", ownerId).query(UUID.class).list();
+	}
+
 	public void renameDeck(UUID deckId, String name) {
 		jdbc.sql("UPDATE decks SET name = :name, updated_at = now() WHERE id = :id").param("id", deckId).param("name", name).update();
 	}

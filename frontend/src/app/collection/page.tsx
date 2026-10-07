@@ -11,6 +11,7 @@ import { CustomArtSection } from "@/components/CustomArtSection";
 import { Dialog } from "@/components/Dialog";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { loginUrl } from "@/lib/auth";
 import { customArtUrl, formatPrice } from "@/lib/links";
 import type { Card, CustomPrinting } from "@/lib/types";
 
@@ -62,7 +63,7 @@ export default function CollectionPage() {
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        router.replace("/login");
+        router.replace(loginUrl());
         return;
       }
       setError(err instanceof ApiError ? err.message : "Could not load your collection.");

@@ -10,6 +10,7 @@ import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { loginUrl } from "@/lib/auth";
 import { GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { exploreCommanderUrl, formatPrice, sortColors } from "@/lib/links";
@@ -38,7 +39,7 @@ export default function PublicDeckPage() {
       .then(setDetail)
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) {
-          router.replace("/login");
+          router.replace(loginUrl());
           return;
         }
         setError(err instanceof ApiError && err.status === 404 ? "This deck is not public, or it no longer exists." : "Could not load the deck.");

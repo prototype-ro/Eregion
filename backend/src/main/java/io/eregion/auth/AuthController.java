@@ -26,11 +26,13 @@ public class AuthController {
 	private final AuthService auth;
 	private final SessionCookie cookie;
 	private final RateLimits limits;
+	private final AccountService accounts;
 
-	public AuthController(AuthService auth, SessionCookie cookie, RateLimits limits) {
+	public AuthController(AuthService auth, SessionCookie cookie, RateLimits limits, AccountService accounts) {
 		this.auth = auth;
 		this.cookie = cookie;
 		this.limits = limits;
+		this.accounts = accounts;
 	}
 
 	/** Creates the account and signs in. The token goes out in an httpOnly cookie, never in the body. */
@@ -50,6 +52,26 @@ public class AuthController {
 		limits.loginSucceeded(request.email());
 		cookie.write(response, session.token());
 		return session.user();
+	}
+
+	/** Always answers the same, so it cannot be used to find out which addresses have accounts. */
+	@PostMapping("/auth/forgot")
+	@ResponseStatus(HttpStatus.ACCEPTED)
+	public void forgot(@Valid @RequestBody AuthDtos.ForgotRequest request, HttpServletRequest http) {
+		limits.mail(http, request.email());
+		accounts.forgotPassword(request.email());
+	}
+
+	@PostMapping("/auth/reset")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void reset(@Valid @RequestBody AuthDtos.ResetRequest request) {
+		accounts.resetPassword(request.token(), request.password());
+	}
+
+	@PostMapping("/auth/verify")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void verify(@Valid @RequestBody AuthDtos.TokenRequest request) {
+		accounts.verifyEmail(request.token());
 	}
 
 	@PostMapping("/auth/logout")

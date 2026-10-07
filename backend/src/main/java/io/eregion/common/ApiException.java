@@ -28,6 +28,10 @@ public class ApiException extends RuntimeException {
 		return new ApiException(HttpStatus.CONFLICT, message);
 	}
 
+	public static ApiException forbidden(String message) {
+		return new ApiException(HttpStatus.FORBIDDEN, message);
+	}
+
 	public static ApiException unauthorized(String message) {
 		return new ApiException(HttpStatus.UNAUTHORIZED, message);
 	}

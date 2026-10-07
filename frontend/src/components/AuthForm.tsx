@@ -1,16 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { refreshMe } from "@/lib/me";
 import type { User } from "@/lib/types";
 
 const input =
   "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none";
 
+/** Where to go after signing in: the page the player came from, but only a page of this site. */
+export function safeNext(next: string | null): string {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/decks";
+}
+
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
+  const params = useSearchParams();
   const isRegister = mode === "register";
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -31,7 +38,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         method: "POST",
         body,
       });
-      router.push("/decks");
+      refreshMe();
+      router.push(safeNext(params.get("next")));
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -75,6 +83,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           className={input}
         />
         {isRegister && !fields.password && <p className="text-sm text-muted">At least 10 characters, and not a common password.</p>}
+        {!isRegister && (
+          <Link href="/forgot-password" className="self-start text-sm text-muted underline underline-offset-4 hover:text-ink">
+            Forgot your password?
+          </Link>
+        )}
         {fields.password && <p className="text-sm text-add-text">{fields.password}</p>}
       </div>
 

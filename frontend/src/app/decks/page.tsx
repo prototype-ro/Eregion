@@ -11,6 +11,7 @@ import type { DeckActions } from "@/components/decks/DeckMenu";
 import { DeckToolbar } from "@/components/decks/DeckToolbar";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { loginUrl } from "@/lib/auth";
 import {
   DEFAULT_DIRECTION,
   DECK_SORTS,
@@ -99,7 +100,7 @@ export default function DecksPage() {
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        router.replace("/login");
+        router.replace(loginUrl());
         return;
       }
       setError(err instanceof ApiError ? err.message : "Could not load your decks.");

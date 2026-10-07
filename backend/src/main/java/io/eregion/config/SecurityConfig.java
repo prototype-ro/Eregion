@@ -13,7 +13,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -58,8 +64,20 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtSecretKey) {
-		return NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
+	JwtDecoder jwtDecoder(SecretKey jwtSecretKey, io.eregion.auth.UserRepository users) {
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
+		// A session is only good while its token version is the account's current one. Changing the password or
+		// signing out everywhere moves the version on, and deleting the account removes it, so old tokens stop working at once.
+		OAuth2TokenValidator<Jwt> current = token -> {
+			Long claimed = token.getClaim("tv");
+			Integer actual = users.tokenVersion(java.util.UUID.fromString(token.getSubject())).orElse(null);
+			if (claimed == null || actual == null || claimed.intValue() != actual) {
+				return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "The session has ended", null));
+			}
+			return OAuth2TokenValidatorResult.success();
+		};
+		decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefault(), current));
+		return decoder;
 	}
 
 	@Bean

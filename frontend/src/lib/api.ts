@@ -49,6 +49,7 @@ export async function api<T>(path: string, { method = "GET", body }: RequestOpti
     throw new ApiError(response.status, message, fields);
   }
 
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  // Some answers, like 204 and 202, carry nothing to read.
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountLinks } from "./AccountLinks";
+import { VerifyNotice } from "./VerifyNotice";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Wordmark({ className = "" }: { className?: string }) {
@@ -12,6 +13,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
 
 export function Nav({ active }: { active?: "decks" | "explore" | "collection" }) {
   return (
+    <>
     <header className="flex min-h-[72px] flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line">
       <Wordmark />
       <nav className="flex gap-8 text-[15px] font-medium" aria-label="Main">
@@ -39,5 +41,7 @@ export function Nav({ active }: { active?: "decks" | "explore" | "collection" })
         <AccountLinks />
       </div>
     </header>
+    <VerifyNotice />
+    </>
   );
 }

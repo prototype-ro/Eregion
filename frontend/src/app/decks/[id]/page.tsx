@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { DeckBuilder } from "@/components/builder/DeckBuilder";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { loginUrl } from "@/lib/auth";
 import type { DeckDetail, Timeline, VersionDetail } from "@/lib/types";
 
 interface CollectionEntry {
@@ -48,7 +49,7 @@ export default function DeckPage() {
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        router.replace("/login");
+        router.replace(loginUrl());
         return;
       }
       setError(err instanceof ApiError ? err.message : "Could not load the deck.");

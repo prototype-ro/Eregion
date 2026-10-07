@@ -105,3 +105,5 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 - Passwords need 10 characters and may not be a common password, a run of keys, or contain the email name or display name.
 - The site sends a Content Security Policy, frame, referrer and permission headers, and HSTS in production.
 - CI (`.github/workflows/ci.yml`) runs the backend tests and the frontend type check, tests and build.
+- The site forwards `/api` to the API with `src/proxy.ts`, which reads `BACKEND_URL` when the server starts, so one built image can run against any backend. (A rewrite in `next.config` would have fixed the address at build time.)
+- Accounts: new accounts must confirm their email before making a deck public. Password reset links last an hour and work once. Changing the password, resetting it or signing out everywhere ends every other session, and deleting an account removes everything it owns. Without `SPRING_MAIL_HOST` the API writes each email, with its link, to its log.

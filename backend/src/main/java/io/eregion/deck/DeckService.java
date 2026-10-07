@@ -45,9 +45,11 @@ public class DeckService {
 	public static final String MAIN_BRANCH = "main";
 
 	private final DeckRepository decks;
+	private final io.eregion.auth.UserRepository users;
 
-	public DeckService(DeckRepository decks) {
+	public DeckService(DeckRepository decks, io.eregion.auth.UserRepository users) {
 		this.decks = decks;
+		this.users = users;
 	}
 
 	/** Every deck of the player with its latest version's size, price, colors and what stops it being legal. */
@@ -134,6 +136,10 @@ public class DeckService {
 		owned(deckId, userId);
 		switch (request.visibility()) {
 			case "public" -> {
+				// Sharing a deck with everyone needs an address the player has proved is theirs.
+				if (!users.findById(userId).map(io.eregion.auth.User::emailVerified).orElse(false)) {
+					throw ApiException.forbidden("Confirm your email address to make a deck public. We sent you a link, and you can ask for another from your account page.");
+				}
 				if (request.versionNumber() == null) {
 					throw ApiException.badRequest("Choose which version to publish");
 				}

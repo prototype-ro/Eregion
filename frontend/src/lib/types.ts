@@ -6,6 +6,8 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
+  /** Whether the player proved they own the address. Needed to make a deck public. */
+  emailVerified: boolean;
 }
 
 export interface Card {

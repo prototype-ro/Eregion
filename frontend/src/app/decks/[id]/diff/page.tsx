@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { DiffView } from "@/components/DiffView";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { loginUrl } from "@/lib/auth";
 import type { DeckDetail, DeckDiff, Timeline, VersionSummary } from "@/lib/types";
 
 const select =
@@ -75,7 +76,7 @@ function Diff() {
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          router.replace("/login");
+          router.replace(loginUrl());
           return;
         }
         setError(err instanceof ApiError ? err.message : "Could not load the history.");
