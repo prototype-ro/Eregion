@@ -9,6 +9,8 @@ import { allTags, GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, 
 import { checkLegality } from "@/lib/legality";
 import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
+import { loginUrl } from "@/lib/auth";
+import { clearDraft, loadDraft, saveDraft } from "@/lib/draft";
 import { inheritArt } from "@/lib/importArt";
 import { canApplyInPlace } from "@/lib/versions";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
@@ -142,6 +144,13 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const baseLines = useMemo(() => version?.cards ?? [], [version]);
 
   const [lines, setLines] = useState<DeckCardLine[]>(baseLines);
+  const versionNumber = version?.versionNumber ?? 0;
+  // Edits kept from an earlier visit that ended before they were saved. Offered once, then restored or dropped.
+  const [recovered, setRecovered] = useState(() => {
+    const kept = loadDraft(deck.id, versionNumber, signature(baseLines));
+    return kept && signature(kept.lines) !== signature(baseLines) ? kept : null;
+  });
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [tab, setTab] = useState<Tab>("main");
   const [group, setGroup] = useState<GroupMode>("type");
   const [sort, setSort] = useState<SortMode>("name");
@@ -247,6 +256,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       window.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  // Keep the edits on this device a moment after each change, so a refresh or an ended session loses nothing.
+  // While a recovered draft is waiting for an answer it is left alone.
+  useEffect(() => {
+    if (recovered) return;
+    if (!dirty) {
+      clearDraft(deck.id, versionNumber);
+      return;
+    }
+    const timer = setTimeout(() => saveDraft(deck.id, versionNumber, signature(baseLines), lines), 600);
+    return () => clearTimeout(timer);
+  }, [lines, dirty, recovered, deck.id, versionNumber, baseLines]);
 
   // Leaving the page with unsaved edits would lose them, so let the browser ask first.
   useEffect(() => {
@@ -498,6 +519,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const applyCheck = version ? canApplyInPlace(timeline, version.versionNumber) : { ok: false, reason: null };
   const versionIsPublic = version !== null && visibility === "public" && publishedVersion === version.versionNumber;
 
+  /** Shows why a save failed. When the session ended, the edits are kept here and signing in brings the person back to them. */
+  function failed(err: unknown, fallback: string) {
+    if (err instanceof ApiError && err.status === 401) {
+      saveDraft(deck.id, versionNumber, signature(baseLines), lines);
+      setSessionEnded(true);
+      setError("Your session ended, so nothing was saved. Your changes are kept on this device.");
+      return;
+    }
+    setSessionEnded(false);
+    setError(err instanceof ApiError ? err.message : fallback);
+  }
+
   /** Saves the draft over the open version. It keeps its number and place, and no new version appears. */
   async function applyChanges() {
     if (!version) return;
@@ -513,7 +546,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       setToast(`Changes applied to v${version.versionNumber}`);
       onReload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not apply the changes.");
+      failed(err, "Could not apply the changes.");
     } finally {
       setSaving(false);
     }
@@ -532,9 +565,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           branchName: needsBranch ? branchName.trim() : undefined,
         },
       });
+      clearDraft(deck.id, versionNumber);
       onSaved(saved.versionNumber);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save the version.");
+      failed(err, "Could not save the version.");
     } finally {
       setSaving(false);
     }
@@ -696,7 +730,46 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       {error && (
         <p role="alert" className="mb-6 rounded-2xl border border-add-line bg-add-bg px-5 py-3.5 text-sm text-add-text">
           {error}
+          {sessionEnded && (
+            <>
+              {" "}
+              <Link href={loginUrl()} className="font-medium underline underline-offset-4">
+                Sign in again
+              </Link>
+              , then pick up where you left off.
+            </>
+          )}
         </p>
+      )}
+
+      {recovered && (
+        <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent-text px-5 py-3.5 text-sm">
+          <p>
+            You have unsaved changes from {new Date(recovered.savedAt).toLocaleString()}, {Math.abs(recovered.lines.length - baseLines.length) === 0 ? "same number of cards" : `${recovered.lines.length} cards against ${baseLines.length} saved`}.
+          </p>
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setLines(recovered.lines);
+                setRecovered(null);
+              }}
+              className="press min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
+            >
+              Restore them
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearDraft(deck.id, versionNumber);
+                setRecovered(null);
+              }}
+              className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Version timeline, collapsible */}

@@ -128,3 +128,8 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 - Public reads are limited per network (`EREGION_RATE_PUBLIC`, default 240 a minute).
 - A deck can have a description (up to 2000 characters, shown on its public page). Saving it does not make a version.
 - Signed in players can report a public deck (`POST /api/explore/{id}/report`, one per player per deck, 10 an hour). Reports are stored in `deck_reports` for whoever runs the site to review. There is no moderation screen yet.
+
+### Drafts and sessions
+
+- Unsaved edits in the builder are kept on the device (per deck and version) a moment after each change. After a refresh, a crash or a sign in, the builder offers to restore them or discard them. Saving, applying or discarding clears the kept draft, and signing out clears all of them.
+- When a save fails because the session ended, the message says so, the edits are kept, and a link goes to sign in and back to the deck.
