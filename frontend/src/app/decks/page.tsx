@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DeleteDeckDialog, RenameDeckDialog } from "@/components/decks/DeckDialogs";
-import { DeckTile } from "@/components/decks/DeckTile";
+import { NewDeckDialog, type NewDeckDraft } from "@/components/decks/NewDeckDialog";
+import { DeckRow, DeckTile } from "@/components/decks/DeckTile";
+import { ImportDialog, type ImportedCard } from "@/components/builder/ImportDialog";
+import type { DeckActions } from "@/components/decks/DeckMenu";
 import { DeckToolbar } from "@/components/decks/DeckToolbar";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
@@ -14,6 +17,8 @@ import {
   isFiltering,
   matches,
   NO_FILTERS,
+  PAGE_SIZE,
+  plural,
   sortDecks,
   type DeckDirection,
   type DeckFilters,
@@ -29,6 +34,8 @@ interface StoredView {
   visibility: DeckFilters["visibility"];
   legality: DeckFilters["legality"];
   colors: string[];
+  status: DeckFilters["status"];
+  view: "grid" | "list";
 }
 
 export default function DecksPage() {
@@ -36,8 +43,13 @@ export default function DecksPage() {
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [name, setName] = useState("");
+  const [newOpen, setNewOpen] = useState(false);
+  const [draft, setDraft] = useState<NewDeckDraft | null>(null);
+  const [listOpen, setListOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const [filters, setFilters] = useState<DeckFilters>(NO_FILTERS);
   const [sort, setSort] = useState<DeckSort>("updated");
@@ -62,7 +74,9 @@ export default function DecksPage() {
         visibility: ["all", "public", "private"].includes(stored.visibility ?? "") ? (stored.visibility as DeckFilters["visibility"]) : "all",
         legality: ["all", "legal", "issues"].includes(stored.legality ?? "") ? (stored.legality as DeckFilters["legality"]) : "all",
         colors: Array.isArray(stored.colors) ? stored.colors.filter((c) => "WUBRGC".includes(c)) : [],
+        status: ["active", "archived", "all"].includes(stored.status ?? "") ? (stored.status as DeckFilters["status"]) : "active",
       }));
+      if (stored.view === "list") setView("list");
     } catch {
       // Storage blocked or unreadable: the defaults apply.
     }
@@ -72,12 +86,12 @@ export default function DecksPage() {
   useEffect(() => {
     if (!restored) return;
     try {
-      const view: StoredView = { sort, direction, visibility: filters.visibility, legality: filters.legality, colors: filters.colors };
-      localStorage.setItem(VIEW_KEY, JSON.stringify(view));
+      const saved: StoredView = { sort, direction, visibility: filters.visibility, legality: filters.legality, colors: filters.colors, status: filters.status, view };
+      localStorage.setItem(VIEW_KEY, JSON.stringify(saved));
     } catch {
       // Not remembered, nothing else is affected.
     }
-  }, [restored, sort, direction, filters.visibility, filters.legality, filters.colors]);
+  }, [restored, sort, direction, filters.visibility, filters.legality, filters.colors, filters.status, view]);
 
   const load = useCallback(async () => {
     try {
@@ -117,23 +131,42 @@ export default function DecksPage() {
 
   const shown = useMemo(() => sortDecks((decks ?? []).filter((deck) => matches(deck, filters)), sort, direction), [decks, filters, sort, direction]);
 
+  // A new search, filter or order starts again from the first page.
+  useEffect(() => {
+    setLimit(PAGE_SIZE);
+  }, [filters, sort, direction, view]);
+
   function chooseSort(next: DeckSort) {
     setSort(next);
     setDirection(DEFAULT_DIRECTION[next]);
   }
 
-  async function createDeck(event: React.FormEvent) {
-    event.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
+  /** Makes the deck, then opens it. cards stay empty for a plain new deck. */
+  async function createDeck(name: string, cards: Array<{ cardId: string; quantity: number; board: string }>) {
     setCreating(true);
+    setCreateError(null);
     try {
-      const created = await api<DeckDetail>("/api/decks", { method: "POST", body: { name: trimmed } });
+      const created = await api<DeckDetail>("/api/decks", { method: "POST", body: { name, cards: cards.length > 0 ? cards : undefined } });
       router.push(`/decks/${created.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the deck.");
+      setCreateError(err instanceof ApiError ? (err.fields?.cards ?? err.message) : "Could not create the deck.");
       setCreating(false);
+      setNewOpen(true);
     }
+  }
+
+  const createFromDraft = (next: NewDeckDraft) =>
+    createDeck(next.name, next.commander ? [{ cardId: next.commander.id, quantity: 1, board: "commander" }] : []);
+
+  function importedToDeck(cards: ImportedCard[]) {
+    const name = draft?.name || "Imported deck";
+    const lines = cards.map(({ card, quantity, board }) => ({ cardId: card.id, quantity, board }));
+    // A commander chosen in the dialog leads the deck, unless the list brought its own.
+    if (draft?.commander && !lines.some((line) => line.board === "commander")) {
+      lines.unshift({ cardId: draft.commander.id, quantity: 1, board: "commander" });
+    }
+    setListOpen(false);
+    void createDeck(name, lines);
   }
 
   async function duplicate(deck: DeckSummary) {
@@ -159,6 +192,30 @@ export default function DecksPage() {
     }
   }
 
+  async function setFlag(deck: DeckSummary, flag: "pinned" | "archived") {
+    const next = !deck[flag];
+    try {
+      await api(`/api/decks/${deck.id}/flags`, { method: "PATCH", body: { [flag]: next } });
+      setToast(
+        flag === "pinned"
+          ? next ? `${deck.name} is pinned to the top` : `${deck.name} is unpinned`
+          : next ? `${deck.name} is archived` : `${deck.name} is back in your active decks`,
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not change that.");
+    }
+  }
+
+  const actions: DeckActions = {
+    onRename: setRenaming,
+    onDelete: setDeleting,
+    onDuplicate: (deck) => void duplicate(deck),
+    onVisibility: (deck, visibility) => void setVisibility(deck, visibility),
+    onPin: (deck) => void setFlag(deck, "pinned"),
+    onArchive: (deck) => void setFlag(deck, "archived"),
+  };
+
   const finished = (message: string) => {
     setRenaming(null);
     setDeleting(null);
@@ -173,26 +230,31 @@ export default function DecksPage() {
       <main className="pb-24">
         <h1 className="pt-16 pb-8 font-display text-[clamp(72px,13vw,200px)] leading-[0.9]">Your decks</h1>
 
-        <form onSubmit={createDeck} className="mb-10 flex max-w-[560px] flex-col gap-2">
-          <label htmlFor="deckName" className="text-sm text-muted">
-            New deck name
-          </label>
-          <div className="flex gap-2.5">
-            <input
-              id="deckName"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={80}
-              className="min-h-12 flex-1 rounded-full border border-line bg-surface px-5 text-base text-ink focus:border-ink focus:outline-none"
-            />
-            <button type="submit" disabled={creating || name.trim() === ""} className="press min-h-12 rounded-full bg-accent px-6 text-sm font-bold text-on-accent disabled:opacity-50">
-              {creating ? "Creating" : "Create and open"}
-            </button>
-          </div>
-        </form>
+        <div className="mb-10 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setCreateError(null);
+              setNewOpen(true);
+            }}
+            className="press min-h-14 rounded-full bg-accent px-8 text-base font-bold text-on-accent"
+          >
+            New deck
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraft({ name: "", commander: null });
+              setListOpen(true);
+            }}
+            className="pill min-h-14 rounded-full border border-ink px-7 text-base font-medium"
+          >
+            Import a list
+          </button>
+        </div>
 
         {decks !== null && decks.length > 0 && (
-          <DeckToolbar filters={filters} onFilters={setFilters} sort={sort} direction={direction} onSort={chooseSort} onFlip={() => setDirection((d) => (d === "asc" ? "desc" : "asc"))} shown={shown.length} total={decks.length} />
+          <DeckToolbar filters={filters} onFilters={setFilters} sort={sort} direction={direction} onSort={chooseSort} onFlip={() => setDirection((d) => (d === "asc" ? "desc" : "asc"))} shown={shown.length} total={decks.length} view={view} onView={setView} />
         )}
 
         {error && (
@@ -241,15 +303,55 @@ export default function DecksPage() {
           </p>
         )}
 
-        {shown.length > 0 && (
+        {shown.length > 0 && view === "grid" && (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-10">
-            {shown.map((deck) => (
-              <DeckTile key={deck.id} deck={deck} onRename={setRenaming} onDelete={setDeleting} onDuplicate={(d) => void duplicate(d)} onVisibility={(d, v) => void setVisibility(d, v)} />
+            {shown.slice(0, limit).map((deck) => (
+              <DeckTile key={deck.id} deck={deck} actions={actions} />
             ))}
           </ul>
         )}
+
+        {shown.length > 0 && view === "list" && (
+          <ul className="border-t border-line">
+            {shown.slice(0, limit).map((deck) => (
+              <DeckRow key={deck.id} deck={deck} actions={actions} />
+            ))}
+          </ul>
+        )}
+
+        {shown.length > limit && (
+          <div className="mt-12 flex flex-wrap items-center gap-4">
+            <button type="button" onClick={() => setLimit((current) => current + PAGE_SIZE)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+              Show {Math.min(PAGE_SIZE, shown.length - limit)} more
+            </button>
+            <p className="text-sm text-muted">
+              Showing {limit} of {plural(shown.length, "deck")}
+            </p>
+          </div>
+        )}
       </main>
 
+      <NewDeckDialog
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        busy={creating}
+        error={createError}
+        onCreate={(next) => void createFromDraft(next)}
+        onFromList={(next) => {
+          setDraft(next);
+          setNewOpen(false);
+          setListOpen(true);
+        }}
+      />
+      <ImportDialog
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+        onImport={(cards) => importedToDeck(cards)}
+        title="Start a deck from a list"
+        addLabel="Create a new deck from this list"
+        replaceLabel={null}
+        confirmLabel={(count) => `Create a deck with ${count} cards`}
+      />
       <RenameDeckDialog deck={renaming} onClose={() => setRenaming(null)} onDone={finished} />
       <DeleteDeckDialog deck={deleting} onClose={() => setDeleting(null)} onDone={finished} />
 

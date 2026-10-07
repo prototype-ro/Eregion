@@ -91,13 +91,13 @@ public class DeckRepository {
 	/** What the decks page needs about one deck before legality is worked out. */
 	public record SummaryRow(UUID id, String name, String format, int latestVersion, UUID latestVersionId, String latestBranch,
 			boolean latestOnMain, int versionCount, int branchCount, int cardCount, double priceUsd, String commanderName,
-			List<String> artUrls, Instant updatedAt, String visibility, Integer publishedVersion) {
+			List<String> artUrls, Instant updatedAt, String visibility, Integer publishedVersion, boolean pinned, boolean archived) {
 	}
 
 	/** Every deck of a player with the facts about its latest version, in one query. */
 	public List<SummaryRow> summaryRows(UUID ownerId) {
 		return jdbc.sql("""
-				SELECT d.id, d.name, d.format, d.updated_at, d.visibility,
+				SELECT d.id, d.name, d.format, d.updated_at, d.visibility, d.pinned, d.archived,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version,
 				       v.id AS latest_id, COALESCE(v.version_number, 0) AS latest_version,
 				       b.name AS latest_branch, COALESCE(b.is_main, TRUE) AS latest_main,
@@ -140,7 +140,9 @@ public class DeckRepository {
 							arts == null ? List.of() : List.of((String[]) arts.getArray()),
 							rs.getTimestamp("updated_at").toInstant(),
 							rs.getString("visibility"),
-							(Integer) rs.getObject("published_version"));
+							(Integer) rs.getObject("published_version"),
+							rs.getBoolean("pinned"),
+							rs.getBoolean("archived"));
 				})
 				.list();
 	}
@@ -165,6 +167,19 @@ public class DeckRepository {
 				})
 				.list();
 		return result;
+	}
+
+	/** Sets the flags that are not null. Pinning and archiving are not edits, so the edited time stays. */
+	public DeckDtos.DeckFlags updateFlags(UUID deckId, Boolean pinned, Boolean archived) {
+		return jdbc.sql("""
+				UPDATE decks SET pinned = COALESCE(CAST(:pinned AS boolean), pinned), archived = COALESCE(CAST(:archived AS boolean), archived)
+				 WHERE id = :id RETURNING pinned, archived
+				""")
+				.param("id", deckId)
+				.param("pinned", pinned)
+				.param("archived", archived)
+				.query((rs, n) -> new DeckDtos.DeckFlags(rs.getBoolean("pinned"), rs.getBoolean("archived")))
+				.single();
 	}
 
 	public void renameDeck(UUID deckId, String name) {

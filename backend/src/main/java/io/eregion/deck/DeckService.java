@@ -61,8 +61,14 @@ public class DeckService {
 			return new DeckSummary(row.id(), row.name(), row.format(), row.latestVersion(), row.latestBranch(), row.latestOnMain(),
 					row.versionCount(), row.branchCount(), row.cardCount(), StatsCalculator.round2(row.priceUsd()), row.commanderName(),
 					row.artUrls(), DeckLegality.identity(cards), DeckLegality.issues(cards), row.updatedAt(), row.visibility(),
-					row.publishedVersion());
+					row.publishedVersion(), row.pinned(), row.archived());
 		}).toList();
+	}
+
+	@Transactional
+	public DeckDtos.DeckFlags setFlags(UUID deckId, UUID userId, DeckDtos.DeckFlagsRequest request) {
+		owned(deckId, userId);
+		return decks.updateFlags(deckId, request.pinned(), request.archived());
 	}
 
 	@Transactional

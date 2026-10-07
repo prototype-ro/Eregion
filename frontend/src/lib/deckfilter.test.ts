@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matches, NO_FILTERS, plural, relativeTime, sortDecks, type DeckFilters } from "./deckfilter.ts";
+import { isFiltering, matches, NO_FILTERS, plural, relativeTime, sortDecks, type DeckFilters } from "./deckfilter.ts";
 import type { DeckSummary } from "./types";
 
 let n = 0;
@@ -9,7 +9,7 @@ function deck(over: Partial<DeckSummary>): DeckSummary {
   return {
     id: `d${n}`, name: `Deck ${n}`, format: "commander", latestVersion: 1, latestBranch: "main", latestOnMain: true, versionCount: 1, branchCount: 1,
     cardCount: 100, priceUsd: 100, commanderName: "Boss", artUrls: [], colorIdentity: "WU", issues: [], updatedAt: "2026-01-01T00:00:00Z",
-    visibility: "private", publishedVersion: null, ...over,
+    visibility: "private", publishedVersion: null, pinned: false, archived: false, ...over,
   };
 }
 const withFilters = (over: Partial<DeckFilters>): DeckFilters => ({ ...NO_FILTERS, ...over });
@@ -80,4 +80,30 @@ test("plural handles one", () => {
   assert.equal(plural(1, "card"), "1 card");
   assert.equal(plural(0, "card"), "0 cards");
   assert.equal(plural(2, "branch", "branches"), "2 branches");
+});
+
+test("archived decks are hidden unless asked for", () => {
+  const live = deck({ name: "Live" });
+  const old = deck({ name: "Old", archived: true });
+  assert.equal(matches(live, NO_FILTERS), true);
+  assert.equal(matches(old, NO_FILTERS), false);
+  assert.equal(matches(old, withFilters({ status: "archived" })), true);
+  assert.equal(matches(live, withFilters({ status: "archived" })), false);
+  assert.equal(matches(old, withFilters({ status: "all" })), true);
+  assert.equal(matches(live, withFilters({ status: "all" })), true);
+});
+
+test("showing active decks is not counted as filtering", () => {
+  assert.equal(isFiltering(NO_FILTERS), false);
+  assert.equal(isFiltering(withFilters({ status: "archived" })), true);
+  assert.equal(isFiltering(withFilters({ status: "all" })), true);
+});
+
+test("pinned decks stay on top in either direction, sorted among themselves", () => {
+  const a = deck({ name: "A" });
+  const b = deck({ name: "B", pinned: true });
+  const c = deck({ name: "C", pinned: true });
+  const d = deck({ name: "D" });
+  assert.deepEqual(ids(sortDecks([a, b, c, d], "name", "asc")), ["B", "C", "A", "D"]);
+  assert.deepEqual(ids(sortDecks([a, b, c, d], "name", "desc")), ["C", "B", "D", "A"]);
 });

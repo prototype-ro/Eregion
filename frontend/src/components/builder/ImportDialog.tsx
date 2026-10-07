@@ -18,7 +18,10 @@ interface Props {
   /** Wording, so the same dialog can import into a deck or into the collection. */
   title?: string;
   addLabel?: string;
-  replaceLabel?: string;
+  /** Pass null to hide the choice, for places where there is nothing to replace. */
+  replaceLabel?: string | null;
+  /** The text of the final button, given how many cards were found. */
+  confirmLabel?: (count: number) => string;
   /** Called with the cards found. replace is true when the draft should be emptied first. */
   onImport: (cards: ImportedCard[], replace: boolean) => void;
 }
@@ -36,6 +39,7 @@ export function ImportDialog({
   title = "Import a list",
   addLabel = "Add to the current draft",
   replaceLabel = "Replace the current draft",
+  confirmLabel = (count) => `Add ${count} cards`,
 }: Props) {
   const [text, setText] = useState("");
   const [replace, setReplace] = useState(false);
@@ -115,7 +119,7 @@ export function ImportDialog({
   const cardCount = step.kind === "review" ? step.found.reduce((sum, item) => sum + item.quantity, 0) : 0;
 
   return (
-    <Dialog open={open} onClose={close} label="Import a decklist" size="md">
+    <Dialog open={open} onClose={close} label={title} size="md">
       <h2 className="font-display text-[44px] leading-none">{title}</h2>
 
       {step.kind === "edit" && (
@@ -154,6 +158,7 @@ export function ImportDialog({
             <span className="text-sm text-muted">.txt or .csv, up to 512 KB</span>
           </div>
 
+          {replaceLabel !== null && (
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-sm text-muted">When importing</legend>
             <label className="flex min-h-11 items-center gap-3 text-[15px]">
@@ -165,6 +170,7 @@ export function ImportDialog({
               {replaceLabel}
             </label>
           </fieldset>
+          )}
 
           {error && (
             <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
@@ -235,7 +241,7 @@ export function ImportDialog({
               }}
               className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent disabled:opacity-50"
             >
-              Add {cardCount} cards
+              {confirmLabel(cardCount)}
             </button>
           </div>
         </div>

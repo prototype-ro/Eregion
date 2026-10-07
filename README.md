@@ -46,6 +46,7 @@ cd frontend && npm run build     # type check and production build
 | `GET /api/decks`, `POST /api/decks` | List decks with their latest version's size, price, commander colors and what keeps it from being a legal Commander deck. Create a deck |
 | `GET /api/decks/{id}` | Deck with its latest version and stats |
 | `PATCH /api/decks/{id}` | Rename a deck |
+| `PATCH /api/decks/{id}/flags` | Pin a deck to the top of the list or archive it. Send only the flag that changes |
 | `POST /api/decks/{id}/duplicate` | Copy the latest version into a new private deck |
 | `POST /api/decks/{id}/versions` | Save a new full snapshot. Send `fromVersion` (the version the draft started from). Saving from the newest version of a branch extends it. Saving from an older one needs `branchName`, which starts a new branch. |
 | `GET /api/decks/{id}/versions[/{n}]` | Version history and one version |

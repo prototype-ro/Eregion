@@ -161,7 +161,16 @@ public final class DeckDtos {
 			List<String> issues,
 			Instant updatedAt,
 			String visibility,
-			Integer publishedVersion) {
+			Integer publishedVersion,
+			boolean pinned,
+			boolean archived) {
+	}
+
+	/** Changes only the flags that are given. */
+	public record DeckFlagsRequest(Boolean pinned, Boolean archived) {
+	}
+
+	public record DeckFlags(boolean pinned, boolean archived) {
 	}
 
 	public record RenameDeckRequest(@NotBlank @Size(max = 80) String name) {

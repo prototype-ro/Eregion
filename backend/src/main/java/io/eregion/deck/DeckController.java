@@ -65,6 +65,12 @@ public class DeckController {
 		return service.rename(deckId, CurrentUser.id(jwt), request.name());
 	}
 
+	/** Pin a deck to the top of the list or archive it. Send only the flag that changes. */
+	@PatchMapping("/{deckId}/flags")
+	public DeckDtos.DeckFlags flags(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @RequestBody DeckDtos.DeckFlagsRequest request) {
+		return service.setFlags(deckId, CurrentUser.id(jwt), request);
+	}
+
 	@PostMapping("/{deckId}/duplicate")
 	@ResponseStatus(HttpStatus.CREATED)
 	public DeckDetail duplicate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {

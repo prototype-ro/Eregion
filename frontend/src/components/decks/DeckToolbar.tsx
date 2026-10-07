@@ -2,7 +2,7 @@
 
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { ManaCost } from "@/components/Mana";
-import { DECK_SORTS, isFiltering, type DeckDirection, type DeckFilters, type DeckSort } from "@/lib/deckfilter";
+import { DECK_SORTS, isFiltering, NO_FILTERS, type DeckDirection, type DeckFilters, type DeckSort } from "@/lib/deckfilter";
 
 interface Props {
   filters: DeckFilters;
@@ -13,6 +13,8 @@ interface Props {
   onFlip: () => void;
   shown: number;
   total: number;
+  view: "grid" | "list";
+  onView: (view: "grid" | "list") => void;
 }
 
 const select = "min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none";
@@ -20,7 +22,7 @@ const COLORS = ["W", "U", "B", "R", "G", "C"];
 const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", C: "Colorless" };
 
 /** Search, filters and sorting for the list of decks. */
-export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFlip, shown, total }: Props) {
+export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFlip, shown, total, view, onView }: Props) {
   const set = (patch: Partial<DeckFilters>) => onFilters({ ...filters, ...patch });
 
   function toggleColor(color: string) {
@@ -75,6 +77,17 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
         </div>
 
         <div className="flex items-center gap-3">
+          <label htmlFor="deck-status" className="text-sm text-muted">
+            Show
+          </label>
+          <select id="deck-status" value={filters.status} onChange={(event) => set({ status: event.target.value as DeckFilters["status"] })} className={select}>
+            <option value="active">Active decks</option>
+            <option value="archived">Archived</option>
+            <option value="all">Everything</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-3">
           <label htmlFor="deck-legality" className="text-sm text-muted">
             Legality
           </label>
@@ -107,10 +120,18 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
           </div>
         </div>
 
+        <div className="flex gap-1 rounded-full border border-line p-1" role="group" aria-label="Layout">
+          {(["grid", "list"] as const).map((mode) => (
+            <button key={mode} type="button" aria-pressed={view === mode} onClick={() => onView(mode)} className={`min-h-9 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}>
+              {mode}
+            </button>
+          ))}
+        </div>
+
         <p className="ml-auto flex items-center gap-4 text-sm text-muted" role="status">
           {isFiltering(filters) ? `${shown} of ${total} decks` : `${total} ${total === 1 ? "deck" : "decks"}`}
           {isFiltering(filters) && (
-            <button type="button" onClick={() => onFilters({ query: "", visibility: "all", legality: "all", colors: [] })} className="text-accent-text underline underline-offset-4">
+            <button type="button" onClick={() => onFilters({ ...NO_FILTERS })} className="text-accent-text underline underline-offset-4">
               Clear filters
             </button>
           )}

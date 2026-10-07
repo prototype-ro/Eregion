@@ -73,6 +73,9 @@ export interface DeckSummary {
   updatedAt: string;
   visibility: Visibility;
   publishedVersion: number | null;
+  /** Pinned decks sit at the top of the list. Archived decks are hidden unless asked for. */
+  pinned: boolean;
+  archived: boolean;
 }
 
 export interface DeckCardLine {

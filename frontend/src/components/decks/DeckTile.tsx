@@ -2,22 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 import { ManaCost } from "@/components/Mana";
 import { plural, relativeTime } from "@/lib/deckfilter";
 import { formatPrice } from "@/lib/links";
 import type { DeckSummary } from "@/lib/types";
-
-interface Props {
-  deck: DeckSummary;
-  onRename: (deck: DeckSummary) => void;
-  onDelete: (deck: DeckSummary) => void;
-  onDuplicate: (deck: DeckSummary) => void;
-  onVisibility: (deck: DeckSummary, visibility: "public" | "private") => void;
-}
-
-const item =
-  "flex min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none disabled:opacity-40";
+import { DeckMenu, type DeckActions } from "./DeckMenu";
 
 /** Where the deck stands as a Commander deck, in a few words. */
 export function legalityLabel(deck: DeckSummary): { text: string; good: boolean } | null {
@@ -45,92 +34,55 @@ function Art({ deck }: { deck: DeckSummary }) {
   );
 }
 
-/** One deck on the decks page: art, what it is, how it stands, and a menu of things to do with it. */
-export function DeckTile({ deck, onRename, onDelete, onDuplicate, onVisibility }: Props) {
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
-    const close = (event: Event) => {
-      if (event instanceof KeyboardEvent) {
-        if (event.key === "Escape") {
-          setOpen(false);
-          button.current?.focus();
-        }
-        return;
-      }
-      if (!menu.current?.contains(event.target as Node) && !button.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
-
-  const act = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
-  };
-
-  const legality = legalityLabel(deck);
-  const meta = [
+/** The facts under a deck's name, shared by the tile and the list row. */
+export function deckMeta(deck: DeckSummary): string[] {
+  return [
     plural(deck.cardCount, "card"),
     deck.cardCount > 0 ? formatPrice(deck.priceUsd) : null,
     deck.latestVersion > 0 ? `v${deck.latestVersion}${deck.latestOnMain ? "" : ` on ${deck.latestBranch}`}` : null,
     deck.branchCount > 1 ? plural(deck.branchCount, "branch", "branches") : null,
-  ].filter(Boolean);
+  ].filter((part): part is string => part !== null);
+}
 
+/** Color symbols, the legality badge and the public and archived marks. */
+export function DeckBadges({ deck }: { deck: DeckSummary }) {
+  const legality = legalityLabel(deck);
   return (
-    <li className="group relative flex flex-col">
-      <Art deck={deck} />
-
-      <div className="absolute top-3 right-3 z-10">
-        <button
-          ref={button}
-          type="button"
-          aria-label={`Options for ${deck.name}`}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-bg/85 text-xl leading-none text-ink backdrop-blur hover:bg-bg focus-visible:outline-2 focus-visible:outline-accent-text"
+    <>
+      {deck.commanderName && <ManaCost cost={deck.colorIdentity ? [...deck.colorIdentity].map((c) => `{${c}}`).join("") : "{C}"} className="text-[18px]" />}
+      {legality && (
+        <span
+          title={deck.issues.join(" ")}
+          className={`rounded-full border px-2.5 py-0.5 text-xs ${legality.good ? "border-accent bg-accent font-bold text-on-accent" : "border-line text-muted"}`}
         >
-          <span aria-hidden="true">...</span>
-        </button>
-        {open && (
-          <div ref={menu} role="menu" aria-label={`Options for ${deck.name}`} className="absolute top-12 right-0 z-20 w-[240px] rounded-3xl border border-line bg-bg p-2 shadow-2xl">
-            <Link role="menuitem" href={`/decks/${deck.id}`} target="_blank" rel="noopener noreferrer" className={item} onClick={() => setOpen(false)}>
-              Open in a new tab
-            </Link>
-            <button role="menuitem" className={item} onClick={act(() => onRename(deck))}>
-              Rename
-            </button>
-            <button role="menuitem" className={item} onClick={act(() => onDuplicate(deck))}>
-              Duplicate
-            </button>
-            {deck.visibility === "public" ? (
-              <button role="menuitem" className={item} onClick={act(() => onVisibility(deck, "private"))}>
-                Make private
-              </button>
-            ) : (
-              <button role="menuitem" className={item} disabled={deck.latestVersion === 0} onClick={act(() => onVisibility(deck, "public"))}>
-                Make public (v{deck.latestVersion})
-              </button>
-            )}
-            <div className="my-1.5 border-t border-line" />
-            <button role="menuitem" className={`${item} text-add-text`} onClick={act(() => onDelete(deck))}>
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
+          {legality.text}
+        </span>
+      )}
+      {deck.visibility === "public" && <span className="rounded-full border border-accent-text px-2.5 py-0.5 text-xs text-accent-text">Public</span>}
+      {deck.archived && <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-muted">Archived</span>}
+    </>
+  );
+}
+
+/** A small pin mark in front of a pinned deck's name. */
+export function PinMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-label="Pinned" role="img" className="mr-1.5 inline text-accent-text">
+      <path d="M9.5 1.5l5 5-1.4 1.4-.9-.4-2.3 2.3.3 3-1.2 1.2-2.7-2.7-4 4-.9-.9 4-4-2.7-2.7L4.9 5.5l3 .3 2.3-2.3-.4-.9L9.5 1.5z" />
+    </svg>
+  );
+}
+
+/** One deck on the decks page: art, what it is, how it stands, and a menu of things to do with it. */
+export function DeckTile({ deck, actions }: { deck: DeckSummary; actions: DeckActions }) {
+  return (
+    <li className={`group relative flex flex-col ${deck.archived ? "opacity-70" : ""}`}>
+      <Art deck={deck} />
+      <DeckMenu deck={deck} actions={actions} className="absolute top-3 right-3 z-10" />
 
       <div className="flex flex-1 flex-col px-1 pt-4">
         <h2 className="line-clamp-2 text-xl font-medium tracking-[-0.02em]" title={deck.name}>
+          {deck.pinned && <PinMark />}
           {/* The after pseudo-element stretches the link over the whole tile. */}
           <Link href={`/decks/${deck.id}`} className="after:absolute after:inset-0">
             {deck.name}
@@ -141,21 +93,40 @@ export function DeckTile({ deck, onRename, onDelete, onDuplicate, onVisibility }
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {deck.commanderName && <ManaCost cost={deck.colorIdentity ? [...deck.colorIdentity].map((c) => `{${c}}`).join("") : "{C}"} className="text-[18px]" />}
-          {legality && (
-            <span
-              title={deck.issues.join(" ")}
-              className={`rounded-full border px-2.5 py-0.5 text-xs ${legality.good ? "border-accent bg-accent font-bold text-on-accent" : "border-line text-muted"}`}
-            >
-              {legality.text}
-            </span>
-          )}
-          {deck.visibility === "public" && <span className="rounded-full border border-accent-text px-2.5 py-0.5 text-xs text-accent-text">Public</span>}
+          <DeckBadges deck={deck} />
         </div>
 
-        <p className="mt-3 font-mono text-[12px] leading-relaxed text-muted">{meta.join(", ")}</p>
+        <p className="mt-3 font-mono text-[12px] leading-relaxed text-muted">{deckMeta(deck).join(", ")}</p>
         <p className="mt-0.5 font-mono text-[12px] text-muted">Edited {relativeTime(deck.updatedAt)}</p>
       </div>
+    </li>
+  );
+}
+
+/** A deck as one line, for a long list. */
+export function DeckRow({ deck, actions }: { deck: DeckSummary; actions: DeckActions }) {
+  return (
+    <li className={`group relative grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-line py-3 md:grid-cols-[64px_minmax(0,1.4fr)_minmax(0,1.6fr)_160px_auto] ${deck.archived ? "opacity-70" : ""}`}>
+      <div className="relative h-12 w-16 overflow-hidden rounded-lg bg-surface" aria-hidden="true">
+        {deck.artUrls[0] && <Image src={deck.artUrls[0]} alt="" fill sizes="64px" className="object-cover grayscale" />}
+      </div>
+      <div className="min-w-0">
+        <h2 className="truncate text-[17px] font-medium" title={deck.name}>
+          {deck.pinned && <PinMark />}
+          <Link href={`/decks/${deck.id}`} className="after:absolute after:inset-0">
+            {deck.name}
+          </Link>
+        </h2>
+        <p className="truncate text-sm text-muted">{deck.commanderName ?? "No commander yet"}</p>
+      </div>
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
+        <DeckBadges deck={deck} />
+      </div>
+      <p className="hidden font-mono text-[12px] leading-relaxed text-muted md:block">
+        {deckMeta(deck).slice(0, 2).join(", ")}
+        <span className="block">Edited {relativeTime(deck.updatedAt)}</span>
+      </p>
+      <DeckMenu deck={deck} actions={actions} className="relative z-10" />
     </li>
   );
 }
