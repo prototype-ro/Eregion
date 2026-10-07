@@ -185,6 +185,8 @@ export interface StatsChange {
 export interface DeckDiff {
   fromVersion: number;
   toVersion: number;
+  printings: PrintingChange[];
+  tags: TagChange[];
   added: CardChange[];
   removed: CardChange[];
   changed: QuantityChange[];
@@ -212,4 +214,20 @@ export interface PublicDeckDetail {
   deck: PublicDeck;
   cards: DeckCardLine[];
   stats: DeckStats;
+}
+
+export interface PrintingChange {
+  cardId: string;
+  name: string;
+  board: Board;
+  from: string;
+  to: string;
+}
+
+export interface TagChange {
+  cardId: string;
+  name: string;
+  board: Board;
+  added: string[];
+  removed: string[];
 }

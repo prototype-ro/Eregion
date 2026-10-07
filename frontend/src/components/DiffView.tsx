@@ -1,4 +1,4 @@
-import type { CardChange, DeckDiff, QuantityChange } from "@/lib/types";
+import type { CardChange, DeckDiff, PrintingChange, QuantityChange, TagChange } from "@/lib/types";
 
 const cost = (manaCost: string) => manaCost.replace(/[{}]/g, "");
 
@@ -62,6 +62,43 @@ function Changed({ change }: { change: QuantityChange }) {
   );
 }
 
+function Reprinted({ change }: { change: PrintingChange }) {
+  return (
+    <li className="flex items-center justify-between gap-3 border-b border-line py-4 text-xl last:border-b-0">
+      <span className="flex flex-wrap items-center gap-2.5">
+        {change.name}
+        <BoardTag board={change.board} />
+      </span>
+      <span className="font-mono text-sm text-muted">
+        {change.from} to <span className="text-ink">{change.to}</span>
+      </span>
+    </li>
+  );
+}
+
+function Retagged({ change }: { change: TagChange }) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line py-4 text-xl last:border-b-0">
+      <span className="flex flex-wrap items-center gap-2.5">
+        {change.name}
+        <BoardTag board={change.board} />
+      </span>
+      <span className="flex flex-wrap gap-1.5 font-mono text-sm">
+        {change.added.map((tag) => (
+          <span key={`+${tag}`} className="rounded-full border border-add-line px-2.5 py-0.5 text-add-text">
+            + {tag}
+          </span>
+        ))}
+        {change.removed.map((tag) => (
+          <span key={`-${tag}`} className="rounded-full border border-line px-2.5 py-0.5 text-muted line-through">
+            {tag}
+          </span>
+        ))}
+      </span>
+    </li>
+  );
+}
+
 export function DiffView({ diff }: { diff: DeckDiff }) {
   const { stats } = diff;
   const maxCurve = Math.max(...stats.from.curve, ...stats.to.curve, 1);
@@ -112,6 +149,22 @@ export function DiffView({ diff }: { diff: DeckDiff }) {
         <ChangeList title="Quantity changed" empty="">
           {diff.changed.map((change) => (
             <Changed key={`${change.cardId}|${change.board}`} change={change} />
+          ))}
+        </ChangeList>
+      )}
+
+      {diff.printings.length > 0 && (
+        <ChangeList title="Printing changed" empty="">
+          {diff.printings.map((change) => (
+            <Reprinted key={`${change.cardId}|${change.board}`} change={change} />
+          ))}
+        </ChangeList>
+      )}
+
+      {diff.tags.length > 0 && (
+        <ChangeList title="Tags changed" empty="">
+          {diff.tags.map((change) => (
+            <Retagged key={`${change.cardId}|${change.board}`} change={change} />
           ))}
         </ChangeList>
       )}

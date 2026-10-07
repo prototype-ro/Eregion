@@ -18,6 +18,7 @@ import { ImportDialog, type ImportedCard } from "./ImportDialog";
 import { PrintingPicker } from "./PrintingPicker";
 import { StatsSection } from "./StatsSection";
 import { TagEditor } from "./TagEditor";
+import { BranchesDialog } from "./BranchesDialog";
 import { VersionTimeline } from "./VersionTimeline";
 
 type Tab = "main" | "maybe" | "considering";
@@ -119,9 +120,11 @@ interface Props {
   /** Called with the new version number after a successful save. */
   onSaved: (versionNumber: number) => void;
   onSelectVersion: (versionNumber: number) => void;
+  /** Reloads the deck, its timeline and the open version after branches changed. */
+  onReload: () => void;
 }
 
-export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, onSelectVersion }: Props) {
+export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, onSelectVersion, onReload }: Props) {
   const baseLines = useMemo(() => version?.cards ?? [], [version]);
 
   const [lines, setLines] = useState<DeckCardLine[]>(baseLines);
@@ -133,6 +136,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const [visibility, setVisibility] = useState<Visibility>(deck.visibility);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [branchesOpen, setBranchesOpen] = useState(false);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -277,6 +281,23 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const makeCommander = useCallback((target: DeckCardLine) => {
     setLines((previous) => {
       const rest = takeOne(previous, target).flatMap((line) => (line.board === "commander" ? [{ ...line, board: "main" as Board }] : [line]));
+      return [...mergeAll(rest), { ...target, board: "commander", quantity: 1 }];
+    });
+  }, []);
+
+  /** A partner is the commander's second slot too. A second partner already there goes back to the main board. */
+  const makePartner = useCallback((target: DeckCardLine) => {
+    setLines((previous) => {
+      if (!previous.some((line) => line.board === "commander")) {
+        setToast("Choose a commander first, then set the partner.");
+        return previous;
+      }
+      let rest = takeOne(previous, target);
+      const commanders = rest.filter((line) => line.board === "commander");
+      if (commanders.length >= 2) {
+        const demoted = lineKey(commanders[commanders.length - 1]);
+        rest = rest.map((line) => (lineKey(line) === demoted ? { ...line, board: "main" as Board } : line));
+      }
       return [...mergeAll(rest), { ...target, board: "commander", quantity: 1 }];
     });
   }, []);
@@ -534,6 +555,13 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
             )}
             <button
               type="button"
+              onClick={() => setBranchesOpen(true)}
+              className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
+            >
+              Branches
+            </button>
+            <button
+              type="button"
               aria-expanded={timelineOpen}
               aria-controls="timeline-body"
               onClick={toggleTimeline}
@@ -673,6 +701,26 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
       </div>
 
       {/* Overlays */}
+      <BranchesDialog
+        open={branchesOpen}
+        onClose={() => setBranchesOpen(false)}
+        deckId={deck.id}
+        token={token}
+        timeline={timeline}
+        currentBranchId={version?.branchId ?? null}
+        onChanged={(next, deletedId) => {
+          if (deletedId !== null && deletedId === version?.branchId) {
+            // The open version went with its branch: move to the end of the first line.
+            setBranchesOpen(false);
+            const first = next.branches.find((branch) => branch.forkedFromVersion === null) ?? next.branches[0];
+            const tip = first?.versions[first.versions.length - 1];
+            if (tip) onSelectVersion(tip.versionNumber);
+          } else {
+            onReload();
+          }
+          setToast(deletedId !== null ? "Branch deleted" : "Branch renamed");
+        }}
+      />
       <VisibilityDialog
         open={visibilityOpen}
         onClose={() => setVisibilityOpen(false)}
@@ -698,6 +746,7 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         onMove={moveLine}
         onSetCommander={makeCommander}
         onSetBackground={makeBackground}
+        onSetPartner={makePartner}
         onRemove={removeLine}
         onNotify={setToast}
       />

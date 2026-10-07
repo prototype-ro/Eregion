@@ -8,6 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,6 +23,7 @@ import io.eregion.deck.DeckDtos.CreateDeckRequest;
 import io.eregion.deck.DeckDtos.DeckDetail;
 import io.eregion.deck.DeckDtos.DeckDiff;
 import io.eregion.deck.DeckDtos.DeckSummary;
+import io.eregion.deck.DeckDtos.RenameBranchRequest;
 import io.eregion.deck.DeckDtos.SaveVersionRequest;
 import io.eregion.deck.DeckDtos.Timeline;
 import io.eregion.deck.DeckDtos.VersionDetail;
@@ -84,6 +86,17 @@ public class DeckController {
 	@GetMapping("/{deckId}/timeline")
 	public Timeline timeline(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
 		return service.timeline(deckId, CurrentUser.id(jwt));
+	}
+
+	@PatchMapping("/{deckId}/branches/{branchId}")
+	public Timeline renameBranch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID branchId,
+			@Valid @RequestBody RenameBranchRequest request) {
+		return service.renameBranch(deckId, CurrentUser.id(jwt), branchId, request.name());
+	}
+
+	@DeleteMapping("/{deckId}/branches/{branchId}")
+	public Timeline deleteBranch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID branchId) {
+		return service.deleteBranch(deckId, CurrentUser.id(jwt), branchId);
 	}
 
 	@GetMapping("/{deckId}/versions/{number}")

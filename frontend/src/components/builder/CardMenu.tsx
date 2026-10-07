@@ -21,6 +21,7 @@ interface Props {
   onMove: (line: DeckCardLine, board: Board) => void;
   onSetCommander: (line: DeckCardLine) => void;
   onSetBackground: (line: DeckCardLine) => void;
+  onSetPartner: (line: DeckCardLine) => void;
   onRemove: (line: DeckCardLine) => void;
   onNotify: (message: string) => void;
 }
@@ -29,7 +30,7 @@ const item =
   "flex min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none";
 
 /** The quick menu for a card, opened from its three dots or by right-clicking it. */
-export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onRemove, onNotify }: Props) {
+export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onSetPartner, onRemove, onNotify }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [amount, setAmount] = useState(1);
@@ -70,6 +71,7 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
   const isCommander = line.board === "commander";
   const isBackground = line.typeLine.includes("Background");
   const canLeadDeck = canLead(line) && !isBackground;
+  const hasPartner = canLeadDeck && /\b(partner|friends forever|doctor's companion)\b/i.test(line.oracleText);
 
   const act = (fn: () => void) => () => {
     fn();
@@ -115,6 +117,11 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       {isBackground && !isCommander && (
         <button role="menuitem" className={item} onClick={act(() => onSetBackground(line))}>
           Set as background
+        </button>
+      )}
+      {hasPartner && !isCommander && (
+        <button role="menuitem" className={item} onClick={act(() => onSetPartner(line))}>
+          Set as partner
         </button>
       )}
       {canLeadDeck && !isCommander && (

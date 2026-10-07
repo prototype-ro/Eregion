@@ -156,6 +156,35 @@ public class DeckRepository {
 				.single();
 	}
 
+	public void renameBranch(UUID branchId, String name) {
+		jdbc.sql("UPDATE deck_branches SET name = :name WHERE id = :id").param("id", branchId).param("name", name).update();
+	}
+
+	/** Branches that split off from a version inside this branch. Deleting it would orphan them. */
+	public List<String> branchesForkedFrom(UUID branchId) {
+		return jdbc.sql("""
+				SELECT b.name FROM deck_branches b
+				  JOIN deck_versions v ON v.id = b.forked_from_version_id
+				 WHERE v.branch_id = :id AND b.id <> :id
+				 ORDER BY b.name
+				""").param("id", branchId).query(String.class).list();
+	}
+
+	/** True when the deck's public version is one of this branch's versions. */
+	public boolean publishesFrom(UUID deckId, UUID branchId) {
+		return jdbc.sql("""
+				SELECT EXISTS (SELECT 1 FROM decks d JOIN deck_versions v ON v.id = d.published_version_id
+				                WHERE d.id = :deck AND v.branch_id = :branch)
+				""").param("deck", deckId).param("branch", branchId).query(Boolean.class).single();
+	}
+
+	/** Removes a branch and every version on it. Callers check nothing else depends on them first. */
+	public void deleteBranch(UUID branchId) {
+		jdbc.sql("UPDATE deck_versions SET parent_version_id = NULL WHERE branch_id = :id").param("id", branchId).update();
+		jdbc.sql("DELETE FROM deck_versions WHERE branch_id = :id").param("id", branchId).update();
+		jdbc.sql("DELETE FROM deck_branches WHERE id = :id").param("id", branchId).update();
+	}
+
 	public Optional<UUID> findBranchId(UUID deckId, String name) {
 		return jdbc.sql("SELECT id FROM deck_branches WHERE deck_id = :deck AND name = :name")
 				.param("deck", deckId)

@@ -13,6 +13,8 @@ import io.eregion.deck.DeckDtos.CardChange;
 import io.eregion.deck.DeckDtos.DeckCardLine;
 import io.eregion.deck.DeckDtos.DeckDiff;
 import io.eregion.deck.DeckDtos.DeckStats;
+import io.eregion.deck.DeckDtos.PrintingChange;
+import io.eregion.deck.DeckDtos.TagChange;
 import io.eregion.deck.DeckDtos.QuantityChange;
 import io.eregion.deck.DeckDtos.StatsChange;
 
@@ -38,15 +40,24 @@ public final class DeckDiffer {
 		List<CardChange> added = new ArrayList<>();
 		List<CardChange> removed = new ArrayList<>();
 		List<QuantityChange> changed = new ArrayList<>();
+		List<PrintingChange> printings = new ArrayList<>();
+		List<TagChange> tags = new ArrayList<>();
 
 		after.forEach((key, line) -> {
 			DeckCardLine previous = before.get(key);
 			if (previous == null) {
 				added.add(change(line));
 			}
-			else if (previous.quantity() != line.quantity()) {
-				changed.add(new QuantityChange(line.cardId(), line.name(), line.board(), previous.quantity(),
-						line.quantity()));
+			else {
+				if (previous.quantity() != line.quantity()) {
+					changed.add(new QuantityChange(line.cardId(), line.name(), line.board(), previous.quantity(),
+							line.quantity()));
+				}
+				if (!previous.printingId().equals(line.printingId())) {
+					printings.add(new PrintingChange(line.cardId(), line.name(), line.board(), printing(previous),
+							printing(line)));
+				}
+				tagChange(previous, line).ifPresent(tags::add);
 			}
 		});
 		before.forEach((key, line) -> {
@@ -58,10 +69,34 @@ public final class DeckDiffer {
 		added.sort(Comparator.comparing(CardChange::name).thenComparing(CardChange::board));
 		removed.sort(Comparator.comparing(CardChange::name).thenComparing(CardChange::board));
 		changed.sort(Comparator.comparing(QuantityChange::name).thenComparing(QuantityChange::board));
+		printings.sort(Comparator.comparing(PrintingChange::name).thenComparing(PrintingChange::board));
+		tags.sort(Comparator.comparing(TagChange::name).thenComparing(TagChange::board));
 
 		StatsChange stats = statsChange(StatsCalculator.compute(from), StatsCalculator.compute(to));
 		return new DeckDiff(fromVersion, toVersion, List.copyOf(added), List.copyOf(removed), List.copyOf(changed),
-				stats);
+				List.copyOf(printings), List.copyOf(tags), stats);
+	}
+
+	private static String printing(DeckCardLine line) {
+		return (line.setCode() + " " + line.collectorNumber()).trim();
+	}
+
+	/** Tags are compared ignoring case, and reported with the spelling they have in the version that holds them. */
+	private static java.util.Optional<TagChange> tagChange(DeckCardLine before, DeckCardLine after) {
+		Set<String> had = lower(before.tags());
+		Set<String> has = lower(after.tags());
+		List<String> added = after.tags().stream().filter(tag -> !had.contains(tag.toLowerCase(java.util.Locale.ROOT))).toList();
+		List<String> removed = before.tags().stream().filter(tag -> !has.contains(tag.toLowerCase(java.util.Locale.ROOT))).toList();
+		if (added.isEmpty() && removed.isEmpty()) {
+			return java.util.Optional.empty();
+		}
+		return java.util.Optional.of(new TagChange(after.cardId(), after.name(), after.board(), added, removed));
+	}
+
+	private static Set<String> lower(List<String> tags) {
+		Set<String> result = new LinkedHashSet<>();
+		tags.forEach(tag -> result.add(tag.toLowerCase(java.util.Locale.ROOT)));
+		return result;
 	}
 
 	private static StatsChange statsChange(DeckStats from, DeckStats to) {

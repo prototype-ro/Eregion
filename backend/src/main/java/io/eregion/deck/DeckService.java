@@ -102,6 +102,54 @@ public class DeckService {
 	// ---- versions and branches ----
 
 	@Transactional
+	public Timeline renameBranch(UUID deckId, UUID userId, UUID branchId, String rawName) {
+		owned(deckId, userId);
+		BranchRow branch = requireBranch(deckId, branchId);
+		String name = rawName.trim().replaceAll("\\s+", " ");
+		if (name.isEmpty()) {
+			throw ApiException.badRequest("A branch needs a name");
+		}
+		if (!name.equals(branch.name())) {
+			try {
+				decks.renameBranch(branchId, name);
+			}
+			catch (DuplicateKeyException ex) {
+				throw ApiException.conflict("This deck already has a branch called '" + name + "'");
+			}
+		}
+		return timeline(deckId, userId);
+	}
+
+	/**
+	 * Deletes a branch and all of its versions. The first line of the deck cannot be deleted, nor
+	 * can a branch that other branches split from or that holds the public version.
+	 */
+	@Transactional
+	public Timeline deleteBranch(UUID deckId, UUID userId, UUID branchId) {
+		owned(deckId, userId);
+		BranchRow branch = requireBranch(deckId, branchId);
+		if (branch.forkedFromVersion() == null) {
+			throw ApiException.conflict("The first branch cannot be deleted");
+		}
+		List<String> children = decks.branchesForkedFrom(branchId);
+		if (!children.isEmpty()) {
+			throw ApiException.conflict("Other branches split off from '" + branch.name() + "': " + String.join(", ", children)
+					+ ". Delete those first");
+		}
+		if (decks.publishesFrom(deckId, branchId)) {
+			throw ApiException.conflict("The public version is on this branch. Publish another version or make the deck private first");
+		}
+		decks.deleteBranch(branchId);
+		decks.touch(deckId);
+		return timeline(deckId, userId);
+	}
+
+	private BranchRow requireBranch(UUID deckId, UUID branchId) {
+		return decks.branches(deckId).stream().filter(branch -> branch.id().equals(branchId)).findFirst()
+				.orElseThrow(() -> ApiException.notFound("Branch"));
+	}
+
+	@Transactional
 	public VersionDetail saveVersion(UUID deckId, UUID userId, SaveVersionRequest request) {
 		owned(deckId, userId);
 		List<DeckCardInput> cards = prepare(request.cards());

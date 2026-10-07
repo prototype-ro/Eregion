@@ -26,4 +26,19 @@ final class Lines {
 	static DeckCardLine main(String name, String type, double manaValue, int quantity) {
 		return line(name, type, manaValue, "main", quantity, quantity);
 	}
+
+	/** The same card pinned to another printing. */
+	static DeckCardLine printing(DeckCardLine line, String setCode, String number) {
+		return new DeckCardLine(line.cardId(), line.name(), line.manaCost(), line.manaValue(), line.primaryType(), line.typeLine(),
+				line.colors(), line.colorIdentity(), line.oracleText(), line.rarity(), line.artist(), line.imageSmall(),
+				line.imageNormal(), line.imageArtCrop(), UUID.nameUUIDFromBytes((setCode + number).getBytes(StandardCharsets.UTF_8)),
+				setCode, line.setName(), number, line.priceUsd(), line.board(), line.quantity(), line.owned(), line.tags());
+	}
+
+	static DeckCardLine tagged(DeckCardLine line, String... tags) {
+		return new DeckCardLine(line.cardId(), line.name(), line.manaCost(), line.manaValue(), line.primaryType(), line.typeLine(),
+				line.colors(), line.colorIdentity(), line.oracleText(), line.rarity(), line.artist(), line.imageSmall(),
+				line.imageNormal(), line.imageArtCrop(), line.printingId(), line.setCode(), line.setName(), line.collectorNumber(),
+				line.priceUsd(), line.board(), line.quantity(), line.owned(), java.util.List.of(tags));
+	}
 }

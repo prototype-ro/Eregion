@@ -2,6 +2,8 @@ package io.eregion.deck;
 
 import static io.eregion.deck.Lines.line;
 import static io.eregion.deck.Lines.main;
+import static io.eregion.deck.Lines.printing;
+import static io.eregion.deck.Lines.tagged;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -93,5 +95,53 @@ class DeckDifferTest {
 
 		assertThat(diff.added()).extracting(c -> c.name())
 				.containsExactly("Arcane Signet", "Mind Stone", "Zur's Weirding");
+	}
+
+	@Test
+	void aChangedPrintingIsReportedWithBothSides() {
+		var ring = main("Sol Ring", "Artifact", 1, 1);
+
+		DeckDiff diff = DeckDiffer.diff(1, List.of(printing(ring, "C21", "263")), 2, List.of(printing(ring, "LTC", "319")));
+
+		assertThat(diff.printings()).hasSize(1);
+		assertThat(diff.printings().get(0).from()).isEqualTo("C21 263");
+		assertThat(diff.printings().get(0).to()).isEqualTo("LTC 319");
+		assertThat(diff.added()).isEmpty();
+		assertThat(diff.changed()).isEmpty();
+	}
+
+	@Test
+	void samePrintingIsNotReported() {
+		var ring = printing(main("Sol Ring", "Artifact", 1, 1), "C21", "263");
+
+		assertThat(DeckDiffer.diff(1, List.of(ring), 2, List.of(ring)).printings()).isEmpty();
+	}
+
+	@Test
+	void tagChangesListWhatWasAddedAndRemoved() {
+		var before = tagged(main("Sol Ring", "Artifact", 1, 1), "Ramp", "Staple");
+		var after = tagged(main("Sol Ring", "Artifact", 1, 1), "ramp", "Fast mana");
+
+		DeckDiff diff = DeckDiffer.diff(1, List.of(before), 2, List.of(after));
+
+		assertThat(diff.tags()).hasSize(1);
+		assertThat(diff.tags().get(0).added()).containsExactly("Fast mana");
+		assertThat(diff.tags().get(0).removed()).containsExactly("Staple");
+	}
+
+	@Test
+	void tagsDifferingOnlyByCaseAreNotAChange() {
+		var before = tagged(main("Sol Ring", "Artifact", 1, 1), "Ramp");
+		var after = tagged(main("Sol Ring", "Artifact", 1, 1), "ramp");
+
+		assertThat(DeckDiffer.diff(1, List.of(before), 2, List.of(after)).tags()).isEmpty();
+	}
+
+	@Test
+	void aNewCardIsAnAdditionNotATagChange() {
+		DeckDiff diff = DeckDiffer.diff(1, List.of(), 2, List.of(tagged(main("Sol Ring", "Artifact", 1, 1), "Ramp")));
+
+		assertThat(diff.added()).hasSize(1);
+		assertThat(diff.tags()).isEmpty();
 	}
 }

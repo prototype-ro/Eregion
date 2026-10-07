@@ -47,6 +47,8 @@ cd frontend && npm run build     # type check and production build
 | `POST /api/decks/{id}/versions` | Save a new full snapshot. Send `fromVersion` (the version the draft started from). Saving from the newest version of a branch extends it. Saving from an older one needs `branchName`, which starts a new branch. |
 | `GET /api/decks/{id}/versions[/{n}]` | Version history and one version |
 | `GET /api/decks/{id}/timeline` | Every branch with its versions, for the multiverse timeline |
+| `PATCH /api/decks/{id}/branches/{branchId}` | Rename a branch |
+| `DELETE /api/decks/{id}/branches/{branchId}` | Delete a branch and its versions. Refused for the first branch, a branch others split from, or one holding the public version |
 | `GET /api/decks/{id}/diff?from=7&to=8` | Added, removed and changed cards plus stat deltas |
 | `PUT /api/decks/{id}/visibility` | Publish one saved version of a deck (`public` plus `versionNumber`) or make it private again. Only the chosen version is ever shown to others |
 | `GET /api/explore?commander=&q=&limit=&offset=` | Public decks, newest first, optionally only those with a given commander card |

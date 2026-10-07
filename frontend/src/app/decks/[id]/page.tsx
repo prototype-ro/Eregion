@@ -98,6 +98,7 @@ export default function DeckPage() {
           owned={loaded.owned}
           onSaved={openVersion}
           onSelectVersion={openVersion}
+          onReload={() => void load()}
         />
       )}
     </div>

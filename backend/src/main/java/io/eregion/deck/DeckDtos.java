@@ -129,6 +129,9 @@ public final class DeckDtos {
 	}
 
 	/** Makes a deck public, showing one chosen version, or private again. versionNumber is required for public. */
+	public record RenameBranchRequest(@NotBlank @Size(max = 40) String name) {
+	}
+
 	public record VisibilityRequest(@NotBlank String visibility, Integer versionNumber) {
 	}
 
@@ -159,6 +162,14 @@ public final class DeckDtos {
 	public record QuantityChange(UUID cardId, String name, String board, int from, int to) {
 	}
 
+	/** A card kept in the deck whose chosen printing changed. from and to read like "2XM 190". */
+	public record PrintingChange(UUID cardId, String name, String board, String from, String to) {
+	}
+
+	/** A card kept in the deck whose tags changed. */
+	public record TagChange(UUID cardId, String name, String board, List<String> added, List<String> removed) {
+	}
+
 	public record StatsChange(
 			DeckStats from,
 			DeckStats to,
@@ -175,6 +186,8 @@ public final class DeckDtos {
 			List<CardChange> added,
 			List<CardChange> removed,
 			List<QuantityChange> changed,
+			List<PrintingChange> printings,
+			List<TagChange> tags,
 			StatsChange stats) {
 	}
 }

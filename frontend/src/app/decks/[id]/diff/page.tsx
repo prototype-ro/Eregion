@@ -1,26 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { DiffView } from "@/components/DiffView";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
-import type { DeckDetail, DeckDiff, VersionSummary } from "@/lib/types";
+import type { DeckDetail, DeckDiff, Timeline, VersionSummary } from "@/lib/types";
 
 const select =
   "min-h-11 rounded-full border border-line bg-surface px-4 text-[15px] text-ink focus:border-ink focus:outline-none";
 
 export default function DiffPage() {
+  // useSearchParams needs a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={<p className="py-16 text-muted">Loading the history.</p>}>
+      <Diff />
+    </Suspense>
+  );
+}
+
+function Diff() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const params = useSearchParams();
+  const wantedFrom = Number(params.get("from"));
+  const wantedTo = Number(params.get("to"));
+  const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [deckName, setDeckName] = useState<string>("");
   const [versions, setVersions] = useState<VersionSummary[] | null>(null);
   const [from, setFrom] = useState<number | null>(null);
   const [to, setTo] = useState<number | null>(null);
   const [diff, setDiff] = useState<DeckDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const branchOf = (versionNumber: number) =>
+    timeline?.branches.find((branch) => branch.versions.some((version) => version.versionNumber === versionNumber))?.name;
+  const label = (version: VersionSummary) =>
+    `v${version.versionNumber}${timeline && timeline.branches.length > 1 ? ` on ${branchOf(version.versionNumber) ?? "?"}` : ""}${version.note ? `, ${version.note}` : ""}`;
+
+  /** Compares the newest version of one branch with the newest of another. */
+  const compareHeads = (side: "from" | "to", branchId: string) => {
+    const tip = timeline?.branches.find((branch) => branch.id === branchId)?.versions.at(-1);
+    if (!tip) return;
+    if (side === "from") setFrom(tip.versionNumber);
+    else setTo(tip.versionNumber);
+  };
+  const branchIdOf = (versionNumber: number | null) =>
+    versionNumber === null ? "" : (timeline?.branches.find((branch) => branch.versions.some((version) => version.versionNumber === versionNumber))?.id ?? "");
 
   // Load the version list once and default to "previous to latest".
   useEffect(() => {
@@ -31,13 +59,20 @@ export default function DiffPage() {
     }
     (async () => {
       try {
-        const [deck, list] = await Promise.all([
+        const [deck, list, tl] = await Promise.all([
           api<DeckDetail>(`/api/decks/${id}`, { token }),
           api<VersionSummary[]>(`/api/decks/${id}/versions`, { token }),
+          api<Timeline>(`/api/decks/${id}/timeline`, { token }),
         ]);
         setDeckName(deck.name);
         setVersions(list);
-        if (list.length >= 2) {
+        setTimeline(tl);
+        const exists = (n: number) => list.some((version) => version.versionNumber === n);
+        if (exists(wantedFrom) && exists(wantedTo)) {
+          // A link from the branches list names the two versions to compare.
+          setFrom(wantedFrom);
+          setTo(wantedTo);
+        } else if (list.length >= 2) {
           // Compare the newest version with the one it was made from, which on a branch
           // is not necessarily the previous number.
           const newest = list[0];
@@ -53,7 +88,7 @@ export default function DiffPage() {
         setError(err instanceof ApiError ? err.message : "Could not load the history.");
       }
     })();
-  }, [id, router]);
+  }, [id, router, wantedFrom, wantedTo]);
 
   // Recompute the diff whenever the picked versions change.
   useEffect(() => {
@@ -99,8 +134,7 @@ export default function DiffPage() {
                 <select id="from" className={select} value={from ?? ""} onChange={(event) => setFrom(Number(event.target.value))}>
                   {versions.map((version) => (
                     <option key={version.versionNumber} value={version.versionNumber}>
-                      v{version.versionNumber}
-                      {version.note ? `, ${version.note}` : ""}
+                      {label(version)}
                     </option>
                   ))}
                 </select>
@@ -112,8 +146,7 @@ export default function DiffPage() {
                 <select id="to" className={select} value={to ?? ""} onChange={(event) => setTo(Number(event.target.value))}>
                   {versions.map((version) => (
                     <option key={version.versionNumber} value={version.versionNumber}>
-                      v{version.versionNumber}
-                      {version.note ? `, ${version.note}` : ""}
+                      {label(version)}
                     </option>
                   ))}
                 </select>
@@ -121,6 +154,26 @@ export default function DiffPage() {
             </div>
           )}
         </div>
+
+        {timeline && timeline.branches.length > 1 && versions && versions.length >= 2 && (
+          <div className="mb-10 flex flex-wrap items-end gap-3 border-y border-line py-5">
+            <p className="w-full text-sm text-muted">Or compare the newest versions of two branches</p>
+            {(["from", "to"] as const).map((side) => (
+              <div key={side} className="flex flex-col gap-1.5">
+                <label htmlFor={`branch-${side}`} className="text-sm text-muted">
+                  {side === "from" ? "Branch to start from" : "Branch to compare against"}
+                </label>
+                <select id={`branch-${side}`} className={select} value={branchIdOf(side === "from" ? from : to)} onChange={(event) => compareHeads(side, event.target.value)}>
+                  {timeline.branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
 
         {error && (
           <p role="alert" className="mb-8 max-w-[560px] rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
