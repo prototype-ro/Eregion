@@ -8,6 +8,7 @@ import { allTags, GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, 
 import { checkLegality } from "@/lib/legality";
 import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
+import { canApplyInPlace } from "@/lib/versions";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -150,6 +151,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [branchesOpen, setBranchesOpen] = useState(false);
   const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
+  const [confirmApply, setConfirmApply] = useState(false);
   const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
@@ -471,6 +473,42 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     setToast(`Imported ${incoming.reduce((sum, line) => sum + line.quantity, 0)} cards`);
   }
 
+  /** The cards of the draft as the server wants them. */
+  const cardsPayload = () =>
+    lines.map((line) => ({
+      cardId: line.cardId,
+      quantity: line.quantity,
+      board: line.board,
+      printingId: line.customPrintingId ? null : line.printingId,
+      customPrintingId: line.customPrintingId,
+      tags: line.tags,
+    }));
+
+  // Saving over a version only works when nothing grew from it. The public version needs a second look.
+  const applyCheck = version ? canApplyInPlace(timeline, version.versionNumber) : { ok: false, reason: null };
+  const versionIsPublic = version !== null && visibility === "public" && publishedVersion === version.versionNumber;
+
+  /** Saves the draft over the open version. It keeps its number and place, and no new version appears. */
+  async function applyChanges() {
+    if (!version) return;
+    setSaving(true);
+    setError(null);
+    setConfirmApply(false);
+    try {
+      await api<VersionDetail>(`/api/decks/${deck.id}/versions/${version.versionNumber}`, {
+        method: "PUT",
+        body: { cards: cardsPayload(), note: note.trim() || undefined },
+      });
+      setNote("");
+      setToast(`Changes applied to v${version.versionNumber}`);
+      onReload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not apply the changes.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -479,14 +517,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         method: "POST",
         body: {
           note: note.trim(),
-          cards: lines.map((line) => ({
-            cardId: line.cardId,
-            quantity: line.quantity,
-            board: line.board,
-            printingId: line.customPrintingId ? null : line.printingId,
-        customPrintingId: line.customPrintingId,
-            tags: line.tags,
-          })),
+          cards: cardsPayload(),
           fromVersion: version?.versionNumber,
           branchName: needsBranch ? branchName.trim() : undefined,
         },
@@ -611,6 +642,17 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             >
               Discard changes
             </button>
+            {version && (
+              <button
+                type="button"
+                disabled={!dirty || saving || !applyCheck.ok || lines.length === 0}
+                onClick={() => (versionIsPublic ? setConfirmApply(true) : void applyChanges())}
+                title={applyCheck.ok ? `Save these changes over version ${version.versionNumber} without adding a new version` : (applyCheck.reason ?? undefined)}
+                className="pill min-h-11 rounded-full border border-ink px-5 text-[15px] font-medium disabled:opacity-40"
+              >
+                Apply changes
+              </button>
+            )}
             <button
               type="button"
               disabled={!canSave}
@@ -837,6 +879,22 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       {/* Overlays */}
+      <Dialog open={confirmApply} onClose={() => setConfirmApply(false)} label="Update the public version" size="sm">
+        <div className="flex flex-col gap-5">
+          <h2 className="font-display text-[44px] leading-none">This version is public</h2>
+          <p className="text-[15px] leading-snug text-muted">
+            Version {version?.versionNumber} is the one everyone sees on Explore. Applying your changes updates it for them too. To keep the public version as it is, save a new version instead.
+          </p>
+          <div className="flex flex-wrap gap-2.5">
+            <button type="button" onClick={() => void applyChanges()} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent">
+              Apply and update the public version
+            </button>
+            <button type="button" onClick={() => setConfirmApply(false)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Dialog>
       <CardHistoryDialog
         line={lineByKey(historyKey)}
         deckId={deck.id}

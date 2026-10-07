@@ -55,6 +55,7 @@ cd frontend && npm run build     # type check and production build
 | `DELETE /api/decks/{id}/branches/{branchId}` | Delete a branch and its versions. Refused for the first branch, a branch others split from, or one holding the public version |
 | `GET /api/decks/{id}/branches/{branchId}/merge` | Preview merging a branch into main: the shared version, what main would gain or lose, and cards both lines changed differently (conflicts) |
 | `POST /api/decks/{id}/merge` | Merge a branch into main as a new main version that records both parents. Needs a choice (`ours` or `theirs`) for each conflict, and the heads that were previewed. Can delete the branch afterwards |
+| `PUT /api/decks/{id}/versions/{n}` | Apply changes: save the cards (and optionally the note) over an existing version instead of adding one. Refused when a later version, merge or branch grew from it |
 | `PATCH /api/decks/{id}/versions/{n}`, `DELETE /api/decks/{id}/versions/{n}` | Edit a version's note, or delete a version. History closes up around a deleted version. The public version, the last version of a deck and the only version on main cannot be deleted |
 | `GET /api/decks/{id}/branches/status` | For each branch other than main, how many versions it is ahead of and behind main, and the version they last shared |
 | `GET /api/decks/{id}/cards/{cardId}/history` | Every version a card appears in, with its board, copies and printing |

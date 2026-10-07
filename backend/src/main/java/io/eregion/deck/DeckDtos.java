@@ -222,6 +222,12 @@ public final class DeckDtos {
 
 	// ---- editing the timeline ----
 
+	/** The cards of an existing version, replaced in place. A note is changed only when one is given. */
+	public record ApplyChangesRequest(
+			@Size(max = 200) String note,
+			@NotNull @Size(min = 1, max = 400, message = "a version needs at least one card") List<@Valid DeckCardInput> cards) {
+	}
+
 	public record NoteRequest(@Size(max = 200) String note) {
 	}
 

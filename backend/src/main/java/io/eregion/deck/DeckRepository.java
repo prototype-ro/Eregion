@@ -280,6 +280,20 @@ public class DeckRepository {
 		jdbc.sql("DELETE FROM deck_versions WHERE id = :v").param("v", versionId).update();
 	}
 
+	/** True when another version, a merge or a branch starts from this version, so changing it would rewrite what they grew from. */
+	public boolean hasDependents(UUID versionId) {
+		return jdbc.sql("""
+				SELECT EXISTS (SELECT 1 FROM deck_versions WHERE parent_version_id = :v OR merge_parent_version_id = :v)
+				    OR EXISTS (SELECT 1 FROM deck_branches WHERE forked_from_version_id = :v)
+				""").param("v", versionId).query(Boolean.class).single();
+	}
+
+	/** Swaps all the cards of a version for new ones. */
+	public void replaceVersionCards(UUID versionId, List<DeckCardInput> cards) {
+		jdbc.sql("DELETE FROM deck_version_cards WHERE version_id = :v").param("v", versionId).update();
+		insertVersionCards(versionId, cards);
+	}
+
 	public void deleteEmptyBranch(UUID branchId) {
 		jdbc.sql("DELETE FROM deck_branches WHERE id = :id").param("id", branchId).update();
 	}

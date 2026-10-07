@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.eregion.common.ApiException;
+import io.eregion.deck.DeckDtos.ApplyChangesRequest;
 import io.eregion.deck.DeckDtos.BranchDto;
 import io.eregion.deck.DeckDtos.CreateDeckRequest;
 import io.eregion.deck.DeckDtos.DeckCardInput;
@@ -180,6 +181,27 @@ public class DeckService {
 		decks.deleteBranch(branchId);
 		decks.touch(deckId);
 		return timeline(deckId, userId);
+	}
+
+	/**
+	 * Saves the draft over an existing version instead of adding a new one. Only a version nothing else
+	 * grew from can be changed: no later version, merge or branch starts from it, so no history is rewritten.
+	 * The version keeps its number, branch and place in the timeline.
+	 */
+	@Transactional
+	public VersionDetail applyChanges(UUID deckId, UUID userId, int number, ApplyChangesRequest request) {
+		owned(deckId, userId);
+		VersionRow version = requireVersion(deckId, number);
+		if (decks.hasDependents(version.id())) {
+			throw ApiException.conflict("Other versions or branches grew from version " + number
+					+ ", so it cannot be changed. Save the draft as a new version or branch instead");
+		}
+		decks.replaceVersionCards(version.id(), prepare(userId, request.cards()));
+		if (request.note() != null) {
+			decks.updateNote(version.id(), request.note().trim());
+		}
+		decks.touch(deckId);
+		return detail(requireVersion(deckId, number), userId);
 	}
 
 	/** Rewrites a version's note. Notes are labels, so they can change after saving. */

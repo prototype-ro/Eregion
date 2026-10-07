@@ -23,6 +23,7 @@ import io.eregion.deck.DeckDtos.CreateDeckRequest;
 import io.eregion.deck.DeckDtos.DeckDetail;
 import io.eregion.deck.DeckDtos.DeckDiff;
 import io.eregion.deck.DeckDtos.DeckSummary;
+import io.eregion.deck.DeckDtos.ApplyChangesRequest;
 import io.eregion.deck.DeckDtos.MergePreview;
 import io.eregion.deck.DeckDtos.MergeRequest;
 import io.eregion.deck.DeckDtos.NoteRequest;
@@ -147,6 +148,13 @@ public class DeckController {
 	public Timeline updateNote(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number,
 			@Valid @RequestBody NoteRequest request) {
 		return service.updateNote(deckId, CurrentUser.id(jwt), number, request.note());
+	}
+
+	/** Saves the draft over this version instead of adding a new one. Refused when other versions grew from it. */
+	@PutMapping("/{deckId}/versions/{number}")
+	public VersionDetail applyChanges(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number,
+			@Valid @RequestBody ApplyChangesRequest request) {
+		return service.applyChanges(deckId, CurrentUser.id(jwt), number, request);
 	}
 
 	@DeleteMapping("/{deckId}/versions/{number}")
