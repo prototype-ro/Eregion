@@ -31,9 +31,6 @@ const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black",
 const COLOR_ORDER = ["White", "Blue", "Black", "Red", "Green", "Multicolor", "Colorless", "Lands"];
 const RARITY_ORDER = ["mythic", "rare", "uncommon", "common", "special", "bonus"];
 export const UNTAGGED = "Untagged";
-// The guided creator tags cards by job. These read best in this order, with everything else between and the mana base last.
-const TAG_FIRST = ["Ramp", "Card draw", "Removal", "Board wipes"];
-const TAG_LAST = ["Mana base"];
 
 const byName = (a: DeckCardLine, b: DeckCardLine) => a.name.localeCompare(b.name);
 
@@ -95,14 +92,8 @@ export function groupLines(lines: DeckCardLine[], mode: GroupMode): LineGroup[] 
     case "tag": {
       // A card with several tags shows up under each of them. Untagged cards come last.
       const tagged = bucket(rest, (line) => (line.tags.length ? line.tags : [UNTAGGED]), []);
-      const named = tagged.filter((group) => group.title !== UNTAGGED);
-      const rank = (title: string) => {
-        const first = TAG_FIRST.indexOf(title);
-        if (first >= 0) return first;
-        return TAG_LAST.includes(title) ? 2000 : 1000;
-      };
-      named.sort((a, b) => rank(a.title) - rank(b.title) || a.title.localeCompare(b.title));
-      groups.push(...named, ...tagged.filter((group) => group.title === UNTAGGED));
+      const untagged = tagged.filter((group) => group.title === UNTAGGED);
+      groups.push(...tagged.filter((group) => group.title !== UNTAGGED), ...untagged);
       break;
     }
   }

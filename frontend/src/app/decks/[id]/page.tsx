@@ -30,7 +30,6 @@ export default function DeckPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<string[] | null>(null);
 
   const load = useCallback(async () => {
     const stored = getToken();
@@ -69,20 +68,6 @@ export default function DeckPage() {
     void load();
   }, [load]);
 
-  // A deck just made by the guided creator comes with notes about what it could not fill.
-  useEffect(() => {
-    try {
-      const key = `eregion-generate-notes:${id}`;
-      const stored = sessionStorage.getItem(key);
-      if (stored) {
-        setNotes(JSON.parse(stored) as string[]);
-        sessionStorage.removeItem(key);
-      }
-    } catch {
-      // No notes to show.
-    }
-  }, [id]);
-
   const openVersion = useCallback(
     (versionNumber: number) => router.push(`/decks/${id}?v=${versionNumber}`, { scroll: false }),
     [id, router],
@@ -99,24 +84,6 @@ export default function DeckPage() {
           <Link href="/decks" className="mt-6 inline-block text-accent-text underline underline-offset-4">
             Back to your decks
           </Link>
-        </div>
-      )}
-      {notes !== null && (
-        <div role="status" className="mt-8 rounded-2xl border border-line bg-surface px-5 py-4 text-[15px]">
-          <p className="font-medium">Your first draft is ready.</p>
-          <p className="mt-1 text-muted">
-            Cards are tagged by what they do. Use Group by, then Custom tag, to see them that way, then change anything and save a new version.
-          </p>
-          {notes.length > 0 && (
-            <ul className="mt-3 list-disc pl-5 text-muted">
-              {notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          )}
-          <button type="button" onClick={() => setNotes(null)} className="pill mt-4 min-h-11 rounded-full border border-ink px-5 text-sm font-medium">
-            Dismiss
-          </button>
         </div>
       )}
       {!error && !loaded && <p className="py-16 text-muted">Loading the deck.</p>}

@@ -45,12 +45,11 @@ public class CardController {
 
 	/** Searches our catalog and, when it has too few matches, Scryfall too. Saved cards come back with ids. */
 	@GetMapping("/search")
-	public List<Card> search(@RequestParam String q, @RequestParam(defaultValue = "20") int limit,
-			@RequestParam(defaultValue = "false") boolean commanders) {
+	public List<Card> search(@RequestParam String q, @RequestParam(defaultValue = "20") int limit) {
 		if (q.trim().length() < 2) {
 			throw ApiException.badRequest("Search needs at least 2 characters");
 		}
-		return search.search(q, Math.max(1, Math.min(limit, 50)), commanders);
+		return search.search(q, Math.max(1, Math.min(limit, 50)));
 	}
 
 	@GetMapping("/{id}")

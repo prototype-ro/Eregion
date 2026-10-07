@@ -35,31 +35,29 @@ public class CardSearchService {
 		this.scryfall = scryfall;
 	}
 
-	public List<Card> search(String raw, int limit, boolean commandersOnly) {
+	public List<Card> search(String raw, int limit) {
 		String cleaned = ScryfallQuery.sanitize(raw);
 		if (cleaned.isEmpty()) {
 			return List.of();
 		}
 
-		String memory = commandersOnly ? "commander:" + cleaned : cleaned;
-		List<Card> local = cards.search(cleaned, limit, commandersOnly);
-		if (local.size() >= limit || recentlyAsked(memory)) {
+		List<Card> local = cards.search(cleaned, limit);
+		if (local.size() >= limit || recentlyAsked(cleaned)) {
 			return local;
 		}
 
 		try {
-			String query = ScryfallQuery.toScryfall(cleaned) + (commandersOnly ? " is:commander" : "");
-			for (ScryfallCard found : scryfall.search(query, MAX_FROM_SCRYFALL)) {
+			for (ScryfallCard found : scryfall.search(ScryfallQuery.toScryfall(cleaned), MAX_FROM_SCRYFALL)) {
 				cards.upsert(ScryfallMapper.toCard(found));
 			}
-			remember(memory);
+			remember(cleaned);
 		}
 		catch (RuntimeException ex) {
 			// Scryfall being slow or down must not break search: fall back to what we have.
 			log.warn("Scryfall search failed for '{}', answering from the local catalog", cleaned, ex);
 			return local;
 		}
-		return cards.search(cleaned, limit, commandersOnly);
+		return cards.search(cleaned, limit);
 	}
 
 	private boolean recentlyAsked(String cleaned) {

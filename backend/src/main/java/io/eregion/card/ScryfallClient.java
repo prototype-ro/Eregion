@@ -46,11 +46,6 @@ public class ScryfallClient {
 		return search(scryfallQuery, "name", "asc", false, max);
 	}
 
-	/** Search ordered by how many Commander decks play the card, most played first. Capped at {@code max}. */
-	public List<ScryfallCard> ranked(String scryfallQuery, int max) {
-		return search(scryfallQuery, "edhrec", "asc", false, max);
-	}
-
 	private List<ScryfallCard> search(String scryfallQuery, String order, String dir, boolean prints, int max) {
 		throttle();
 		ScryfallList body = http.get()

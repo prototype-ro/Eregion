@@ -185,15 +185,3 @@ export interface DeckDiff {
   changed: QuantityChange[];
   stats: StatsChange;
 }
-
-export interface Playstyle {
-  id: string;
-  label: string;
-  description: string;
-}
-
-export interface GenerateResult {
-  deck: DeckDetail;
-  /** Things worth knowing about the draft, such as slots that could not be filled. */
-  notes: string[];
-}
