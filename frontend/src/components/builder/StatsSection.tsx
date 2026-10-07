@@ -10,10 +10,12 @@ interface Props {
   savedVersion: number;
   removed: DeckCardLine[];
   showCollection: boolean;
+  /** A page someone else's deck: no changes to compare against. */
+  readOnly?: boolean;
 }
 
 /** The deck's numbers, in their own section under the cards so they read separately. */
-export function StatsSection({ deckId, stats, saved, savedVersion, removed, showCollection }: Props) {
+export function StatsSection({ deckId, stats, saved, savedVersion, removed, showCollection, readOnly = false }: Props) {
   const maxCurve = Math.max(...stats.curve, 1);
   const shift = saved ? Math.round((stats.averageManaValue - saved.averageManaValue) * 100) / 100 : 0;
 
@@ -23,7 +25,7 @@ export function StatsSection({ deckId, stats, saved, savedVersion, removed, show
         Statistics
       </h2>
 
-      <div className="mt-10 grid gap-x-16 gap-y-14 md:grid-cols-2 xl:grid-cols-[1fr_1.5fr_1fr_1fr]">
+      <div className={`mt-10 grid gap-x-16 gap-y-14 md:grid-cols-2 ${readOnly ? "xl:grid-cols-[1fr_1.5fr_1fr]" : "xl:grid-cols-[1fr_1.5fr_1fr_1fr]"}`}>
         <div className="flex flex-col gap-10">
           <div>
             <p className="text-[15px] text-muted">Average mana value</p>
@@ -86,6 +88,7 @@ export function StatsSection({ deckId, stats, saved, savedVersion, removed, show
           </ul>
         </div>
 
+        {!readOnly && (
         <div>
           <div className="flex items-baseline justify-between border-b border-line pb-2.5">
             <p className="text-[15px] text-muted">{saved ? `Removed since v${savedVersion}` : "Removed"}</p>
@@ -108,6 +111,7 @@ export function StatsSection({ deckId, stats, saved, savedVersion, removed, show
             </ul>
           )}
         </div>
+        )}
       </div>
     </section>
   );

@@ -23,6 +23,7 @@ import io.eregion.deck.DeckDtos.DeckSummary;
 import io.eregion.deck.DeckDtos.SaveVersionRequest;
 import io.eregion.deck.DeckDtos.Timeline;
 import io.eregion.deck.DeckDtos.VersionDetail;
+import io.eregion.deck.DeckDtos.VisibilityRequest;
 import io.eregion.deck.DeckDtos.VersionSummary;
 import io.eregion.deck.DeckRepository.BranchRow;
 import io.eregion.deck.DeckRepository.DeckRow;
@@ -68,13 +69,34 @@ public class DeckService {
 		VersionDetail latest = decks.findLatestVersion(deckId)
 				.map(version -> detail(version, userId))
 				.orElse(null);
-		return new DeckDetail(deck.id(), deck.name(), deck.format(), deck.createdAt(), deck.updatedAt(), latest);
+		return new DeckDetail(deck.id(), deck.name(), deck.format(), deck.createdAt(), deck.updatedAt(), latest,
+				deck.visibility(), deck.publishedVersion());
 	}
 
 	@Transactional
 	public void delete(UUID deckId, UUID userId) {
 		owned(deckId, userId);
 		decks.delete(deckId);
+	}
+
+	/**
+	 * Publishes one version of the deck for everyone to see, or hides the deck again. Only the chosen
+	 * version is shown, and it stays that version until the owner publishes another.
+	 */
+	@Transactional
+	public DeckDetail setVisibility(UUID deckId, UUID userId, VisibilityRequest request) {
+		owned(deckId, userId);
+		switch (request.visibility()) {
+			case "public" -> {
+				if (request.versionNumber() == null) {
+					throw ApiException.badRequest("Choose which version to publish");
+				}
+				decks.setPublished(deckId, requireVersion(deckId, request.versionNumber()).id());
+			}
+			case "private" -> decks.setPublished(deckId, null);
+			default -> throw ApiException.badRequest("visibility must be public or private");
+		}
+		return get(deckId, userId);
 	}
 
 	// ---- versions and branches ----
@@ -206,8 +228,8 @@ public class DeckService {
 				printingIds.add(card.printingId());
 			}
 		}
-		if (commanders > 1) {
-			throw ApiException.badRequest("A deck can have only one commander");
+		if (commanders > 2) {
+			throw ApiException.badRequest("A deck can have at most two commanders: a partner pair or a commander with a background");
 		}
 
 		Map<UUID, UUID> defaults = decks.defaultPrintings(cardIds);

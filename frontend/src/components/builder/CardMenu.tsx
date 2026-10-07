@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { canBeCommander, edhrecCardUrl, edhrecCommanderUrl } from "@/lib/links";
+import { exploreCommanderUrl } from "@/lib/links";
+import { canLead } from "@/lib/legality";
 import type { Board, DeckCardLine } from "@/lib/types";
 
 export interface MenuTarget {
@@ -18,6 +19,8 @@ interface Props {
   onTags: (line: DeckCardLine) => void;
   onQuantity: (line: DeckCardLine, delta: number) => void;
   onMove: (line: DeckCardLine, board: Board) => void;
+  onSetCommander: (line: DeckCardLine) => void;
+  onSetBackground: (line: DeckCardLine) => void;
   onRemove: (line: DeckCardLine) => void;
   onNotify: (message: string) => void;
 }
@@ -26,7 +29,7 @@ const item =
   "flex min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none";
 
 /** The quick menu for a card, opened from its three dots or by right-clicking it. */
-export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onRemove, onNotify }: Props) {
+export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onRemove, onNotify }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [amount, setAmount] = useState(1);
@@ -65,6 +68,8 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
   if (!target) return null;
   const { line } = target;
   const isCommander = line.board === "commander";
+  const isBackground = line.typeLine.includes("Background");
+  const canLeadDeck = canLead(line) && !isBackground;
 
   const act = (fn: () => void) => () => {
     fn();
@@ -107,18 +112,19 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
 
       <div className="my-1.5 border-t border-line" />
 
-      <a role="menuitem" className={item} href={edhrecCardUrl(line.name)} target="_blank" rel="noopener noreferrer" onClick={onClose}>
-        Find decks with this card
-      </a>
-      {canBeCommander(line.typeLine) && (
-        <a
-          role="menuitem"
-          className={item}
-          href={edhrecCommanderUrl(line.name)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={onClose}
-        >
+      {isBackground && !isCommander && (
+        <button role="menuitem" className={item} onClick={act(() => onSetBackground(line))}>
+          Set as background
+        </button>
+      )}
+      {canLeadDeck && !isCommander && (
+        <button role="menuitem" className={item} onClick={act(() => onSetCommander(line))}>
+          Set as commander
+        </button>
+      )}
+      {canLeadDeck && (
+        // A new tab keeps an unsaved draft safe.
+        <a role="menuitem" className={item} href={exploreCommanderUrl(line.cardId)} target="_blank" rel="noopener noreferrer" onClick={onClose}>
           Find decks with this commander
         </a>
       )}

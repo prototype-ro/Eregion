@@ -123,7 +123,13 @@ public final class DeckDtos {
 			String format,
 			Instant createdAt,
 			Instant updatedAt,
-			VersionDetail latest) {
+			VersionDetail latest,
+			String visibility,
+			Integer publishedVersion) {
+	}
+
+	/** Makes a deck public, showing one chosen version, or private again. versionNumber is required for public. */
+	public record VisibilityRequest(@NotBlank String visibility, Integer versionNumber) {
 	}
 
 	public record DeckSummary(
@@ -134,7 +140,8 @@ public final class DeckDtos {
 			int cardCount,
 			String commanderName,
 			String artUrl,
-			Instant updatedAt) {
+			Instant updatedAt,
+			String visibility) {
 	}
 
 	// ---- diff ----

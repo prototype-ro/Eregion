@@ -65,6 +65,7 @@ export interface DeckSummary {
   commanderName: string | null;
   artUrl: string | null;
   updatedAt: string;
+  visibility: Visibility;
 }
 
 export interface DeckCardLine {
@@ -148,6 +149,9 @@ export interface DeckDetail {
   createdAt: string;
   updatedAt: string;
   latest: VersionDetail | null;
+  visibility: Visibility;
+  /** The version number shown on Explore, when the deck is public. */
+  publishedVersion: number | null;
 }
 
 export interface CardChange {
@@ -185,4 +189,27 @@ export interface DeckDiff {
   removed: CardChange[];
   changed: QuantityChange[];
   stats: StatsChange;
+}
+
+export type Visibility = "private" | "public";
+
+/** A published deck in the Explore list. */
+export interface PublicDeck {
+  id: string;
+  name: string;
+  ownerName: string;
+  commanderName: string | null;
+  artUrl: string | null;
+  colorIdentity: string;
+  versionNumber: number;
+  cardCount: number;
+  priceUsd: number;
+  publishedAt: string;
+  mine: boolean;
+}
+
+export interface PublicDeckDetail {
+  deck: PublicDeck;
+  cards: DeckCardLine[];
+  stats: DeckStats;
 }

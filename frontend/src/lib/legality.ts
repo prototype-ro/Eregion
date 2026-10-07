@@ -12,7 +12,7 @@ const COUNTED = new Set(["commander", "main"]);
 
 const isBasic = (line: DeckCardLine) => line.typeLine.includes("Basic");
 const allowsAnyNumber = (line: DeckCardLine) => /a deck can have any number of cards named/i.test(line.oracleText);
-const canLead = (line: DeckCardLine) =>
+export const canLead = (line: DeckCardLine) =>
   (line.typeLine.includes("Legendary") && line.typeLine.includes("Creature")) ||
   /can be your commander/i.test(line.oracleText) ||
   line.typeLine.includes("Background");

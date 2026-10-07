@@ -42,7 +42,7 @@ function Badges({ line, isNew }: { line: DeckCardLine; isNew: boolean }) {
  * Clicking a card that is buried under others brings it to the front, drawn over its neighbors
  * without moving anything. Clicking it again puts it back.
  */
-export function CardStacks({ groups, selectedKey, newKeys, checkCollection, cardSize, onSelect, onMenu }: ViewProps) {
+export function CardStacks({ groups, selectedKey, newKeys, checkCollection, cardSize, readOnly = false, onSelect, onMenu }: ViewProps) {
   const [raised, setRaised] = useState<string | null>(null);
   if (groups.length === 0) return <Empty />;
   const strip = Math.round(cardSize * STRIP_RATIO);
@@ -63,6 +63,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                   style={last ? undefined : { height: strip }}
                   className={`${front ? "relative z-20" : last ? "" : "overflow-hidden"}`}
                   onContextMenu={(event) => {
+                    if (readOnly) return;
                     event.preventDefault();
                     onMenu(line, event.clientX, event.clientY);
                   }}
@@ -87,9 +88,11 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                     </button>
                     <span className="pointer-events-none absolute top-1 right-1 flex items-center gap-1">
                       <Badges line={line} isNew={newKeys.has(key)} />
-                      <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100">
-                        <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
-                      </span>
+                      {!readOnly && (
+                        <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100">
+                          <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
+                        </span>
+                      )}
                     </span>
                   </div>
                 </li>
@@ -103,7 +106,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
 }
 
 /** Every card as a full image. The image already shows the title, so the name is only in the accessible label. */
-export function CardGallery({ groups, selectedKey, newKeys, checkCollection, cardSize, onSelect, onMenu }: ViewProps) {
+export function CardGallery({ groups, selectedKey, newKeys, checkCollection, cardSize, readOnly = false, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) return <Empty />;
 
   return (
@@ -121,6 +124,7 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                   className="group/card relative"
                   onMouseEnter={() => onSelect(line)}
                   onContextMenu={(event) => {
+                    if (readOnly) return;
                     event.preventDefault();
                     onMenu(line, event.clientX, event.clientY);
                   }}
@@ -138,9 +142,11 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                   <span className="pointer-events-none absolute top-2 right-2 flex items-center gap-1">
                     <Badges line={line} isNew={newKeys.has(key)} />
                     {needs && <span className="rounded-full border border-add-line bg-bg px-2 py-0.5 text-xs text-add-text">Need</span>}
-                    <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100">
-                      <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
-                    </span>
+                    {!readOnly && (
+                      <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100">
+                        <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
+                      </span>
+                    )}
                   </span>
                 </li>
               );

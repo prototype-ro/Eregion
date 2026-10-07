@@ -6,8 +6,9 @@ import { api, ApiError } from "@/lib/api";
 import { allTags, GROUP_MODES, groupLines, lineKey, type GroupMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { computeStats } from "@/lib/stats";
-import type { Board, Card, DeckCardLine, Printing, Timeline, VersionDetail } from "@/lib/types";
+import type { Board, Card, DeckCardLine, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
+import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
 import { CardPeek } from "./CardPeek";
 import { CardPreview } from "./CardPreview";
@@ -81,6 +82,24 @@ const signature = (lines: DeckCardLine[]) =>
 const field =
   "min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none";
 
+/** Removes one copy of a line, dropping the line when that was the last copy. */
+function takeOne(lines: DeckCardLine[], target: DeckCardLine): DeckCardLine[] {
+  return lines.flatMap((line) => {
+    if (lineKey(line) !== lineKey(target)) return [line];
+    return line.quantity > 1 ? [{ ...line, quantity: line.quantity - 1 }] : [];
+  });
+}
+
+/** Joins lines that ended up with the same card on the same board. */
+function mergeAll(lines: DeckCardLine[]): DeckCardLine[] {
+  const merged = new Map<string, DeckCardLine>();
+  for (const line of lines) {
+    const seen = merged.get(lineKey(line));
+    merged.set(lineKey(line), seen ? { ...seen, quantity: Math.min(MAX_QUANTITY, seen.quantity + line.quantity) } : line);
+  }
+  return [...merged.values()];
+}
+
 function remember(key: string, value: string) {
   try {
     localStorage.setItem(key, value);
@@ -90,7 +109,7 @@ function remember(key: string, value: string) {
 }
 
 interface Props {
-  deck: { id: string; name: string; format: string };
+  deck: { id: string; name: string; format: string; visibility: Visibility; publishedVersion: number | null };
   /** The version opened in the builder. Null for a deck with no saved version yet. */
   version: VersionDetail | null;
   timeline: Timeline;
@@ -111,6 +130,9 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
   const [view, setView] = useState<ViewMode>("list");
   const [cardSize, setCardSize] = useState(SIZE_DEFAULT);
   const [timelineOpen, setTimelineOpen] = useState(true);
+  const [visibility, setVisibility] = useState<Visibility>(deck.visibility);
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -251,6 +273,28 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
     });
   }, []);
 
+  /** Puts one copy of the card on the commander board. A commander already there goes back to the main board. */
+  const makeCommander = useCallback((target: DeckCardLine) => {
+    setLines((previous) => {
+      const rest = takeOne(previous, target).flatMap((line) => (line.board === "commander" ? [{ ...line, board: "main" as Board }] : [line]));
+      return [...mergeAll(rest), { ...target, board: "commander", quantity: 1 }];
+    });
+  }, []);
+
+  /** A background is the commander's second slot. It needs a commander to go with. */
+  const makeBackground = useCallback((target: DeckCardLine) => {
+    setLines((previous) => {
+      if (!previous.some((line) => line.board === "commander")) {
+        setToast("Choose a commander first, then set the background.");
+        return previous;
+      }
+      const rest = takeOne(previous, target).flatMap((line) =>
+        line.board === "commander" && line.typeLine.includes("Background") ? [{ ...line, board: "main" as Board }] : [line],
+      );
+      return [...mergeAll(rest), { ...target, board: "commander", quantity: 1 }];
+    });
+  }, []);
+
   function setTags(target: DeckCardLine, tags: string[]) {
     setLines((previous) => previous.map((line) => (lineKey(line) === lineKey(target) ? { ...line, tags } : line)));
   }
@@ -356,6 +400,14 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
                 {version ? `Version ${version.versionNumber}` : "No cards yet"}
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => setVisibilityOpen(true)}
+              aria-label={visibility === "public" ? `Public, showing version ${publishedVersion}. Change visibility` : "Private. Change visibility"}
+              className={`pill rounded-full border px-3.5 py-1.5 ${visibility === "public" ? "border-accent-text text-accent-text" : "border-line"}`}
+            >
+              {visibility === "public" ? `Public, v${publishedVersion}` : "Private"}
+            </button>
             {!hasCommander && lines.length > 0 && (
               <span className="rounded-full border border-line px-3.5 py-1.5 text-muted">No commander chosen</span>
             )}
@@ -621,6 +673,21 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
       </div>
 
       {/* Overlays */}
+      <VisibilityDialog
+        open={visibilityOpen}
+        onClose={() => setVisibilityOpen(false)}
+        deckId={deck.id}
+        token={token}
+        timeline={timeline}
+        visibility={visibility}
+        publishedVersion={publishedVersion}
+        currentVersion={version?.versionNumber ?? null}
+        onChanged={(changed) => {
+          setVisibility(changed.visibility);
+          setPublishedVersion(changed.publishedVersion);
+          setToast(changed.visibility === "public" ? `Version ${changed.publishedVersion} is public` : "Deck is private");
+        }}
+      />
       <CardMenu
         target={menu}
         onClose={closeMenu}
@@ -629,6 +696,8 @@ export function DeckBuilder({ deck, version, timeline, token, owned, onSaved, on
         onTags={(line) => setTagKey(lineKey(line))}
         onQuantity={changeQuantity}
         onMove={moveLine}
+        onSetCommander={makeCommander}
+        onSetBackground={makeBackground}
         onRemove={removeLine}
         onNotify={setToast}
       />

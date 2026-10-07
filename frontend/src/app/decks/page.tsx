@@ -125,6 +125,7 @@ export default function DecksPage() {
                     </h2>
                     <p className="mt-1.5 text-sm text-muted">
                       {deck.commanderName ?? "No commander yet"}, {deck.cardCount} cards
+                      {deck.visibility === "public" && <span className="ml-2 rounded-full border border-accent-text px-2 py-0.5 text-xs text-accent-text">Public</span>}
                     </p>
                   </div>
                   <p className="text-right font-mono text-[13px] whitespace-nowrap text-muted">

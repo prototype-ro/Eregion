@@ -9,7 +9,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
   );
 }
 
-export function Nav({ active }: { active?: "decks" | "collection" }) {
+export function Nav({ active }: { active?: "decks" | "explore" | "collection" }) {
   return (
     <header className="flex min-h-[72px] flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line">
       <Wordmark />
@@ -19,6 +19,12 @@ export function Nav({ active }: { active?: "decks" | "collection" }) {
           className={`border-b-2 py-1.5 ${active === "decks" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Decks
+        </Link>
+        <Link
+          href="/explore"
+          className={`border-b-2 py-1.5 ${active === "explore" ? "border-accent-text" : "border-transparent text-muted"}`}
+        >
+          Explore
         </Link>
         <Link
           href="/collection"

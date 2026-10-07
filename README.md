@@ -48,6 +48,9 @@ cd frontend && npm run build     # type check and production build
 | `GET /api/decks/{id}/versions[/{n}]` | Version history and one version |
 | `GET /api/decks/{id}/timeline` | Every branch with its versions, for the multiverse timeline |
 | `GET /api/decks/{id}/diff?from=7&to=8` | Added, removed and changed cards plus stat deltas |
+| `PUT /api/decks/{id}/visibility` | Publish one saved version of a deck (`public` plus `versionNumber`) or make it private again. Only the chosen version is ever shown to others |
+| `GET /api/explore?commander=&q=&limit=&offset=` | Public decks, newest first, optionally only those with a given commander card |
+| `GET /api/explore/{id}` | A public deck's published version, read only. Private decks answer 404 |
 | `GET /api/collection`, `PUT /api/collection/{cardId}` | Cards you own, and set how many of one card |
 | `POST /api/collection/bulk` | Add many cards at once (`mode`: `add` or `replace`). Powers list import on the collection screen. |
 

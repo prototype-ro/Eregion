@@ -15,6 +15,8 @@ export interface ViewProps {
   checkCollection: boolean;
   /** Minimum card width in pixels for the stacks and gallery views. */
   cardSize: number;
+  /** Hides everything that edits: the card menu and its buttons. */
+  readOnly?: boolean;
 }
 
 export const dotsClass =
@@ -39,13 +41,14 @@ export function DotsButton({ line, onMenu, className = "" }: { line: DeckCardLin
   );
 }
 
-function Row({ line, selected, isNew, checkCollection, onSelect, onMenu }: { line: DeckCardLine; selected: boolean; isNew: boolean; checkCollection: boolean; onSelect: ViewProps["onSelect"]; onMenu: ViewProps["onMenu"] }) {
+function Row({ line, selected, isNew, checkCollection, readOnly, onSelect, onMenu }: { line: DeckCardLine; selected: boolean; isNew: boolean; checkCollection: boolean; readOnly: boolean; onSelect: ViewProps["onSelect"]; onMenu: ViewProps["onMenu"] }) {
   const needs = checkCollection && line.owned < line.quantity;
   return (
     <li
       className={`group/row flex items-center rounded-xl pr-1 ${selected ? "bg-surface" : ""} hover:bg-surface focus-within:bg-surface`}
       onMouseEnter={() => onSelect(line)}
       onContextMenu={(event) => {
+        if (readOnly) return;
         event.preventDefault();
         onMenu(line, event.clientX, event.clientY);
       }}
@@ -60,12 +63,12 @@ function Row({ line, selected, isNew, checkCollection, onSelect, onMenu }: { lin
         {isNew && <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold text-on-accent">New</span>}
         {needs && <span className="rounded-full border border-add-line px-2.5 py-0.5 text-xs text-add-text">Need</span>}
       </button>
-      <DotsButton line={line} onMenu={onMenu} className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 [@media(pointer:coarse)]:opacity-100" />
+      {!readOnly && <DotsButton line={line} onMenu={onMenu} className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 [@media(pointer:coarse)]:opacity-100" />}
     </li>
   );
 }
 
-export function CardList({ groups, selectedKey, newKeys, checkCollection, onSelect, onMenu }: ViewProps) {
+export function CardList({ groups, selectedKey, newKeys, checkCollection, readOnly = false, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) {
     return <p className="max-w-[420px] py-6 text-lg leading-normal text-muted">Nothing here yet. Search above to add cards.</p>;
   }
@@ -85,6 +88,7 @@ export function CardList({ groups, selectedKey, newKeys, checkCollection, onSele
                 selected={selectedKey === lineKey(line)}
                 isNew={newKeys.has(lineKey(line))}
                 checkCollection={checkCollection}
+                readOnly={readOnly}
                 onSelect={onSelect}
                 onMenu={onMenu}
               />

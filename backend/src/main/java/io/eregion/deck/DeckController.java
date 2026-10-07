@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,6 +26,7 @@ import io.eregion.deck.DeckDtos.SaveVersionRequest;
 import io.eregion.deck.DeckDtos.Timeline;
 import io.eregion.deck.DeckDtos.VersionDetail;
 import io.eregion.deck.DeckDtos.VersionSummary;
+import io.eregion.deck.DeckDtos.VisibilityRequest;
 import jakarta.validation.Valid;
 
 @RestController
@@ -57,6 +59,13 @@ public class DeckController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
 		service.delete(deckId, CurrentUser.id(jwt));
+	}
+
+	/** Publish one version for the Explore page, or make the deck private again. */
+	@PutMapping("/{deckId}/visibility")
+	public DeckDetail setVisibility(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId,
+			@Valid @RequestBody VisibilityRequest request) {
+		return service.setVisibility(deckId, CurrentUser.id(jwt), request);
 	}
 
 	@PostMapping("/{deckId}/versions")

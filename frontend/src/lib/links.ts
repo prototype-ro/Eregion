@@ -20,3 +20,9 @@ export function formatPrice(value: number | null | undefined): string {
 
 /** A card can lead a deck when it is legendary. This is a hint for showing the commander link, not a legality check. */
 export const canBeCommander = (typeLine: string) => typeLine.includes("Legendary");
+
+/** Public decks that use this card as a commander. */
+export const exploreCommanderUrl = (cardId: string) => `/explore?commander=${cardId}`;
+
+/** Colors in the game's own order: white, blue, black, red, green. */
+export const sortColors = (identity: string) => "WUBRG".split("").filter((color) => identity.includes(color)).join("");

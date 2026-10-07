@@ -24,7 +24,8 @@ import io.eregion.deck.DeckDtos.VersionSummary;
 @Repository
 public class DeckRepository {
 
-	public record DeckRow(UUID id, UUID ownerId, String name, String format, Instant createdAt, Instant updatedAt) {
+	public record DeckRow(UUID id, UUID ownerId, String name, String format, Instant createdAt, Instant updatedAt,
+			String visibility, Integer publishedVersion) {
 	}
 
 	/** A version plus where it sits in the branch graph. head is true when nothing newer is on its branch. */
@@ -66,8 +67,9 @@ public class DeckRepository {
 	/** Only returns the deck when it belongs to the user, so a stranger's id looks like a missing one. */
 	public Optional<DeckRow> findOwned(UUID deckId, UUID ownerId) {
 		return jdbc.sql("""
-				SELECT id, owner_id, name, format, created_at, updated_at
-				  FROM decks WHERE id = :id AND owner_id = :owner
+				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility,
+				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version
+				  FROM decks d WHERE d.id = :id AND d.owner_id = :owner
 				""")
 				.param("id", deckId)
 				.param("owner", ownerId)
@@ -77,13 +79,15 @@ public class DeckRepository {
 						rs.getString("name"),
 						rs.getString("format"),
 						rs.getTimestamp("created_at").toInstant(),
-						rs.getTimestamp("updated_at").toInstant()))
+						rs.getTimestamp("updated_at").toInstant(),
+						rs.getString("visibility"),
+						(Integer) rs.getObject("published_version")))
 				.optional();
 	}
 
 	public List<DeckSummary> summaries(UUID ownerId) {
 		return jdbc.sql("""
-				SELECT d.id, d.name, d.format, d.updated_at,
+				SELECT d.id, d.name, d.format, d.updated_at, d.visibility,
 				       COALESCE(v.version_number, 0) AS latest_version,
 				       COALESCE((SELECT SUM(dc.quantity) FROM deck_version_cards dc
 				                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS card_count,
@@ -107,8 +111,23 @@ public class DeckRepository {
 						rs.getInt("card_count"),
 						rs.getString("commander_name"),
 						rs.getString("art_url"),
-						rs.getTimestamp("updated_at").toInstant()))
+						rs.getTimestamp("updated_at").toInstant(),
+						rs.getString("visibility")))
 				.list();
+	}
+
+	/** Shows the given version to everyone, or hides the deck again when versionId is null. */
+	public void setPublished(UUID deckId, UUID versionId) {
+		jdbc.sql("""
+				UPDATE decks
+				   SET visibility = CASE WHEN CAST(:version AS uuid) IS NULL THEN 'private' ELSE 'public' END,
+				       published_version_id = CAST(:version AS uuid),
+				       published_at = CASE WHEN CAST(:version AS uuid) IS NULL THEN NULL ELSE now() END
+				 WHERE id = :id
+				""")
+				.param("id", deckId)
+				.param("version", versionId)
+				.update();
 	}
 
 	public void touch(UUID deckId) {
@@ -117,6 +136,7 @@ public class DeckRepository {
 
 	public void delete(UUID deckId) {
 		// Versions point at each other and at branches, so clear those links before the cascade.
+		jdbc.sql("UPDATE decks SET visibility = 'private', published_version_id = NULL, published_at = NULL WHERE id = :id").param("id", deckId).update();
 		jdbc.sql("UPDATE deck_versions SET parent_version_id = NULL WHERE deck_id = :id").param("id", deckId).update();
 		jdbc.sql("UPDATE deck_branches SET forked_from_version_id = NULL WHERE deck_id = :id").param("id", deckId).update();
 		jdbc.sql("DELETE FROM decks WHERE id = :id").param("id", deckId).update();
