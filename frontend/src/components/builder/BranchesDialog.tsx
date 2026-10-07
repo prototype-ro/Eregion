@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
-import type { Branch, Timeline } from "@/lib/types";
+import type { Branch, BranchStatus, Timeline } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -36,7 +36,23 @@ function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onC
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statuses, setStatuses] = useState<Map<string, BranchStatus>>(new Map());
   const [error, setError] = useState<string | null>(null);
+
+  // How far each branch is from main. The timeline changing (rename, delete, merge) means asking again.
+  useEffect(() => {
+    let cancelled = false;
+    api<BranchStatus[]>(`/api/decks/${deckId}/branches/status`)
+      .then((list) => {
+        if (!cancelled) setStatuses(new Map(list.map((status) => [status.branchId, status])));
+      })
+      .catch(() => {
+        // The counts are extra. The dialog works without them.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deckId, timeline]);
 
   const root = timeline.branches.find((branch) => branch.main) ?? timeline.branches[0];
 
@@ -119,6 +135,10 @@ function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onC
                 </p>
               </div>
 
+              {!isRoot && statuses.get(branch.id) && (
+                <BranchStatusLine status={statuses.get(branch.id)!} deckId={deckId} mainName={root?.name ?? "main"} />
+              )}
+
               {deleting === branch.id ? (
                 <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
                   <span className="min-w-0 flex-1">
@@ -190,5 +210,34 @@ function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onC
         </button>
       </div>
     </div>
+  );
+}
+
+/** Says how a branch stands against main in plain words, with a link to what it would change. */
+function BranchStatusLine({ status, deckId, mainName }: { status: BranchStatus; deckId: string; mainName: string }) {
+  const merged = status.ahead === 0;
+  return (
+    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+      <span>
+        {merged ? (
+          <span className="text-accent-text">Everything here is already on {mainName}.</span>
+        ) : (
+          <>
+            <span className="text-ink">
+              {status.ahead} {status.ahead === 1 ? "version" : "versions"} ahead
+            </span>
+            {status.behind > 0 && `, ${status.behind} behind ${mainName}`}
+          </>
+        )}
+      </span>
+      {!merged && status.baseVersion !== null && (
+        <Link
+          href={`/decks/${deckId}/diff?from=${status.baseVersion}&to=${status.headVersion}`}
+          className="text-accent-text underline underline-offset-4"
+        >
+          What this branch changed since v{status.baseVersion}
+        </Link>
+      )}
+    </p>
   );
 }

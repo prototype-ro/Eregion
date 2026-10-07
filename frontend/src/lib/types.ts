@@ -271,3 +271,23 @@ export interface MergePreview {
   changes: DeckDiff;
   conflicts: MergeConflict[];
 }
+
+/** One card on one board in one version of a deck. */
+export interface CardAppearance {
+  versionNumber: number;
+  board: Board;
+  quantity: number;
+  printing: string;
+  tags: string[];
+}
+
+/** How far a branch is from main. ahead and behind count versions, like git. */
+export interface BranchStatus {
+  branchId: string;
+  name: string;
+  ahead: number;
+  behind: number;
+  baseVersion: number | null;
+  headVersion: number;
+  mainVersion: number;
+}

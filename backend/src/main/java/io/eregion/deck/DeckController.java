@@ -108,6 +108,18 @@ public class DeckController {
 		return service.mergePreview(deckId, CurrentUser.id(jwt), branchId);
 	}
 
+	@GetMapping("/{deckId}/branches/status")
+	public List<DeckDtos.BranchStatus> branchStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		return service.branchStatus(deckId, CurrentUser.id(jwt));
+	}
+
+	/** Every version a card appears in, with its board, copies and printing. */
+	@GetMapping("/{deckId}/cards/{cardId}/history")
+	public List<DeckDtos.CardAppearance> cardHistory(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId,
+			@PathVariable UUID cardId) {
+		return service.cardHistory(deckId, CurrentUser.id(jwt), cardId);
+	}
+
 	@PostMapping("/{deckId}/merge")
 	@ResponseStatus(HttpStatus.CREATED)
 	public VersionDetail merge(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody MergeRequest request) {

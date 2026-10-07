@@ -53,6 +53,8 @@ cd frontend && npm run build     # type check and production build
 | `GET /api/decks/{id}/branches/{branchId}/merge` | Preview merging a branch into main: the shared version, what main would gain or lose, and cards both lines changed differently (conflicts) |
 | `POST /api/decks/{id}/merge` | Merge a branch into main as a new main version that records both parents. Needs a choice (`ours` or `theirs`) for each conflict, and the heads that were previewed. Can delete the branch afterwards |
 | `PATCH /api/decks/{id}/versions/{n}`, `DELETE /api/decks/{id}/versions/{n}` | Edit a version's note, or delete a version. History closes up around a deleted version. The public version, the last version of a deck and the only version on main cannot be deleted |
+| `GET /api/decks/{id}/branches/status` | For each branch other than main, how many versions it is ahead of and behind main, and the version they last shared |
+| `GET /api/decks/{id}/cards/{cardId}/history` | Every version a card appears in, with its board, copies and printing |
 | `GET /api/decks/{id}/diff?from=7&to=8` | Added, removed and changed cards plus stat deltas |
 | `PUT /api/decks/{id}/visibility` | Publish one saved version of a deck (`public` plus `versionNumber`) or make it private again. Only the chosen version is ever shown to others |
 | `GET /api/explore?commander=&q=&limit=&offset=` | Public decks, newest first, optionally only those with a given commander card |

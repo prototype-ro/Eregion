@@ -175,6 +175,45 @@ public class DeckService {
 		return timeline(deckId, userId);
 	}
 
+	/** Where a card was, version by version. The caller can combine it with the timeline to show gaps. */
+	@Transactional(readOnly = true)
+	public List<DeckDtos.CardAppearance> cardHistory(UUID deckId, UUID userId, UUID cardId) {
+		owned(deckId, userId);
+		return decks.cardHistory(deckId, cardId);
+	}
+
+	/** For every branch other than main: how far ahead and behind main it is. */
+	@Transactional(readOnly = true)
+	public List<DeckDtos.BranchStatus> branchStatus(UUID deckId, UUID userId) {
+		owned(deckId, userId);
+		UUID mainId = decks.findMainBranchId(deckId).orElse(null);
+		if (mainId == null) {
+			return List.of();
+		}
+		VersionRow mainHead = decks.branchHead(mainId).orElse(null);
+		if (mainHead == null) {
+			return List.of();
+		}
+		Map<UUID, Integer> fromMain = decks.ancestors(mainHead.id());
+		List<DeckDtos.BranchStatus> result = new ArrayList<>();
+		for (BranchRow branch : decks.branches(deckId)) {
+			if (branch.main()) {
+				continue;
+			}
+			VersionRow head = decks.branchHead(branch.id()).orElse(null);
+			if (head == null) {
+				continue;
+			}
+			Map<UUID, Integer> fromBranch = decks.ancestors(head.id());
+			int ahead = (int) fromBranch.keySet().stream().filter(id -> !fromMain.containsKey(id)).count();
+			int behind = (int) fromMain.keySet().stream().filter(id -> !fromBranch.containsKey(id)).count();
+			Integer base = fromBranch.entrySet().stream().filter(entry -> fromMain.containsKey(entry.getKey()))
+					.map(Map.Entry::getValue).max(Integer::compare).orElse(null);
+			result.add(new DeckDtos.BranchStatus(branch.id(), branch.name(), ahead, behind, base, head.number(), mainHead.number()));
+		}
+		return result;
+	}
+
 	// ---- merging ----
 
 	/** Everything a merge needs: the two heads, the version they share, and the three sets of cards. */

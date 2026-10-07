@@ -222,6 +222,30 @@ public class DeckRepository {
 		jdbc.sql("UPDATE deck_versions SET note = :note WHERE id = :id").param("id", versionId).param("note", note).update();
 	}
 
+	/** Where a card sits in every version of a deck, oldest first. Versions without the card are not listed. */
+	public List<DeckDtos.CardAppearance> cardHistory(UUID deckId, UUID cardId) {
+		return jdbc.sql("""
+				SELECT v.version_number, dc.board, dc.quantity, dc.tags,
+				       CASE WHEN cp.id IS NOT NULL THEN 'Custom: ' || cp.label
+				            ELSE trim(COALESCE(p.set_code, c.set_code) || ' ' || COALESCE(p.collector_number, c.collector_number)) END AS printing
+				  FROM deck_versions v
+				  JOIN deck_version_cards dc ON dc.version_id = v.id AND dc.card_id = :card
+				  JOIN cards c ON c.id = dc.card_id
+				  LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
+				  LEFT JOIN custom_printings cp ON cp.id = dc.custom_printing_id
+				 WHERE v.deck_id = :deck
+				 ORDER BY v.version_number, dc.board
+				""")
+				.param("deck", deckId)
+				.param("card", cardId)
+				.query((rs, n) -> {
+					java.sql.Array tags = rs.getArray("tags");
+					return new DeckDtos.CardAppearance(rs.getInt("version_number"), rs.getString("board"), rs.getInt("quantity"),
+							rs.getString("printing"), tags == null ? List.of() : List.of((String[]) tags.getArray()));
+				})
+				.list();
+	}
+
 	/** A version and every version it grew from, through parents and merges, with their numbers. */
 	public Map<UUID, Integer> ancestors(UUID versionId) {
 		Map<UUID, Integer> result = new HashMap<>();

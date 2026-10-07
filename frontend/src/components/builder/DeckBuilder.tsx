@@ -21,6 +21,7 @@ import { PrintingPicker } from "./PrintingPicker";
 import { StatsSection } from "./StatsSection";
 import { TagEditor } from "./TagEditor";
 import { BranchesDialog } from "./BranchesDialog";
+import { CardHistoryDialog } from "./CardHistoryDialog";
 import { MergeDialog } from "./MergeDialog";
 import { VersionActions } from "./VersionActions";
 import { VersionTimeline } from "./VersionTimeline";
@@ -142,6 +143,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
   const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
+  const [historyKey, setHistoryKey] = useState<string | null>(null);
   const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
@@ -760,6 +762,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       {/* Overlays */}
+      <CardHistoryDialog
+        line={lineByKey(historyKey)}
+        deckId={deck.id}
+        timeline={timeline}
+        current={version?.versionNumber ?? null}
+        onClose={() => setHistoryKey(null)}
+        onOpenVersion={selectVersion}
+      />
       <MergeDialog
         open={mergeBranch !== null}
         onClose={() => setMergeBranch(null)}
@@ -842,6 +852,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onSetCommander={makeCommander}
         onSetBackground={makeBackground}
         onSetPartner={makePartner}
+        onHistory={(line) => setHistoryKey(lineKey(line))}
         onRemove={removeLine}
         onNotify={setToast}
       />

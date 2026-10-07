@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Timeline, VersionSummary } from "@/lib/types";
 
-const COLUMN = 76; // horizontal space per version
+const WINDOW = 30; // versions drawn by default when a history is long
+const ZOOM_MIN = 36;
+const ZOOM_MAX = 120;
+const ZOOM_DEFAULT = 76; // horizontal space per version
+const LABEL_MIN_ZOOM = 52; // below this the version labels would overlap
 const LANE = 84; // vertical space per branch
 const GUTTER = 148; // room on the left for branch names
 const PAD_RIGHT = 56;
@@ -44,19 +48,32 @@ const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year
 export function VersionTimeline({ timeline, current, published, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<Hover | null>(null);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [showAll, setShowAll] = useState(false);
 
-  const { nodes, edges, width, height, lanes } = useMemo(() => {
-    const placed: Node[] = [];
+  const { nodes, edges, width, height, lanes, total } = useMemo(() => {
+    const all: Node[] = [];
     timeline.branches.forEach((branch, lane) => {
       branch.versions.forEach((version, index) => {
-        placed.push({ version, lane, branchName: branch.name, head: index === branch.versions.length - 1, x: 0, y: PAD_TOP + lane * LANE });
+        all.push({ version, lane, branchName: branch.name, head: index === branch.versions.length - 1, x: 0, y: 0 });
       });
     });
     // Versions are numbered in the order they were made, so one shared column per number
     // keeps parallel branches readable as a single timeline.
-    placed.sort((a, b) => a.version.versionNumber - b.version.versionNumber);
+    all.sort((a, b) => a.version.versionNumber - b.version.versionNumber);
+
+    // A long history draws only its latest versions, plus the one that is open and the public one.
+    const placed =
+      showAll || all.length <= WINDOW
+        ? all
+        : all.filter((node, index) => index >= all.length - WINDOW || node.version.versionNumber === current || node.version.versionNumber === published);
+
+    // Branches with nothing in view give up their lane.
+    const visibleLanes = [...new Set(placed.map((node) => node.lane))].sort((a, b) => a - b);
     placed.forEach((node, index) => {
-      node.x = GUTTER + index * COLUMN;
+      node.lane = visibleLanes.indexOf(node.lane);
+      node.y = PAD_TOP + node.lane * LANE;
+      node.x = GUTTER + index * zoom;
     });
 
     const byNumber = new Map(placed.map((node) => [node.version.versionNumber, node]));
@@ -76,11 +93,12 @@ export function VersionTimeline({ timeline, current, published, onSelect }: Prop
     return {
       nodes: placed,
       edges: paths,
-      width: GUTTER + PAD_RIGHT + Math.max(placed.length - 1, 0) * COLUMN,
-      height: PAD_TOP + (timeline.branches.length - 1) * LANE + 44,
-      lanes: timeline.branches,
+      width: GUTTER + PAD_RIGHT + Math.max(placed.length - 1, 0) * zoom,
+      height: PAD_TOP + Math.max(visibleLanes.length - 1, 0) * LANE + 44,
+      lanes: visibleLanes.map((lane) => timeline.branches[lane]),
+      total: all.length,
     };
-  }, [timeline]);
+  }, [timeline, zoom, showAll, current, published]);
 
   const currentNode = nodes.find((node) => node.version.versionNumber === current) ?? null;
 
@@ -102,8 +120,37 @@ export function VersionTimeline({ timeline, current, published, onSelect }: Prop
 
   const tip = hover?.node.version;
 
+  const hidden = total - nodes.length;
+
   return (
     <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 pb-2 text-sm text-muted">
+        <p>
+          {total > WINDOW
+            ? showAll
+              ? `Showing all ${total} versions.`
+              : `Showing the latest ${nodes.length} of ${total} versions.`
+            : `${total} ${total === 1 ? "version" : "versions"}.`}
+          {total > WINDOW && (
+            <button type="button" onClick={() => setShowAll((all) => !all)} className="ml-2 text-accent-text underline underline-offset-4">
+              {showAll ? "Show only the latest" : `Show the ${hidden} earlier`}
+            </button>
+          )}
+        </p>
+        <label className="flex items-center gap-3">
+          Zoom
+          <input
+            type="range"
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={4}
+            value={zoom}
+            onChange={(event) => setZoom(Number(event.target.value))}
+            aria-label="Timeline zoom"
+            className="w-28 accent-[var(--accent-text)]"
+          />
+        </label>
+      </div>
       <div ref={scroller} onScroll={() => setHover(null)} className="overflow-x-auto pb-2" tabIndex={-1}>
         <div className="relative" style={{ width, height, minWidth: "100%" }}>
           <svg width={width} height={height} className="absolute inset-0" aria-hidden="true">
@@ -126,7 +173,6 @@ export function VersionTimeline({ timeline, current, published, onSelect }: Prop
           {/* Branch names live in a gutter that stays put while a long history scrolls. */}
           <div className="sticky left-0 z-10 h-full w-[132px] bg-surface">
             {lanes.map((branch, lane) => {
-              if (!nodes.some((node) => node.lane === lane)) return null;
               const active = currentNode !== null && currentNode.lane === lane;
               return (
                 <p
@@ -172,7 +218,9 @@ export function VersionTimeline({ timeline, current, published, onSelect }: Prop
                     public
                   </span>
                 )}
-                <span className={`absolute top-full mt-0.5 bg-surface px-1 font-mono text-[11px] ${selected ? "text-ink" : "text-muted"}`}>v{number}</span>
+                {(zoom >= LABEL_MIN_ZOOM || selected) && (
+                  <span className={`absolute top-full mt-0.5 bg-surface px-1 font-mono text-[11px] ${selected ? "text-ink" : "text-muted"}`}>v{number}</span>
+                )}
               </button>
             );
           })}

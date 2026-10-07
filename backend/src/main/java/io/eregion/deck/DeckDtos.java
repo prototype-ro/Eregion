@@ -237,4 +237,17 @@ public final class DeckDtos {
 			@Size(max = 200) String note,
 			Boolean deleteBranch) {
 	}
+
+	// ---- card history and branch status ----
+
+	/** One card on one board in one version of a deck. printing reads like "2XM 190" or "Custom: label". */
+	public record CardAppearance(int versionNumber, String board, int quantity, String printing, List<String> tags) {
+	}
+
+	/**
+	 * How far a branch is from main. ahead counts versions on the branch that main does not have, behind
+	 * counts versions on main that the branch does not have. baseVersion is the newest version they share.
+	 */
+	public record BranchStatus(UUID branchId, String name, int ahead, int behind, Integer baseVersion, int headVersion, int mainVersion) {
+	}
 }
