@@ -120,3 +120,11 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 - Export (builder and public deck pages): plain list, with sets (Moxfield, Archidekt), MTG Arena, MTG Online and CSV, as text to copy or a file to download. What is exported can be imported again.
 - Import takes a pasted list, a file, or a link. Importing into a deck keeps the art already chosen for each card, a printing or your custom art, for cards that were in the deck before.
 - In a quick test the deck sites other than Archidekt answered 403 to automated requests, so for them the import explains that and asks for the text export. Archidekt works.
+
+### Public sharing
+
+- Public decks (`/explore` and `/explore/{id}`) and the art in them can be read without an account. A visitor who is not signed in can browse, export and copy the link, and is asked to sign in only to copy a deck to their own. A bad or expired login on those pages is ignored instead of refused. Writes still need a valid login.
+- Shared links have a preview (title, owner, description, commander art) so chat apps and search engines show the deck.
+- Public reads are limited per network (`EREGION_RATE_PUBLIC`, default 240 a minute).
+- A deck can have a description (up to 2000 characters, shown on its public page). Saving it does not make a version.
+- Signed in players can report a public deck (`POST /api/explore/{id}/report`, one per player per deck, 10 an hour). Reports are stored in `deck_reports` for whoever runs the site to review. There is no moderation screen yet.

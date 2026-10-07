@@ -75,9 +75,15 @@ public class DeckService {
 	}
 
 	@Transactional
-	public DeckDetail rename(UUID deckId, UUID userId, String name) {
+	public DeckDetail update(UUID deckId, UUID userId, String name, String description) {
 		owned(deckId, userId);
-		decks.renameDeck(deckId, name.trim().replaceAll("\\s+", " "));
+		String cleanName = name == null || name.isBlank() ? null : name.trim().replaceAll("\\s+", " ");
+		// The description keeps its line breaks. Trailing space is trimmed and a blank one clears it.
+		String cleanDescription = description == null ? null : description.strip().replace("\r\n", "\n");
+		if (cleanName == null && cleanDescription == null) {
+			throw ApiException.badRequest("Give a name or a description to change");
+		}
+		decks.updateDeck(deckId, cleanName, cleanDescription);
 		return get(deckId, userId);
 	}
 
@@ -118,7 +124,7 @@ public class DeckService {
 				.map(version -> detail(version, userId))
 				.orElse(null);
 		return new DeckDetail(deck.id(), deck.name(), deck.format(), deck.createdAt(), deck.updatedAt(), latest,
-				deck.visibility(), deck.publishedVersion());
+				deck.visibility(), deck.publishedVersion(), deck.description());
 	}
 
 	@Transactional

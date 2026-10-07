@@ -98,7 +98,7 @@ public class CustomPrintingController {
 	 */
 	@GetMapping("/custom-printings/{id}/image")
 	public ResponseEntity<byte[]> image(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-		Image image = repository.imageFor(id, CurrentUser.id(jwt)).orElseThrow(() -> ApiException.notFound("Custom art"));
+		Image image = repository.imageFor(id, CurrentUser.idOrNull(jwt)).orElseThrow(() -> ApiException.notFound("Custom art"));
 		return ResponseEntity.ok()
 				.contentType(MediaType.parseMediaType(image.contentType()))
 				.cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePrivate().immutable())

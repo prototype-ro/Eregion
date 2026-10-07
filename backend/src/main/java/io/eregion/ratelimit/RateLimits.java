@@ -63,6 +63,15 @@ public class RateLimits {
 		check("upload:" + user, properties.uploadPerUserMinute(), MINUTE, "uploads");
 	}
 
+	/** Anyone may read public decks, so a visitor is counted by network, to keep one scraper from using it all. */
+	public void publicRead(HttpServletRequest request) {
+		check("public:" + ip(request), properties.publicReadPerIpMinute(), MINUTE, "page loads");
+	}
+
+	public void report(UUID user) {
+		check("report:" + user, properties.reportPerUserHour(), HOUR, "reports");
+	}
+
 	public void urlImport(UUID user) {
 		check("url-import:" + user, properties.urlImportPerUserHour(), HOUR, "imports from a link");
 	}

@@ -6,16 +6,18 @@ import { useEffect, useMemo, useState } from "react";
 import { CardGallery, CardStacks } from "@/components/builder/CardViews";
 import { CardList } from "@/components/builder/CardList";
 import { ExportDialog } from "@/components/ExportDialog";
+import { ReportDialog } from "@/components/ReportDialog";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
+import { getMe } from "@/lib/me";
 import { GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { exploreCommanderUrl, formatPrice, sortColors } from "@/lib/links";
-import type { DeckDetail, PublicDeckDetail } from "@/lib/types";
+import type { DeckDetail, PublicDeckDetail, User } from "@/lib/types";
 
 type View = "list" | "stacks" | "gallery";
 const VIEWS: Array<[View, string]> = [["list", "List"], ["stacks", "Stacks"], ["gallery", "Gallery"]];
@@ -35,15 +37,19 @@ export default function PublicDeckPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [shared, setShared] = useState<string | null>(null);
+  // undefined while checking, null for a visitor who is not signed in. Public decks can be read without an account.
+  const [me, setMe] = useState<User | null | undefined>(undefined);
+
+  useEffect(() => {
+    void getMe().then(setMe);
+  }, []);
 
   useEffect(() => {
     api<PublicDeckDetail>(`/api/explore/${id}`)
       .then(setDetail)
       .catch((err) => {
-        if (err instanceof ApiError && err.status === 401) {
-          router.replace(loginUrl());
-          return;
-        }
         setError(err instanceof ApiError && err.status === 404 ? "This deck is not public, or it no longer exists." : "Could not load the deck.");
       });
   }, [id, router]);
@@ -56,6 +62,10 @@ export default function PublicDeckPage() {
   /** Starts a private deck of your own from this version. */
   async function copy() {
     if (!detail) return;
+    if (!me) {
+      router.push(loginUrl());
+      return;
+    }
     setCopying(true);
     try {
       const deck = await api<DeckDetail>("/api/decks", {
@@ -73,6 +83,16 @@ export default function PublicDeckPage() {
       setError(err instanceof ApiError ? err.message : "Could not copy the deck.");
       setCopying(false);
     }
+  }
+
+  async function share() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShared("Link copied");
+    } catch {
+      setShared("Copy the address from your browser");
+    }
+    setTimeout(() => setShared(null), 3000);
   }
 
   const commander = detail?.cards.find((line) => line.board === "commander");
@@ -118,6 +138,7 @@ export default function PublicDeckPage() {
                 </span>
               </div>
               <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">{detail.deck.name}</h1>
+              {detail.deck.description && <p className="mt-6 max-w-[68ch] whitespace-pre-line text-[17px] leading-relaxed text-muted">{detail.deck.description}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               {commander && (
@@ -125,11 +146,14 @@ export default function PublicDeckPage() {
                   More decks with this commander
                 </Link>
               )}
+              <button type="button" onClick={() => void share()} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium">
+                {shared ?? "Share link"}
+              </button>
               <button type="button" onClick={() => setExportOpen(true)} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium">
                 Export
               </button>
               <button type="button" onClick={() => void copy()} disabled={copying} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
-                {copying ? "Copying" : "Copy to my decks"}
+                {copying ? "Copying" : me === null ? "Sign in to copy" : "Copy to my decks"}
               </button>
             </div>
           </div>
@@ -189,11 +213,21 @@ export default function PublicDeckPage() {
             </div>
           </div>
 
+          {me && !detail.deck.mine && (
+            <p className="mt-16 text-sm text-muted">
+              Something wrong with this deck?{" "}
+              <button type="button" onClick={() => setReportOpen(true)} className="text-accent-text underline underline-offset-4">
+                Report it
+              </button>
+            </p>
+          )}
+
           <div className="mt-16">
             <StatsSection deckId={id} stats={detail.stats} saved={null} savedVersion={detail.deck.versionNumber} removed={[]} showCollection={false} readOnly />
           </div>
         </main>
       )}
+      {detail && <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} deckId={id} />}
       {detail && <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={detail.deck.name} lines={counted} />}
     </div>
   );

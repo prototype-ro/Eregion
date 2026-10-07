@@ -175,6 +175,7 @@ export interface DeckDetail {
   visibility: Visibility;
   /** The version number shown on Explore, when the deck is public. */
   publishedVersion: number | null;
+  description: string;
 }
 
 export interface CardChange {
@@ -231,6 +232,7 @@ export interface PublicDeck {
   priceUsd: number;
   publishedAt: string;
   mine: boolean;
+  description: string;
 }
 
 export interface PublicDeckDetail {

@@ -24,7 +24,7 @@ import io.eregion.deck.DeckDtos.VersionSummary;
 public class DeckRepository {
 
 	public record DeckRow(UUID id, UUID ownerId, String name, String format, Instant createdAt, Instant updatedAt,
-			String visibility, Integer publishedVersion) {
+			String visibility, Integer publishedVersion, String description) {
 	}
 
 	/** A version plus where it sits in the branch graph. head is true when nothing newer is on its branch. */
@@ -70,7 +70,7 @@ public class DeckRepository {
 	/** Only returns the deck when it belongs to the user, so a stranger's id looks like a missing one. */
 	public Optional<DeckRow> findOwned(UUID deckId, UUID ownerId) {
 		return jdbc.sql("""
-				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility,
+				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility, d.description,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version
 				  FROM decks d WHERE d.id = :id AND d.owner_id = :owner
 				""")
@@ -84,7 +84,8 @@ public class DeckRepository {
 						rs.getTimestamp("created_at").toInstant(),
 						rs.getTimestamp("updated_at").toInstant(),
 						rs.getString("visibility"),
-						(Integer) rs.getObject("published_version")))
+						(Integer) rs.getObject("published_version"),
+						rs.getString("description")))
 				.optional();
 	}
 
@@ -187,8 +188,10 @@ public class DeckRepository {
 		return jdbc.sql("SELECT id FROM decks WHERE owner_id = :owner").param("owner", ownerId).query(UUID.class).list();
 	}
 
-	public void renameDeck(UUID deckId, String name) {
-		jdbc.sql("UPDATE decks SET name = :name, updated_at = now() WHERE id = :id").param("id", deckId).param("name", name).update();
+	/** Sets the name and description that are not null. */
+	public void updateDeck(UUID deckId, String name, String description) {
+		jdbc.sql("UPDATE decks SET name = COALESCE(:name, name), description = COALESCE(:description, description), updated_at = now() WHERE id = :id")
+				.param("id", deckId).param("name", name).param("description", description).update();
 	}
 
 	/** Shows the given version to everyone, or hides the deck again when versionId is null. */

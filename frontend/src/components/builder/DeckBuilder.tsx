@@ -13,6 +13,7 @@ import { inheritArt } from "@/lib/importArt";
 import { canApplyInPlace } from "@/lib/versions";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
+import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
 import { CardPeek } from "./CardPeek";
@@ -124,7 +125,7 @@ function remember(key: string, value: string) {
 }
 
 interface Props {
-  deck: { id: string; name: string; format: string; visibility: Visibility; publishedVersion: number | null };
+  deck: { id: string; name: string; format: string; visibility: Visibility; publishedVersion: number | null; description: string };
   /** The version opened in the builder. Null for a deck with no saved version yet. */
   version: VersionDetail | null;
   timeline: Timeline;
@@ -156,6 +157,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [historyKey, setHistoryKey] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   // Off by default: until the collection is filled in, flagging every card as missing is just noise.
   const [checkCollection, setCheckCollection] = useState(false);
@@ -573,6 +575,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             >
               {visibility === "public" ? `Public, v${publishedVersion}` : "Private"}
             </button>
+            <button type="button" onClick={() => setDescriptionOpen(true)} className="pill rounded-full border border-line px-3.5 py-1.5">
+              {deck.description ? "Edit description" : "Add description"}
+            </button>
             {!hasCommander && lines.length > 0 && (
               <span className="rounded-full border border-line px-3.5 py-1.5 text-muted">No commander chosen</span>
             )}
@@ -895,6 +900,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       {/* Overlays */}
+      <DescriptionDialog open={descriptionOpen} onClose={() => setDescriptionOpen(false)} deckId={deck.id} description={deck.description} onSaved={onReload} />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={deck.name} lines={lines} />
       <Dialog open={confirmApply} onClose={() => setConfirmApply(false)} label="Update the public version" size="sm">
         <div className="flex flex-col gap-5">

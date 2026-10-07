@@ -23,7 +23,8 @@ public class ExploreRepository {
 			int cardCount,
 			double priceUsd,
 			Instant publishedAt,
-			boolean mine) {
+			boolean mine,
+			String description) {
 	}
 
 	/** A public deck's published version id, for loading its cards. */
@@ -31,7 +32,7 @@ public class ExploreRepository {
 	}
 
 	private static final String SELECT = """
-			SELECT d.id, d.name, u.display_name AS owner_name, d.published_at, d.owner_id = :viewer AS mine,
+			SELECT d.id, d.name, d.description, u.display_name AS owner_name, d.published_at, d.owner_id = :viewer AS mine,
 			       v.id AS version_id, v.version_number,
 			       (SELECT string_agg(c.name, ' + ' ORDER BY c.name) FROM deck_version_cards dc
 			          JOIN cards c ON c.id = dc.card_id WHERE dc.version_id = v.id AND dc.board = 'commander') AS commander_name,
@@ -90,6 +91,17 @@ public class ExploreRepository {
 				.optional();
 	}
 
+	/** Records a report. One per player per deck, so asking again changes nothing. False when the deck is not public or is the reporter's own. */
+	public boolean report(UUID deckId, UUID reporterId, String reason) {
+		boolean reportable = jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :deck AND visibility = 'public' AND owner_id <> :reporter)")
+				.param("deck", deckId).param("reporter", reporterId).query(Boolean.class).single();
+		if (reportable) {
+			jdbc.sql("INSERT INTO deck_reports (deck_id, reporter_id, reason) VALUES (:deck, :reporter, :reason) ON CONFLICT (deck_id, reporter_id) DO NOTHING")
+					.param("deck", deckId).param("reporter", reporterId).param("reason", reason).update();
+		}
+		return reportable;
+	}
+
 	/** Makes user text safe to use inside a LIKE pattern. */
 	static String escape(String text) {
 		return text.replace("!", "!!").replace("%", "!%").replace("_", "!_");
@@ -107,6 +119,7 @@ public class ExploreRepository {
 				rs.getInt("card_count"),
 				rs.getDouble("price"),
 				rs.getTimestamp("published_at").toInstant(),
-				rs.getBoolean("mine"));
+				rs.getBoolean("mine"),
+				rs.getString("description"));
 	}
 }

@@ -5,7 +5,11 @@ import java.util.UUID;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +22,11 @@ import io.eregion.deck.DeckDtos.DeckStats;
 import io.eregion.deck.DeckRepository;
 import io.eregion.deck.StatsCalculator;
 import io.eregion.explore.ExploreRepository.PublicDeck;
+import io.eregion.ratelimit.RateLimits;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /** Decks that people chose to publish. Each shows only the version its owner picked. */
 @RestController
@@ -31,24 +40,42 @@ public class ExploreController {
 
 	private final ExploreRepository explore;
 	private final DeckRepository decks;
+	private final RateLimits limits;
 
-	public ExploreController(ExploreRepository explore, DeckRepository decks) {
+	public ExploreController(ExploreRepository explore, DeckRepository decks, RateLimits limits) {
 		this.explore = explore;
 		this.decks = decks;
+		this.limits = limits;
 	}
 
 	@GetMapping
-	public List<PublicDeck> search(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) UUID commander,
+	public List<PublicDeck> search(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) UUID commander,
 			@RequestParam(required = false) String q, @RequestParam(defaultValue = "24") int limit,
 			@RequestParam(defaultValue = "0") int offset) {
+		limits.publicRead(http);
 		String text = q == null || q.isBlank() ? null : q.trim().substring(0, Math.min(q.trim().length(), 80));
-		return explore.search(CurrentUser.id(jwt), commander, text, Math.max(1, Math.min(limit, MAX_PAGE)), Math.max(0, offset));
+		return explore.search(CurrentUser.idOrNull(jwt), commander, text, Math.max(1, Math.min(limit, MAX_PAGE)), Math.max(0, offset));
+	}
+
+	public record ReportRequest(@NotBlank @Size(max = 500) String reason) {
+	}
+
+	/** Tells the people who run the site about a public deck, for example because it breaks the rules. */
+	@PostMapping("/{deckId}/report")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void report(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody ReportRequest request) {
+		UUID reporter = CurrentUser.id(jwt);
+		limits.report(reporter);
+		if (!explore.report(deckId, reporter, request.reason().strip())) {
+			throw ApiException.notFound("Deck");
+		}
 	}
 
 	/** A private or missing deck looks the same: not found. */
 	@GetMapping("/{deckId}")
-	public PublicDeckDetail get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
-		UUID viewer = CurrentUser.id(jwt);
+	public PublicDeckDetail get(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		limits.publicRead(http);
+		UUID viewer = CurrentUser.idOrNull(jwt);
 		var published = explore.find(viewer, deckId).orElseThrow(() -> ApiException.notFound("Deck"));
 		// "owned" is counted against the viewer's own collection, so they can see what they are missing.
 		List<DeckCardLine> cards = decks.versionLines(published.versionId(), viewer);

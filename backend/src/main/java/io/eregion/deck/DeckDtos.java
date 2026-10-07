@@ -131,7 +131,8 @@ public final class DeckDtos {
 			Instant updatedAt,
 			VersionDetail latest,
 			String visibility,
-			Integer publishedVersion) {
+			Integer publishedVersion,
+			String description) {
 	}
 
 	/** Makes a deck public, showing one chosen version, or private again. versionNumber is required for public. */
@@ -174,7 +175,8 @@ public final class DeckDtos {
 	public record DeckFlags(boolean pinned, boolean archived) {
 	}
 
-	public record RenameDeckRequest(@NotBlank @Size(max = 80) String name) {
+	/** Changes only what is given: the name, the description, or both. */
+	public record UpdateDeckRequest(@Size(max = 80) String name, @Size(max = 2000) String description) {
 	}
 
 	// ---- diff ----

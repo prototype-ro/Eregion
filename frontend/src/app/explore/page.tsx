@@ -6,7 +6,6 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CardArt } from "@/components/CardArt";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
-import { loginUrl } from "@/lib/auth";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { Card, PublicDeck } from "@/lib/types";
 
@@ -22,7 +21,6 @@ export default function ExplorePage() {
 }
 
 function Explore() {
-  const router = useRouter();
   const params = useSearchParams();
   const commanderId = params.get("commander");
 
@@ -35,9 +33,6 @@ function Explore() {
   const [error, setError] = useState<string | null>(null);
   const latest = useRef(0);
 
-  useEffect(() => {
-  }, [router]);
-
   // Wait a moment after typing before asking the server.
   useEffect(() => {
     const timer = setTimeout(() => setQuery(text.trim()), 300);
@@ -46,13 +41,9 @@ function Explore() {
 
   const fail = useCallback(
     (err: unknown) => {
-      if (err instanceof ApiError && err.status === 401) {
-        router.replace(loginUrl());
-        return;
-      }
       setError(err instanceof ApiError ? err.message : "Could not load decks.");
     },
-    [router],
+    [],
   );
 
   const url = useCallback(

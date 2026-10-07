@@ -98,7 +98,7 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, CorsProperties corsProperties) throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http, CorsProperties corsProperties, JwtDecoder jwtDecoder) throws Exception {
 		http
 				.csrf(csrf -> csrf.disable())
 				.headers(headers -> headers
@@ -108,10 +108,12 @@ public class SecurityConfig {
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/auth/**", "/api/health", "/error").permitAll()
+						// Public decks and the art in them can be read without an account.
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/explore", "/api/explore/*", "/api/custom-printings/*/image").permitAll()
 						.anyRequest().authenticated())
 				.addFilterBefore(new SameOriginFilter(corsProperties.allowedOrigins()), BearerTokenAuthenticationFilter.class)
 				.oauth2ResourceServer(oauth -> oauth
-						.bearerTokenResolver(new SessionTokenResolver())
+						.bearerTokenResolver(new SessionTokenResolver(jwtDecoder))
 						.jwt(Customizer.withDefaults()));
 		return http.build();
 	}
