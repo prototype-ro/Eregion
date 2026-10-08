@@ -28,7 +28,7 @@ services:
       EREGION_DB_URL: jdbc:postgresql://db:5432/eregion
       EREGION_DB_USER: eregion
       EREGION_DB_PASSWORD: eregion
-      EREGION_JWT_SECRET: ${EREGION_JWT_SECRET:?set EREGION_JWT_SECRET, for example with: openssl rand -base64 48}
+      EREGION_JWT_SECRET: "${EREGION_JWT_SECRET:?set EREGION_JWT_SECRET, for example with: openssl rand -base64 48}"
       EREGION_ENV: production
       EREGION_CORS_ORIGINS: ${EREGION_PUBLIC_URL:-http://localhost:3000}
       EREGION_TRUST_PROXY: "true"
