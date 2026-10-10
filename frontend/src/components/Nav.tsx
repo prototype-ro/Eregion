@@ -14,29 +14,33 @@ export function Wordmark({ className = "" }: { className?: string }) {
 export function Nav({ active }: { active?: "decks" | "explore" | "collection" }) {
   return (
     <>
-    <header className="flex min-h-[72px] flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line">
+    {/*
+      Phones: wordmark and account on one row, the three sections on a second row that runs
+      the full width. From sm up everything sits on one line.
+    */}
+    <header className="flex min-h-[72px] flex-wrap items-center justify-between gap-x-6 border-b border-line pt-3 sm:pt-0">
       <Wordmark />
-      <nav className="flex gap-8 text-[15px] font-medium" aria-label="Main">
+      <nav className="order-last -mb-px flex w-full gap-7 text-[15px] font-medium sm:order-none sm:mb-0 sm:w-auto sm:gap-8" aria-label="Main">
         <Link
           href="/decks"
-          className={`border-b-2 py-1.5 ${active === "decks" ? "border-accent-text" : "border-transparent text-muted"}`}
+          className={`border-b-2 py-3 sm:py-1.5 ${active === "decks" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Decks
         </Link>
         <Link
           href="/explore"
-          className={`border-b-2 py-1.5 ${active === "explore" ? "border-accent-text" : "border-transparent text-muted"}`}
+          className={`border-b-2 py-3 sm:py-1.5 ${active === "explore" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Explore
         </Link>
         <Link
           href="/collection"
-          className={`border-b-2 py-1.5 ${active === "collection" ? "border-accent-text" : "border-transparent text-muted"}`}
+          className={`border-b-2 py-3 sm:py-1.5 ${active === "collection" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Collection
         </Link>
       </nav>
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
         <ThemeToggle />
         <AccountLinks />
       </div>

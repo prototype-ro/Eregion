@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
               <input id="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className={input} />
             </div>
             {error && (
-              <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+              <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
                 {error}
               </p>
             )}

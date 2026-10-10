@@ -57,7 +57,7 @@ export function PrintingPicker({ line, onClose, onChoose, onChooseCustom }: Prop
           </div>
 
           {error && (
-            <p role="alert" className="mt-6 rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+            <p role="alert" className="mt-6 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
               {error}
             </p>
           )}

@@ -5,6 +5,8 @@
  * it, unless the user picked dark, or when the user picked light with the toggle.
  * Black plus one accent: Lyons Blue. --accent-text is a lighter tint of the same blue
  * for text and lines on dark, where the accent itself is too dark to read.
+ * --danger is the one exception to the single accent: a muted red kept for destructive
+ * actions only (delete, remove), so they never look like the main action.
  */
 :root {
   --bg: #0a0a0a;
@@ -19,6 +21,8 @@
   --add-bg: rgba(93, 177, 207, 0.12);
   --add-line: rgba(93, 177, 207, 0.42);
   --add-text: #5db1cf;
+  --danger: #e5787a;
+  --danger-line: rgba(229, 120, 122, 0.45);
   color-scheme: dark;
 }
 
@@ -34,6 +38,8 @@
     --add-bg: rgba(11, 78, 102, 0.1);
     --add-line: rgba(11, 78, 102, 0.4);
     --add-text: #0b4e66;
+    --danger: #a8322f;
+    --danger-line: rgba(168, 50, 47, 0.4);
     color-scheme: light;
   }
 }
@@ -49,6 +55,8 @@
   --add-bg: rgba(11, 78, 102, 0.1);
   --add-line: rgba(11, 78, 102, 0.4);
   --add-text: #0b4e66;
+  --danger: #a8322f;
+  --danger-line: rgba(168, 50, 47, 0.4);
   color-scheme: light;
 }
 
@@ -65,6 +73,8 @@
   --color-add-bg: var(--add-bg);
   --color-add-line: var(--add-line);
   --color-add-text: var(--add-text);
+  --color-danger: var(--danger);
+  --color-danger-line: var(--danger-line);
 
   --font-display: var(--font-pirata);
   --font-sans: var(--font-bricolage);

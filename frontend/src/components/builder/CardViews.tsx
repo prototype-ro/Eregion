@@ -73,10 +73,11 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                     <button
                       type="button"
                       onClick={() => {
-                        onSelect(line);
+                        // The first tap raises a card out of the stack; tapping the raised card opens it.
+                        onSelect(line, front ? "click" : "hover");
                         setRaised(front ? null : `${group.title}|${key}`);
                       }}
-                      onMouseEnter={() => onSelect(line)}
+                      onMouseEnter={() => onSelect(line, "hover")}
                       aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}`}
                       aria-pressed={front}
                       className={`block w-full rounded-[10px] text-left ${
@@ -124,7 +125,7 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                   key={key}
                   data-line-key={key}
                   className="group/card relative"
-                  onMouseEnter={() => onSelect(line)}
+                  onMouseEnter={() => onSelect(line, "hover")}
                   onContextMenu={(event) => {
                     if (readOnly) return;
                     event.preventDefault();
@@ -133,7 +134,7 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                 >
                   <button
                     type="button"
-                    onClick={() => onSelect(line)}
+                    onClick={() => onSelect(line, "click")}
                     aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}${needs ? ", not owned" : ""}`}
                     className={`relative block w-full rounded-[14px] ${selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""}`}
                   >

@@ -84,7 +84,7 @@ function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onC
       </p>
 
       {error && (
-        <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}
@@ -140,11 +140,11 @@ function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onC
               )}
 
               {deleting === branch.id ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm">
                   <span className="min-w-0 flex-1">
                     Delete {branch.name} and its {branch.versions.length} {branch.versions.length === 1 ? "version" : "versions"}? This cannot be undone.
                   </span>
-                  <button type="button" disabled={busy} onClick={() => void remove(branch)} className="min-h-11 rounded-full bg-add-text px-5 text-sm font-bold text-bg disabled:opacity-50">
+                  <button type="button" disabled={busy} onClick={() => void remove(branch)} className="min-h-11 rounded-full bg-danger px-5 text-sm font-bold text-bg disabled:opacity-50">
                     Delete branch
                   </button>
                   <button type="button" onClick={() => setDeleting(null)} className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium text-ink">

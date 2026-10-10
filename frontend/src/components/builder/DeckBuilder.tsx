@@ -1,5 +1,6 @@
 "use client";
 
+import { GlobeSimple, LockSimple, PencilSimpleLine, SlidersHorizontal } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/Dialog";
@@ -13,6 +14,7 @@ import { loginUrl } from "@/lib/auth";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draft";
 import { inheritArt } from "@/lib/importArt";
 import { canApplyInPlace } from "@/lib/versions";
+import { btn, tag } from "@/lib/ui";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
 import { DescriptionDialog } from "./DescriptionDialog";
@@ -158,6 +160,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [view, setView] = useState<ViewMode>("list");
   const [cardSize, setCardSize] = useState(SIZE_DEFAULT);
   const [timelineOpen, setTimelineOpen] = useState(true);
+  // Phones fold the group, sort and collection controls away; the board itself comes first.
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [visibility, setVisibility] = useState<Visibility>(deck.visibility);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
@@ -281,6 +285,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   // Saving from anything but the newest version of a line has to start a new branch.
   const viewingOlder = version !== null && !version.head;
   const needsBranch = viewingOlder || branching;
+  const showDraft = dirty || needsBranch;
   const canSave = lines.length > 0 && !saving && (needsBranch ? branchName.trim() !== "" : dirty);
 
   const visible = withOwned.filter((line) => (tab === "main" ? line.board === "main" || line.board === "commander" : line.board === tab));
@@ -580,7 +585,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     groups,
     selectedKey,
     newKeys,
-    onSelect: (line: DeckCardLine) => setSelectedKey(lineKey(line)),
+    onSelect: (line: DeckCardLine, via?: "hover" | "click") => {
+      setSelectedKey(lineKey(line));
+      // Without the side preview (below lg), clicking a card opens it in the peek sheet instead.
+      if (via === "click" && window.matchMedia("(max-width: 1023px)").matches) setPeekKey(lineKey(line));
+    },
     onMenu: (line: DeckCardLine, x: number, y: number) => setMenu({ line, x, y }),
     checkCollection,
     cardSize,
@@ -591,35 +600,39 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-8">
         <div className="min-w-0">
-          <div className="mb-3.5 flex flex-wrap gap-2 text-sm">
-            <span className="rounded-full border border-line px-3.5 py-1.5 capitalize">{deck.format}</span>
-            {version && <span className="rounded-full border border-line px-3.5 py-1.5">{version.branchName}</span>}
+          {/* Facts about the version first, then the two settings you can change, set apart by a rule. */}
+          <div className="mb-3.5 flex flex-wrap items-center gap-2">
+            <span className={`${tag} capitalize`}>{deck.format}</span>
+            {version && <span className={tag}>{version.branchName}</span>}
             {dirty ? (
-              <span className="rounded-full border border-add-line bg-add-bg px-3.5 py-1.5 text-add-text">Unsaved changes</span>
+              <span className="inline-flex items-center rounded-full border border-add-line bg-add-bg px-3 py-1 text-[13px] text-add-text">Unsaved changes</span>
             ) : (
-              <span className="rounded-full border border-line px-3.5 py-1.5">
-                {version ? `Version ${version.versionNumber}` : "No cards yet"}
-              </span>
+              <span className={tag}>{version ? `Version ${version.versionNumber}` : "No cards yet"}</span>
             )}
+            {!hasCommander && lines.length > 0 && <span className={tag}>No commander chosen</span>}
+            <span aria-hidden="true" className="mx-1 hidden h-5 w-px bg-line sm:block" />
             <button
               type="button"
               onClick={() => setVisibilityOpen(true)}
               aria-label={visibility === "public" ? `Public, showing version ${publishedVersion}. Change visibility` : "Private. Change visibility"}
-              className={`pill rounded-full border px-3.5 py-1.5 ${visibility === "public" ? "border-accent-text text-accent-text" : "border-line"}`}
+              className={`pill inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11 ${visibility === "public" ? "border-accent-text text-accent-text" : "border-ink/60"}`}
             >
+              {visibility === "public" ? <GlobeSimple size={15} aria-hidden /> : <LockSimple size={15} aria-hidden />}
               {visibility === "public" ? `Public, v${publishedVersion}` : "Private"}
             </button>
-            <button type="button" onClick={() => setDescriptionOpen(true)} className="pill rounded-full border border-line px-3.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => setDescriptionOpen(true)}
+              className="pill inline-flex min-h-9 items-center gap-1.5 rounded-full border border-ink/60 px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11"
+            >
+              <PencilSimpleLine size={15} aria-hidden />
               {deck.description ? "Edit description" : "Add description"}
             </button>
-            {!hasCommander && lines.length > 0 && (
-              <span className="rounded-full border border-line px-3.5 py-1.5 text-muted">No commander chosen</span>
-            )}
           </div>
           <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">{deck.name}</h1>
         </div>
 
-        <div className="ml-auto flex flex-col items-end gap-3.5">
+        <div className="flex flex-col items-start gap-3.5 sm:ml-auto sm:items-end">
           <p className="text-base text-muted">
             <span className="text-4xl font-medium tracking-[-0.03em] text-ink">{stats.totalCards}</span> of 100 cards
           </p>
@@ -646,8 +659,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           </details>
         </div>
 
-        {/* Its own row, so a long set of controls (note, branch name) wraps under the title instead of squeezing the count */}
-        <div className="flex w-full flex-wrap items-center justify-end gap-2.5">
+        {/*
+          Its own row, so a long set of controls wraps under the title instead of squeezing the count.
+          With nothing to save it is a single quiet line; the draft controls appear once there is a draft.
+        */}
+        {showDraft ? (
+          <div className="flex w-full flex-wrap items-center justify-end gap-2.5">
             <label className="sr-only" htmlFor="version-note">
               Version note
             </label>
@@ -657,7 +674,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
               placeholder="What changed? (optional)"
-              className={`${field} w-56`}
+              className={`${field} w-full sm:w-64`}
             />
             {needsBranch && (
               <>
@@ -670,48 +687,47 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                   onChange={(event) => setBranchName(event.target.value)}
                   maxLength={40}
                   placeholder="Name the new branch"
-                  className={`${field} w-52 border-accent-text`}
+                  className={`${field} w-full border-accent-text sm:w-52`}
                 />
               </>
             )}
             {!viewingOlder && (
-              <button
-                type="button"
-                aria-pressed={branching}
-                onClick={() => setBranching((value) => !value)}
-                className="pill min-h-11 rounded-full border border-ink px-5 text-[15px] font-medium"
-              >
+              <button type="button" aria-pressed={branching} onClick={() => setBranching((value) => !value)} className={btn.quiet}>
                 {branching ? "Keep on this branch" : "Branch off"}
               </button>
             )}
-            <button
-              type="button"
-              disabled={!dirty || saving}
-              onClick={() => setLines(baseLines)}
-              className="pill min-h-11 rounded-full border border-ink px-5 text-[15px] font-medium disabled:opacity-40"
-            >
-              Discard changes
-            </button>
-            {version && (
-              <button
-                type="button"
-                disabled={!dirty || saving || !applyCheck.ok || lines.length === 0}
-                onClick={() => (versionIsPublic ? setConfirmApply(true) : void applyChanges())}
-                title={applyCheck.ok ? `Save these changes over version ${version.versionNumber} without adding a new version` : (applyCheck.reason ?? undefined)}
-                className="pill min-h-11 rounded-full border border-ink px-5 text-[15px] font-medium disabled:opacity-40"
-              >
-                Apply changes
+            {dirty && (
+              <button type="button" disabled={saving} onClick={() => setLines(baseLines)} className={btn.quiet}>
+                Discard
               </button>
             )}
-            <button
-              type="button"
-              disabled={!canSave}
-              onClick={save}
-              className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent disabled:opacity-40"
-            >
+            {version && dirty && (
+              <button
+                type="button"
+                disabled={saving || !applyCheck.ok || lines.length === 0}
+                onClick={() => (versionIsPublic ? setConfirmApply(true) : void applyChanges())}
+                title={applyCheck.ok ? `Save these changes over version ${version.versionNumber} without adding a new version` : (applyCheck.reason ?? undefined)}
+                className={btn.secondary}
+              >
+                Apply to v{version.versionNumber}
+              </button>
+            )}
+            <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
               {saving ? "Saving" : needsBranch ? "Save as new branch" : "Save version"}
             </button>
-        </div>
+          </div>
+        ) : (
+          <div className="-ml-4 flex w-full flex-wrap items-center gap-x-4 gap-y-2 sm:ml-0 sm:justify-end">
+            <p className="pl-4 text-sm text-muted sm:pl-0">
+              {version ? `Everything is saved in v${version.versionNumber} on ${version.branchName}.` : "Add cards to save the first version."}
+            </p>
+            {version && (
+              <button type="button" aria-pressed={false} onClick={() => setBranching(true)} className={btn.quiet}>
+                Branch off
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {viewingOlder && (
@@ -730,7 +746,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         </p>
       )}
       {error && (
-        <p role="alert" className="mb-6 rounded-2xl border border-add-line bg-add-bg px-5 py-3.5 text-sm text-add-text">
+        <p role="alert" className="mb-6 rounded-2xl border border-danger-line bg-danger/10 px-5 py-3.5 text-sm text-ink">
           {error}
           {sessionEnded && (
             <>
@@ -775,24 +791,20 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       )}
 
       {/* Version timeline, collapsible */}
-      <section aria-labelledby="timeline-heading" className="mb-10 rounded-card border border-line bg-surface px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section aria-labelledby="timeline-heading" className="mb-10 rounded-card border border-line bg-surface px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
           <h2 id="timeline-heading" className="text-lg font-medium">
             Versions
           </h2>
-          <div className="flex items-center gap-4">
-            {version && (
-              <p className="text-sm text-muted">
-                v{version.versionNumber} on {version.branchName}
-                {versionSummary ? `, ${versionSummary.cardCount} cards` : ""}
-                {version.note ? `, "${version.note}"` : ""}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => setBranchesOpen(true)}
-              className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
-            >
+          {version && (
+            <p className="order-last w-full text-sm text-muted sm:order-none sm:w-auto sm:min-w-0 sm:flex-1 sm:truncate" title={version.note ?? undefined}>
+              v{version.versionNumber} on {version.branchName}
+              {versionSummary ? `, ${versionSummary.cardCount} cards` : ""}
+              {version.note ? `, "${version.note}"` : ""}
+            </p>
+          )}
+          <div className="-mr-3 ml-auto flex items-center">
+            <button type="button" onClick={() => setBranchesOpen(true)} className={`${btn.quiet} text-sm`}>
               Branches
             </button>
             <button
@@ -800,7 +812,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               aria-expanded={timelineOpen}
               aria-controls="timeline-body"
               onClick={toggleTimeline}
-              className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
+              className={`${btn.quiet} text-sm`}
             >
               {timelineOpen ? "Hide timeline" : "Show timeline"}
             </button>
@@ -828,7 +840,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-b border-line">
-        <div className="flex flex-wrap gap-7" role="tablist" aria-label="Boards">
+        <div className="-mb-px flex w-full gap-5 overflow-x-auto sm:gap-7 [scrollbar-width:none] md:w-auto" role="tablist" aria-label="Boards">
           {TABS.map(([key, label]) => (
             <button
               key={key}
@@ -836,13 +848,23 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               role="tab"
               aria-selected={tab === key}
               onClick={() => setTab(key)}
-              className={`min-h-12 border-b-2 py-2.5 text-base ${tab === key ? "border-accent-text" : "border-transparent text-muted"}`}
+              className={`min-h-12 shrink-0 whitespace-nowrap border-b-2 py-2.5 text-[15px] sm:text-base ${tab === key ? "border-accent-text" : "border-transparent text-muted"}`}
             >
               {label} <span className="text-sm text-muted">{tabCount(key)}</span>
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-2">
+        <button
+          type="button"
+          aria-expanded={optionsOpen}
+          aria-controls="board-options"
+          onClick={() => setOptionsOpen((open) => !open)}
+          className={`${btn.quiet} -ml-4 text-sm md:hidden`}
+        >
+          <SlidersHorizontal size={18} aria-hidden />
+          {optionsOpen ? "Hide display options" : "Display options"}
+        </button>
+        <div id="board-options" className={`${optionsOpen ? "flex" : "hidden"} flex-wrap items-center gap-x-6 gap-y-3 pb-3 md:flex md:pb-2`}>
           {tab === "main" && (
             <div className="flex items-center gap-3">
               <label htmlFor="group-by" className="text-sm text-muted">
@@ -937,7 +959,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         <button
           type="button"
           onClick={() => setImportOpen(true)}
-          className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium"
+          className={`${btn.secondary} min-h-14 px-6`}
         >
           Import list
         </button>
@@ -945,7 +967,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           type="button"
           onClick={() => setExportOpen(true)}
           disabled={lines.length === 0}
-          className="pill min-h-14 rounded-full border border-ink px-6 text-[15px] font-medium disabled:opacity-40"
+          className={`${btn.quiet} min-h-14`}
         >
           Export
         </button>
@@ -953,7 +975,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
       {/* Cards */}
       <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
-        <div className="lg:sticky lg:top-6">
+        <div className="hidden lg:sticky lg:top-6 lg:block">
           <CardPreview line={selected} showCollection={checkCollection} />
         </div>
         <div>

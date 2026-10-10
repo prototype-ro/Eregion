@@ -166,7 +166,7 @@ export default function CollectionPage() {
         <h1 className="pt-14 pb-8 font-display text-[clamp(72px,12vw,190px)] leading-[0.9]">Your collection</h1>
 
         {error && (
-          <p role="alert" className="mb-8 max-w-[640px] rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+          <p role="alert" className="mb-8 max-w-[640px] rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
             {error}
           </p>
         )}

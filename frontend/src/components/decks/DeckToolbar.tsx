@@ -1,5 +1,7 @@
 "use client";
 
+import { SlidersHorizontal } from "@phosphor-icons/react";
+import { useState } from "react";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { ManaCost } from "@/components/Mana";
 import { DECK_SORTS, isFiltering, NO_FILTERS, type DeckDirection, type DeckFilters, type DeckSort } from "@/lib/deckfilter";
@@ -24,6 +26,9 @@ const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black",
 /** Search, filters and sorting for the list of decks. */
 export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFlip, shown, total, view, onView }: Props) {
   const set = (patch: Partial<DeckFilters>) => onFilters({ ...filters, ...patch });
+  // Phones show the search and the layout switch; sort and filters fold into one button.
+  const [open, setOpen] = useState(false);
+  const active = [filters.visibility !== "all", filters.status !== "active", filters.legality !== "all", filters.colors.length > 0].filter(Boolean).length;
 
   function toggleColor(color: string) {
     if (color === "C") return set({ colors: filters.colors.includes("C") ? [] : ["C"] });
@@ -34,7 +39,7 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
   return (
     <div className="flex flex-col gap-4 border-t border-line py-6">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="min-w-[240px] max-w-[460px] flex-1">
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto md:max-w-[460px]">
           <label htmlFor="deck-search" className="sr-only">
             Search your decks
           </label>
@@ -49,6 +54,27 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
           />
         </div>
 
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="deck-filters"
+          onClick={() => setOpen((value) => !value)}
+          className="flex min-h-12 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium md:hidden"
+        >
+          <SlidersHorizontal size={18} aria-hidden />
+          Filters{active > 0 ? ` (${active})` : ""}
+        </button>
+        <div className="ml-auto flex gap-1 rounded-full border border-line p-1 md:order-last" role="group" aria-label="Layout">
+          {(["grid", "list"] as const).map((mode) => (
+            <button key={mode} type="button" aria-pressed={view === mode} onClick={() => onView(mode)} className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}>
+              {mode}
+            </button>
+          ))}
+        </div>
+
+      </div>
+
+      <div id="deck-filters" className={`${open ? "flex" : "hidden"} flex-wrap items-center gap-x-6 gap-y-3 md:flex`}>
         <div className="flex items-center gap-3">
           <label htmlFor="deck-sort" className="text-sm text-muted">
             Sort by
@@ -62,9 +88,6 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
           </select>
           <SortDirectionButton direction={direction} onFlip={onFlip} />
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-3">
           <label htmlFor="deck-visibility" className="text-sm text-muted">
             Visibility
@@ -118,14 +141,6 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
               );
             })}
           </div>
-        </div>
-
-        <div className="flex gap-1 rounded-full border border-line p-1" role="group" aria-label="Layout">
-          {(["grid", "list"] as const).map((mode) => (
-            <button key={mode} type="button" aria-pressed={view === mode} onClick={() => onView(mode)} className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}>
-              {mode}
-            </button>
-          ))}
         </div>
 
         <p className="ml-auto flex items-center gap-4 text-sm text-muted" role="status">

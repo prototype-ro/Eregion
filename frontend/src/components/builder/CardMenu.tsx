@@ -171,7 +171,7 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
           </button>
         </>
       )}
-      <button role="menuitem" className={`${item} text-add-text`} onClick={act(() => onRemove(line))}>
+      <button role="menuitem" className={`${item} text-danger`} onClick={act(() => onRemove(line))}>
         Remove from deck
       </button>
     </div>

@@ -105,7 +105,7 @@ export function CustomArtSection({ cardId, currentId = null, onChoose, onChanged
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="mt-4 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}
@@ -145,7 +145,7 @@ export function CustomArtSection({ cardId, currentId = null, onChoose, onChanged
                       : "Delete this art for good?"}
                   </p>
                   <div className="flex gap-2">
-                    <button type="button" disabled={busy} onClick={() => void remove(art)} className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-add-text px-4 text-xs font-bold text-bg disabled:opacity-50">
+                    <button type="button" disabled={busy} onClick={() => void remove(art)} className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-danger px-4 text-xs font-bold text-bg disabled:opacity-50">
                       Delete
                     </button>
                     <button type="button" onClick={() => setDeleting(null)} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-4 text-xs font-medium text-ink">
@@ -154,7 +154,7 @@ export function CustomArtSection({ cardId, currentId = null, onChoose, onChanged
                   </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => setDeleting(art.id)} aria-label={`Delete ${art.label}`} className="mt-1 min-h-9 [@media(pointer:coarse)]:min-h-11 text-xs text-muted underline underline-offset-4 hover:text-add-text">
+                <button type="button" onClick={() => setDeleting(art.id)} aria-label={`Delete ${art.label}`} className="mt-1 min-h-9 [@media(pointer:coarse)]:min-h-11 text-xs text-muted underline underline-offset-4 hover:text-danger">
                   Delete
                 </button>
               )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { gsap, useGSAP, whenMotionAllowed } from "@/lib/motion";
 import type { Timeline, VersionSummary } from "@/lib/types";
 
 const WINDOW = 30; // versions drawn by default when a history is long
@@ -47,6 +48,21 @@ const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year
  */
 export function VersionTimeline({ timeline, current, published, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
+
+  // When the open version changes (picked, or just saved), its dot pops so the eye lands on it.
+  useGSAP(
+    () => {
+      if (firstRender.current) {
+        firstRender.current = false;
+        return;
+      }
+      whenMotionAllowed(() => {
+        gsap.fromTo("[data-current-dot]", { scale: 0.3 }, { scale: 1, duration: 0.5, ease: "back.out(2.4)", clearProps: "transform" });
+      });
+    },
+    { scope: scroller, dependencies: [current] },
+  );
   const [hover, setHover] = useState<Hover | null>(null);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [showAll, setShowAll] = useState(false);
@@ -209,6 +225,7 @@ export function VersionTimeline({ timeline, current, published, onSelect }: Prop
                 style={{ left: node.x, top: node.y, width: HIT, height: HIT }}
               >
                 <span
+                  data-current-dot={selected ? "" : undefined}
                   className={`block rounded-full border-2 transition-all duration-200 group-hover:scale-125 ${
                     selected ? "h-[22px] w-[22px] border-accent-text bg-accent-text" : "h-4 w-4 border-ink bg-bg"
                   } ${inCurrentBranch && !selected ? "border-accent-text" : ""} ${node.version.mergeParent !== null && !selected ? "ring-2 ring-accent-text ring-offset-2 ring-offset-surface" : ""}`}

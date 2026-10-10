@@ -56,7 +56,7 @@ function RenameForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
         <input id="rename-deck" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoFocus className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink focus:border-ink focus:outline-none" />
       </div>
       {error && (
-        <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}
@@ -104,12 +104,12 @@ function DeleteForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
         {deck.visibility === "public" ? ", and it disappears from Explore" : ""}. This cannot be undone.
       </p>
       {error && (
-        <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}
       <div className="flex gap-2.5">
-        <button type="button" disabled={busy} onClick={() => void remove()} className="min-h-12 rounded-full bg-add-text px-7 text-sm font-bold text-bg disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={() => void remove()} className="min-h-12 rounded-full bg-danger px-7 text-sm font-bold text-bg disabled:opacity-50">
           {busy ? "Deleting" : "Delete deck"}
         </button>
         <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">

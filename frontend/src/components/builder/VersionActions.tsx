@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import type { DeckCardLine, Timeline, VersionDetail } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 interface Props {
   deckId: string;
@@ -23,7 +24,7 @@ interface Props {
   onToast: (message: string) => void;
 }
 
-const button = "pill inline-flex min-h-11 items-center rounded-full border border-ink px-5 text-sm font-medium disabled:opacity-40";
+const button = "pill inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
 export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast }: Props) {
@@ -91,8 +92,8 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
 
   return (
     <div className="mt-4 border-t border-line pt-4">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <p className="mr-2 text-sm text-muted">Version {number}</p>
+      <div className="grid grid-cols-2 items-center gap-2.5 sm:flex sm:flex-wrap">
+        <p className="col-span-2 mr-2 text-sm text-muted">Version {number}</p>
         {version.parentVersion !== null && (
           <Link href={`/decks/${deckId}/diff?from=${version.parentVersion}&to=${number}`} className={button}>
             Compare with v{version.parentVersion}
@@ -102,7 +103,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           Edit note
         </button>
         {!version.head && branchHead !== null && (
-          <button type="button" onClick={() => void restore()} disabled={busy || dirty} title={lockedHint} className={button}>
+          <button type="button" onClick={() => void restore()} disabled={busy || dirty} title={lockedHint} className={`${button} col-span-2`}>
             Restore as latest on {version.branchName}
           </button>
         )}
@@ -111,26 +112,26 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             Show on Explore
           </button>
         )}
-        <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy || dirty} title={lockedHint} className={`${button} border-add-line text-add-text`}>
+        <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy || dirty} title={lockedHint} className={`${btn.danger} col-span-2 text-sm sm:ml-auto`}>
           Delete version
         </button>
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="mt-3 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}
 
       {confirmDelete && (
-        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <div role="alertdialog" aria-label={`Delete version ${number}`} className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm">
           <span className="min-w-0 flex-1">
             Delete v{number} for good? Versions and branches that grew from it will grow from {version.parentVersion !== null ? `v${version.parentVersion}` : "the start"} instead.
           </span>
-          <button type="button" disabled={busy} onClick={() => void remove()} className="min-h-11 rounded-full bg-add-text px-5 text-sm font-bold text-bg disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => void remove()} className="inline-flex min-h-11 items-center rounded-full bg-danger px-5 text-sm font-bold text-bg disabled:opacity-50">
             Delete v{number}
           </button>
-          <button type="button" onClick={() => setConfirmDelete(false)} className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium text-ink">
+          <button type="button" onClick={() => setConfirmDelete(false)} className={`${btn.quiet} text-sm text-ink`}>
             Keep it
           </button>
         </div>
@@ -200,7 +201,7 @@ function NoteForm({ onClose, deckId, number, initial, onSaved }: { onClose: () =
         />
       </div>
       {error && (
-        <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}

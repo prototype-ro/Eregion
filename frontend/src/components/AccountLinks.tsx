@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { signOut } from "@/lib/auth";
 import { getMe, onMeChange, refreshMe } from "@/lib/me";
 import type { User } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 /** Shows who is signed in, with a way to their account and to sign out, or the sign in and sign up buttons. */
 export function AccountLinks() {
@@ -34,7 +35,7 @@ export function AccountLinks() {
     }
   }
 
-  if (user === undefined) return <span className="min-h-11 w-40" aria-hidden="true" />;
+  if (user === undefined) return <span className="min-h-11 w-24" aria-hidden="true" />;
 
   if (user) {
     return (
@@ -42,7 +43,7 @@ export function AccountLinks() {
         <Link href="/account" className="hidden max-w-[160px] truncate text-sm text-muted hover:text-ink sm:inline" title="Your account">
           {user.displayName}
         </Link>
-        <button type="button" onClick={() => void leave()} className="pill inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-ink px-5 text-sm font-medium">
+        <button type="button" onClick={() => void leave()} className={`${btn.quiet} text-sm`}>
           Sign out
         </button>
       </>
@@ -51,10 +52,10 @@ export function AccountLinks() {
 
   return (
     <>
-      <Link href="/login" className="pill inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-ink px-5 text-sm font-medium">
+      <Link href="/login" className={`${btn.quiet} text-sm`}>
         Sign in
       </Link>
-      <Link href="/register" className="press inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-accent px-5 text-sm font-bold text-on-accent">
+      <Link href="/register" className={`${btn.primary} px-5 text-sm`}>
         Start a deck
       </Link>
     </>

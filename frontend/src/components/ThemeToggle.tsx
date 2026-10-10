@@ -1,5 +1,6 @@
 "use client";
 
+import { MoonStars, Sun } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
@@ -31,10 +32,11 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label="Switch between light and dark theme"
-      className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
+      aria-label={theme === "light" ? "Switch to the dark theme" : "Switch to the light theme"}
+      title={theme === "light" ? "Dark theme" : "Light theme"}
+      className="flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink"
     >
-      {theme === "light" ? "Dark" : "Light"}
+      {theme === "light" ? <MoonStars size={20} weight="regular" aria-hidden /> : <Sun size={20} weight="regular" aria-hidden />}
     </button>
   );
 }

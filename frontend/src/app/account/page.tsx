@@ -170,7 +170,7 @@ function DeleteAccount() {
       <h2 id="delete-heading" className="text-[28px] leading-tight font-medium tracking-[-0.02em]">Delete account</h2>
       <div className="flex max-w-[560px] flex-col items-start gap-4">
         <p className="text-[15px] leading-snug text-muted">Removes your account, decks, versions, collection and custom art for good. Public decks leave Explore at once. This cannot be undone.</p>
-        <button type="button" onClick={() => setOpen(true)} className="pill min-h-12 rounded-full border border-add-line px-6 text-sm font-medium text-add-text">
+        <button type="button" onClick={() => setOpen(true)} className="min-h-12 rounded-full border border-danger-line px-6 text-sm font-medium text-danger transition-colors hover:bg-danger/10">
           Delete my account
         </button>
       </div>
@@ -218,7 +218,7 @@ function DeleteForm({ onClose, onDeleted }: { onClose: () => void; onDeleted: ()
       </div>
       {error && <Message text={error} bad />}
       <div className="flex gap-2.5">
-        <button type="submit" disabled={busy || !password} className="min-h-12 rounded-full bg-add-text px-7 text-sm font-bold text-bg disabled:opacity-50">
+        <button type="submit" disabled={busy || !password} className="min-h-12 rounded-full bg-danger px-7 text-sm font-bold text-bg disabled:opacity-50">
           {busy ? "Deleting" : "Delete everything"}
         </button>
         <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">

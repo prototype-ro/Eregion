@@ -8,7 +8,8 @@ export interface ViewProps {
   selectedKey: string | null;
   /** Keys (card and board) of lines that are not in the opened version. */
   newKeys: Set<string>;
-  onSelect: (line: DeckCardLine) => void;
+  /** via says whether the card was hovered or deliberately clicked or tapped. */
+  onSelect: (line: DeckCardLine, via?: "hover" | "click") => void;
   /** Opens the card menu at a screen position. */
   onMenu: (line: DeckCardLine, x: number, y: number) => void;
   /** When on, cards you do not own are flagged. When off, nothing about the collection shows. */
@@ -47,7 +48,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, onSelect, onMen
     <li
       data-line-key={lineKey(line)}
       className={`group/row flex items-center rounded-xl pr-1 ${selected ? "bg-surface" : ""} hover:bg-surface focus-within:bg-surface`}
-      onMouseEnter={() => onSelect(line)}
+      onMouseEnter={() => onSelect(line, "hover")}
       onContextMenu={(event) => {
         if (readOnly) return;
         event.preventDefault();
@@ -56,7 +57,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, onSelect, onMen
     >
       <button
         type="button"
-        onClick={() => onSelect(line)}
+        onClick={() => onSelect(line, "click")}
         className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left text-[15px]"
       >
         {line.quantity > 1 && <span className="font-mono text-[13px] text-muted">{line.quantity}x</span>}

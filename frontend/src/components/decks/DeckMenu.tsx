@@ -17,7 +17,7 @@ const item =
   "flex min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none disabled:opacity-40";
 
 /** The "..." button of a deck and the menu of things to do with it. */
-export function DeckMenu({ deck, actions, className = "" }: { deck: DeckSummary; actions: DeckActions; className?: string }) {
+export function DeckMenu({ deck, actions, className = "relative" }: { deck: DeckSummary; actions: DeckActions; className?: string }) {
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -49,7 +49,7 @@ export function DeckMenu({ deck, actions, className = "" }: { deck: DeckSummary;
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={className}>
       <button
         ref={button}
         type="button"
@@ -88,7 +88,7 @@ export function DeckMenu({ deck, actions, className = "" }: { deck: DeckSummary;
             {deck.archived ? "Restore from the archive" : "Archive"}
           </button>
           <div className="my-1.5 border-t border-line" />
-          <button role="menuitem" className={`${item} text-add-text`} onClick={act(() => actions.onDelete(deck))}>
+          <button role="menuitem" className={`${item} text-danger`} onClick={act(() => actions.onDelete(deck))}>
             Delete
           </button>
         </div>

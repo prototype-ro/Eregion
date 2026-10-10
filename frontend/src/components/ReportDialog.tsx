@@ -65,7 +65,7 @@ function Form({ onClose, deckId }: Props) {
         <textarea id="report-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={5} autoFocus className="w-full resize-y rounded-3xl border border-line bg-surface px-5 py-4 text-[15px] text-ink focus:border-ink focus:outline-none" />
       </div>
       {error && (
-        <p role="alert" className="rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+        <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
         </p>
       )}

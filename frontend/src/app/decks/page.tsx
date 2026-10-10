@@ -9,6 +9,7 @@ import { DeckRow, DeckTile } from "@/components/decks/DeckTile";
 import { ImportDialog, type ImportedCard, type ImportSource } from "@/components/builder/ImportDialog";
 import type { DeckActions } from "@/components/decks/DeckMenu";
 import { DeckToolbar } from "@/components/decks/DeckToolbar";
+import { StaggerList } from "@/components/motion/StaggerList";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
@@ -259,7 +260,7 @@ export default function DecksPage() {
         )}
 
         {error && (
-          <p role="alert" className="mb-8 max-w-[560px] rounded-2xl border border-add-line bg-add-bg px-4 py-3 text-sm text-add-text">
+          <p role="alert" className="mb-8 max-w-[560px] rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
             {error}
           </p>
         )}
@@ -305,19 +306,19 @@ export default function DecksPage() {
         )}
 
         {shown.length > 0 && view === "grid" && (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-10">
+          <StaggerList replayKey="grid" className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-10">
             {shown.slice(0, limit).map((deck) => (
               <DeckTile key={deck.id} deck={deck} actions={actions} />
             ))}
-          </ul>
+          </StaggerList>
         )}
 
         {shown.length > 0 && view === "list" && (
-          <ul className="border-t border-line">
+          <StaggerList replayKey="list" className="border-t border-line">
             {shown.slice(0, limit).map((deck) => (
               <DeckRow key={deck.id} deck={deck} actions={actions} />
             ))}
-          </ul>
+          </StaggerList>
         )}
 
         {shown.length > limit && (
