@@ -262,7 +262,7 @@ export default function CollectionPage() {
                       type="button"
                       aria-pressed={view === mode}
                       onClick={() => setView(mode)}
-                      className={`min-h-9 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}
+                      className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}
                     >
                       {mode}
                     </button>

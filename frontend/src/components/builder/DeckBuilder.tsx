@@ -625,7 +625,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           </p>
           <details className="group/legal relative text-right">
             <summary
-              className={`inline-flex min-h-9 cursor-pointer list-none items-center rounded-full border px-4 text-sm font-medium ${
+              className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 cursor-pointer list-none items-center rounded-full border px-4 text-sm font-medium ${
                 legality.legal ? "border-accent-text text-accent-text" : "border-add-line text-add-text"
               }`}
             >
@@ -920,7 +920,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                   type="button"
                   aria-pressed={view === mode}
                   onClick={() => chooseView(mode)}
-                  className={`min-h-9 rounded-full px-4 text-sm ${view === mode ? "bg-ink text-bg" : ""}`}
+                  className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm ${view === mode ? "bg-ink text-bg" : ""}`}
                 >
                   {label}
                 </button>

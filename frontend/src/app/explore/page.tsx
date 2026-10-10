@@ -116,7 +116,7 @@ function Explore() {
               <span>
                 Commander: <span className="font-medium">{commander?.name ?? "this card"}</span>
               </span>
-              <Link href="/explore" className="pill inline-flex min-h-9 items-center rounded-full border border-ink px-4 text-sm font-medium">
+              <Link href="/explore" className="pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center rounded-full border border-ink px-4 text-sm font-medium">
                 Clear
               </Link>
             </p>

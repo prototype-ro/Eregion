@@ -80,6 +80,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Keyboard focus on form fields. The fields drop the browser outline and only change their
+ * border, which is easy to miss on a pill. Unlayered CSS beats Tailwind's utility layer, so
+ * this one rule gives every field a ring without touching each component.
+ */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
 /* Outline pill that fills upward on hover. */
 .pill {
   background: linear-gradient(var(--text), var(--text)) no-repeat 0 100% / 100% 0;

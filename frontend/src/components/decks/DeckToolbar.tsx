@@ -122,7 +122,7 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
 
         <div className="flex gap-1 rounded-full border border-line p-1" role="group" aria-label="Layout">
           {(["grid", "list"] as const).map((mode) => (
-            <button key={mode} type="button" aria-pressed={view === mode} onClick={() => onView(mode)} className={`min-h-9 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}>
+            <button key={mode} type="button" aria-pressed={view === mode} onClick={() => onView(mode)} className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm capitalize ${view === mode ? "bg-ink text-bg" : ""}`}>
               {mode}
             </button>
           ))}

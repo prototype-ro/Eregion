@@ -91,7 +91,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                       <Badges line={line} isNew={newKeys.has(key)} />
                       {!readOnly && (
                         <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100">
-                          <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
+                          <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! [@media(pointer:coarse)]:h-11! [@media(pointer:coarse)]:w-11! bg-bg/90 text-ink" />
                         </span>
                       )}
                     </span>
@@ -146,7 +146,7 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                     {needs && <span className="rounded-full border border-add-line bg-bg px-2 py-0.5 text-xs text-add-text">Need</span>}
                     {!readOnly && (
                       <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100">
-                        <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! bg-bg/90 text-ink" />
+                        <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! [@media(pointer:coarse)]:h-11! [@media(pointer:coarse)]:w-11! bg-bg/90 text-ink" />
                       </span>
                     )}
                   </span>

@@ -194,7 +194,7 @@ export default function PublicDeckPage() {
               <span className="text-sm text-muted">View</span>
               <div className="flex gap-1 rounded-full border border-line p-1">
                 {VIEWS.map(([mode, label]) => (
-                  <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`min-h-9 rounded-full px-4 text-sm ${view === mode ? "bg-ink text-bg" : ""}`}>
+                  <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm ${view === mode ? "bg-ink text-bg" : ""}`}>
                     {label}
                   </button>
                 ))}
