@@ -84,7 +84,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         />
         {isRegister && !fields.password && <p className="text-sm text-muted">At least 10 characters, and not a common password.</p>}
         {!isRegister && (
-          <Link href="/forgot-password" className="self-start text-sm text-muted underline underline-offset-4 hover:text-ink">
+          <Link href="/forgot-password" className="inline-flex min-h-11 items-center self-start text-sm text-muted underline underline-offset-4 hover:text-ink">
             Forgot your password?
           </Link>
         )}

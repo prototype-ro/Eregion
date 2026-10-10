@@ -78,10 +78,16 @@
 
   --font-display: var(--font-pirata);
   --font-sans: var(--font-bricolage);
-  --font-mono: var(--font-plex-mono);
+  --font-mono: var(--font-fragment-mono);
 
   --radius-card: 28px;
 }
+
+/*
+ * Data (counts, prices, versions, mana values) is set in Fragment Mono through font-mono:
+ * lighter and narrower than most monospaces, so it reads as data without competing with
+ * card names. Sizes come from each element's own text-* class.
+ */
 
 body {
   background: var(--bg);

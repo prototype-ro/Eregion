@@ -93,7 +93,7 @@ export function StatsSection({ deckId, stats, saved, savedVersion, removed, show
           <div className="flex items-baseline justify-between border-b border-line pb-2.5">
             <p className="text-[15px] text-muted">{saved ? `Removed since v${savedVersion}` : "Removed"}</p>
             {saved && (
-              <Link href={`/decks/${deckId}/diff`} className="text-sm text-accent-text">
+              <Link href={`/decks/${deckId}/diff`} className="-my-3 inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-accent-text">
                 Full diff
               </Link>
             )}

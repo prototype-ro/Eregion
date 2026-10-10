@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Mono, Pirata_One } from "next/font/google";
+import { Bricolage_Grotesque, Fragment_Mono, Pirata_One } from "next/font/google";
 import "mana-font/css/mana.min.css";
 import "./globals.css";
 
 const display = Pirata_One({ subsets: ["latin"], weight: "400", variable: "--font-pirata", display: "swap" });
+const mono = Fragment_Mono({ subsets: ["latin"], weight: "400", variable: "--font-fragment-mono", display: "swap" });
 const sans = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap" });
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-plex-mono",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Eregion",

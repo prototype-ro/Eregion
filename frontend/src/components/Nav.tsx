@@ -5,7 +5,7 @@ import { ThemeToggle } from "./ThemeToggle";
 
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <Link href="/" className={`font-display text-[35px] leading-none ${className}`}>
+    <Link href="/" className={`inline-flex min-h-11 items-center font-display text-[35px] leading-none ${className}`}>
       Eregion
     </Link>
   );
@@ -23,19 +23,19 @@ export function Nav({ active }: { active?: "decks" | "explore" | "collection" })
       <nav className="order-last -mb-px flex w-full gap-7 text-[15px] font-medium sm:order-none sm:mb-0 sm:w-auto sm:gap-8" aria-label="Main">
         <Link
           href="/decks"
-          className={`border-b-2 py-3 sm:py-1.5 ${active === "decks" ? "border-accent-text" : "border-transparent text-muted"}`}
+          className={`inline-flex min-h-11 min-w-11 items-center border-b-2 ${active === "decks" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Decks
         </Link>
         <Link
           href="/explore"
-          className={`border-b-2 py-3 sm:py-1.5 ${active === "explore" ? "border-accent-text" : "border-transparent text-muted"}`}
+          className={`inline-flex min-h-11 min-w-11 items-center border-b-2 ${active === "explore" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Explore
         </Link>
         <Link
           href="/collection"
-          className={`border-b-2 py-3 sm:py-1.5 ${active === "collection" ? "border-accent-text" : "border-transparent text-muted"}`}
+          className={`inline-flex min-h-11 min-w-11 items-center border-b-2 ${active === "collection" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Collection
         </Link>

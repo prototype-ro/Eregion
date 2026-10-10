@@ -163,7 +163,7 @@ export function VersionTimeline({ timeline, current, published, onSelect }: Prop
             value={zoom}
             onChange={(event) => setZoom(Number(event.target.value))}
             aria-label="Timeline zoom"
-            className="w-28 accent-[var(--accent-text)]"
+            className="h-11 w-28 cursor-pointer accent-[var(--accent-text)]"
           />
         </label>
       </div>

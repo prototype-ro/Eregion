@@ -216,7 +216,7 @@ export default function CollectionPage() {
               Nothing here yet. Search for a card above, or use Import list to paste what you own. Once it has cards, switch on
               Check collection in a deck to see which of its cards you still need.
             </p>
-            <Link href="/decks" className="mt-5 inline-block text-accent-text underline underline-offset-4">
+            <Link href="/decks" className="mt-2 inline-flex min-h-11 items-center text-accent-text underline underline-offset-4">
               Back to your decks
             </Link>
           </div>
