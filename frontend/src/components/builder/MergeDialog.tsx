@@ -9,9 +9,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   deckId: string;
-  /** The branch to merge into main. */
+  /** The branch whose changes come in. */
   branch: Branch | null;
-  /** Called with the new main version after a successful merge. */
+  /** The branch that receives them. Main when left out. */
+  into?: Branch | null;
+  /** Called with the new version on the receiving branch after a successful merge. */
   onMerged: (version: VersionDetail, deletedBranch: boolean) => void;
 }
 
@@ -32,13 +34,14 @@ function describe(side: MergeSide): string {
  */
 export function MergeDialog(props: Props) {
   return (
-    <Dialog open={props.open} onClose={props.onClose} label="Merge into main" size="md">
-      {props.branch && <Body key={props.branch.id} {...props} branch={props.branch} />}
+    <Dialog open={props.open} onClose={props.onClose} label={props.into ? `Bring ${props.branch?.name ?? "branch"} into ${props.into.name}` : "Merge into main"} size="md">
+      {props.branch && <Body key={`${props.branch.id}-${props.into?.id ?? "main"}`} {...props} branch={props.branch} />}
     </Dialog>
   );
 }
 
-function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch }) {
+function Body({ onClose, deckId, branch, into, onMerged }: Props & { branch: Branch }) {
+  const target = into?.name ?? "main";
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [note, setNote] = useState("");
@@ -48,7 +51,7 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
 
   useEffect(() => {
     let cancelled = false;
-    api<MergePreview>(`/api/decks/${deckId}/branches/${branch.id}/merge`)
+    api<MergePreview>(`/api/decks/${deckId}/branches/${branch.id}/merge${into ? `?into=${into.id}` : ""}`)
       .then((result) => {
         if (!cancelled) setPreview(result);
       })
@@ -58,7 +61,7 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
     return () => {
       cancelled = true;
     };
-  }, [deckId, branch.id]);
+  }, [deckId, branch.id, into]);
 
   const keyOf = (conflict: MergeConflict) => `${conflict.cardId}|${conflict.board}`;
   const unresolved = preview ? preview.conflicts.filter((conflict) => !choices[keyOf(conflict)]).length : 0;
@@ -73,6 +76,7 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
         method: "POST",
         body: {
           sourceBranchId: branch.id,
+          targetBranchId: into?.id,
           expectedMainVersion: preview.mainVersion,
           expectedSourceVersion: preview.sourceVersion,
           resolutions: choices,
@@ -90,10 +94,10 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
   return (
     <div className="flex flex-col gap-7">
       <div>
-        <h2 className="font-display text-[44px] leading-none">Merge {branch.name}</h2>
+        <h2 className="font-display text-[44px] leading-none">{into ? `Bring ${branch.name} into ${target}` : `Merge ${branch.name}`}</h2>
         <p className="mt-2 text-[15px] text-muted">
           {preview
-            ? `Into main. Main is at v${preview.mainVersion}, ${branch.name} at v${preview.sourceVersion}${preview.baseVersion !== null ? `, and they last shared v${preview.baseVersion}` : ""}.`
+            ? `Into ${target}. ${target} is at v${preview.mainVersion}, ${branch.name} at v${preview.sourceVersion}${preview.baseVersion !== null ? `, and they last shared v${preview.baseVersion}` : ""}.`
             : "Comparing the two lines."}
         </p>
       </div>
@@ -104,15 +108,15 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
         </p>
       )}
 
-      {preview?.upToDate && <p className="text-lg">Main already has everything on {branch.name}. There is nothing to merge.</p>}
+      {preview?.upToDate && <p className="text-lg">{target} already has everything on {branch.name}. There is nothing to merge.</p>}
 
       {preview && !preview.upToDate && (
         <>
           {preview.conflicts.length === 0 && !hasChanges(preview) && <p className="text-lg">The two lines end up with the same cards. Merging would only record the link between them.</p>}
 
           {changes && hasChanges(preview) && (
-            <section aria-label="Changes to main">
-              <h3 className="border-b border-line pb-2.5 text-[15px] text-muted">What main would change</h3>
+            <section aria-label={`Changes to ${target}`}>
+              <h3 className="border-b border-line pb-2.5 text-[15px] text-muted">What {target} would change</h3>
               <ul className="mt-1">
                 {changes.added.map((card) => (
                   <li key={`a-${card.cardId}-${card.board}`} className="flex justify-between gap-3 border-b border-line py-2.5 text-[15px]">
@@ -188,7 +192,7 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
                       </p>
                       <p className="mt-1 text-sm text-muted">Before: {describe(conflict.base)}</p>
                       <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-                        {option("ours", "Keep main", conflict.ours)}
+                        {option("ours", `Keep ${target}`, conflict.ours)}
                         {option("theirs", `Use ${branch.name}`, conflict.theirs)}
                       </div>
                     </li>
@@ -207,18 +211,20 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
-              placeholder={`Merged ${branch.name} into main`}
+              placeholder={`Merged ${branch.name} into ${target}`}
               className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
             />
           </div>
 
+          {!branch.main && (
           <label className="flex items-start gap-3.5">
             <input type="checkbox" checked={deleteAfter} onChange={(event) => setDeleteAfter(event.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent-text)]" />
             <span>
               <span className="block text-[15px]">Delete {branch.name} after merging</span>
-              <span className="mt-1 block text-sm text-muted">Its versions are removed for good. The merge on main stays.</span>
+              <span className="mt-1 block text-sm text-muted">Its versions are removed for good. The merge on {target} stays.</span>
             </span>
           </label>
+          )}
         </>
       )}
 
@@ -230,7 +236,7 @@ function Body({ onClose, deckId, branch, onMerged }: Props & { branch: Branch })
             disabled={busy || unresolved > 0}
             className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50"
           >
-            {busy ? "Merging" : "Merge into main"}
+            {busy ? "Merging" : `Merge into ${target}`}
           </button>
         )}
         <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">

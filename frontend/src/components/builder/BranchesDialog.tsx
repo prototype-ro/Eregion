@@ -15,7 +15,8 @@ interface Props {
   currentBranchId: string | null;
   /** Merging opens a new main version, which would replace unsaved edits. */
   locked: boolean;
-  onMerge: (branch: Branch) => void;
+  /** Merge a branch into another one. The receiving branch is main when left out. */
+  onMerge: (branch: Branch, into?: Branch) => void;
   /** Called with the fresh timeline after a rename or delete. */
   onChanged: (timeline: Timeline, deletedBranchId: string | null) => void;
 }
@@ -174,6 +175,17 @@ function Body({ onClose, deckId, timeline, currentBranchId, locked, onMerge, onC
                       className="press min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent disabled:opacity-40"
                     >
                       Merge into {root?.name ?? "main"}
+                    </button>
+                  )}
+                  {!isRoot && root && (
+                    <button
+                      type="button"
+                      onClick={() => onMerge(root, branch)}
+                      disabled={locked}
+                      title={locked ? "Save or discard your changes first" : `Bring what changed on ${root.name} into ${branch.name}`}
+                      className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium disabled:opacity-40"
+                    >
+                      Update from {root.name}
                     </button>
                   )}
                   {!isRoot && root && tip && head(root) && (

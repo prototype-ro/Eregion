@@ -2,7 +2,8 @@
 
 import { GlobeSimple, LockSimple, PencilSimpleLine, SlidersHorizontal } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { api, ApiError } from "@/lib/api";
@@ -167,6 +168,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
   const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
+  const [mergeInto, setMergeInto] = useState<Branch | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -186,7 +188,21 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [printingKey, setPrintingKey] = useState<string | null>(null);
   const [tagKey, setTagKey] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const router = useRouter();
+  const [comparing, setComparing] = useState(false);
+  // Whether the save controls under the timeline are on screen. When they are not, a copy floats at the bottom.
+  const footerRef = useRef<HTMLDivElement>(null);
+  const [footerSeen, setFooterSeen] = useState(true);
+  useEffect(() => {
+    const element = footerRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setFooterSeen(entry.isIntersecting), { threshold: 0.4 });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const [toast, setToast] = useState<string | null>(null);
+  // A deleted version can be brought back for a few seconds right here, and for 30 days on the server.
+  const [undoDelete, setUndoDelete] = useState<number | null>(null);
 
   // Remember the chosen view and whether the timeline is open.
   useEffect(() => {
@@ -212,6 +228,23 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     const timer = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (undoDelete === null) return;
+    const timer = setTimeout(() => setUndoDelete(null), 12000);
+    return () => clearTimeout(timer);
+  }, [undoDelete]);
+
+  async function undoDeleteVersion(number: number) {
+    setUndoDelete(null);
+    try {
+      await api(`/api/decks/${deck.id}/versions/${number}/undo-delete`, { method: "POST" });
+      setToast(`Brought back v${number}`);
+      onSelectVersion(number);
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : "Could not bring that version back.");
+    }
+  }
 
   const withOwned = useMemo(() => lines.map((line) => ({ ...line, owned: owned.get(line.cardId) ?? 0 })), [lines, owned]);
   const baseWithOwned = useMemo(
@@ -285,7 +318,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   // Saving from anything but the newest version of a line has to start a new branch.
   const viewingOlder = version !== null && !version.head;
   const needsBranch = viewingOlder || branching;
-  const showDraft = dirty || needsBranch;
+  // Only a real edit, or a branch asked for, shows the save controls. Just looking at an older version does not.
+  const showDraft = dirty || branching;
   const canSave = lines.length > 0 && !saving && (needsBranch ? branchName.trim() !== "" : dirty);
 
   const visible = withOwned.filter((line) => (tab === "main" ? line.board === "main" || line.board === "commander" : line.board === tab));
@@ -595,19 +629,100 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     cardSize,
   };
 
+  // [ and ] step to the previous and next saved version, unless you are typing.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.key !== "[" && event.key !== "]") || event.metaKey || event.ctrlKey || event.altKey) return;
+      if ((event.target as HTMLElement | null)?.closest("input, textarea, select, dialog, [contenteditable=true]")) return;
+      const numbers = timeline.branches.flatMap((branch) => branch.versions.map((v) => v.versionNumber)).sort((a, b) => a - b);
+      const at = numbers.indexOf(version?.versionNumber ?? -1);
+      const next = at < 0 ? undefined : numbers[at + (event.key === "]" ? 1 : -1)];
+      if (next === undefined) return;
+      event.preventDefault();
+      selectVersion(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  /** The controls for saving a draft. They sit under the timeline, and float at the bottom of the screen when that spot is out of view. */
+  function renderDraft(where: "bar" | "float") {
+    return (
+          <div className="flex w-full flex-wrap items-center gap-2.5">
+        <label className="sr-only" htmlFor={`version-note-${where}`}>
+          Version note
+        </label>
+        <input
+          id={`version-note-${where}`}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          maxLength={200}
+          placeholder="Note (optional)"
+          className={`${field} w-full sm:w-64`}
+        />
+        {needsBranch && (
+          <>
+            <label className="sr-only" htmlFor={`branch-name-${where}`}>
+              New branch name
+            </label>
+            <input
+              id={`branch-name-${where}`}
+              value={branchName}
+              onChange={(event) => setBranchName(event.target.value)}
+              maxLength={40}
+              placeholder="Name the new branch"
+              className={`${field} w-full border-accent-text sm:w-52`}
+            />
+          </>
+        )}
+        {!viewingOlder && (
+          <button type="button" aria-pressed={branching} onClick={() => setBranching((value) => !value)} className={btn.quiet}>
+            {branching ? "Keep on this branch" : "Branch off"}
+          </button>
+        )}
+        {dirty && (
+          <button type="button" disabled={saving} onClick={() => setLines(baseLines)} className={btn.quiet}>
+            Discard
+          </button>
+        )}
+        {version && dirty && (
+          <button
+            type="button"
+            disabled={saving || !applyCheck.ok || lines.length === 0}
+            onClick={() => (versionIsPublic ? setConfirmApply(true) : void applyChanges())}
+            title={applyCheck.ok ? `Save these changes over version ${version.versionNumber} without adding a new version` : (applyCheck.reason ?? undefined)}
+            className={btn.secondary}
+          >
+            Apply to v{version.versionNumber}
+          </button>
+        )}
+        <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
+          {saving ? "Saving" : needsBranch ? "Save as new branch" : "Save version"}
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="relative">
+      <div className="relative">
+        {/* Backdrop art. Placeholder until the art library exists. It spans the header and the Versions panel and fades out before the board tabs. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/art/nobg-knight.png"
+          alt=""
+          aria-hidden="true"
+          className="art-fade pointer-events-none absolute top-0 left-[18%] z-0 hidden w-auto max-w-none select-none md:block"
+          style={{ height: "max(100%, 720px)" }}
+        />
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-8">
+      <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-3">
         <div className="min-w-0">
-          {/* Facts about the version first, then the two settings you can change, set apart by a rule. */}
           <div className="mb-3.5 flex flex-wrap items-center gap-2">
-            <span className={`${tag} capitalize`}>{deck.format}</span>
-            {version && <span className={tag}>{version.branchName}</span>}
             {dirty ? (
               <span className="inline-flex items-center rounded-full border border-add-line bg-add-bg px-3 py-1 text-[13px] text-add-text">Unsaved changes</span>
             ) : (
-              <span className={tag}>{version ? `Version ${version.versionNumber}` : "No cards yet"}</span>
+              <span className="glass inline-flex items-center rounded-full px-3.5 py-1.5 text-[13px] text-ink">{version ? `Version ${version.versionNumber}` : "No cards yet"}</span>
             )}
             {!hasCommander && lines.length > 0 && <span className={tag}>No commander chosen</span>}
             <span aria-hidden="true" className="mx-1 hidden h-5 w-px bg-line sm:block" />
@@ -615,7 +730,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               type="button"
               onClick={() => setVisibilityOpen(true)}
               aria-label={visibility === "public" ? `Public, showing version ${publishedVersion}. Change visibility` : "Private. Change visibility"}
-              className={`pill inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11 ${visibility === "public" ? "border-accent-text text-accent-text" : "border-ink/60"}`}
+              className={`glass inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11 ${visibility === "public" ? "text-accent-text" : ""}`}
             >
               {visibility === "public" ? <GlobeSimple size={15} aria-hidden /> : <LockSimple size={15} aria-hidden />}
               {visibility === "public" ? `Public, v${publishedVersion}` : "Private"}
@@ -623,119 +738,54 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             <button
               type="button"
               onClick={() => setDescriptionOpen(true)}
-              className="pill inline-flex min-h-9 items-center gap-1.5 rounded-full border border-ink/60 px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11"
+              className="glass inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11"
             >
               <PencilSimpleLine size={15} aria-hidden />
               {deck.description ? "Edit description" : "Add description"}
             </button>
           </div>
           <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">{deck.name}</h1>
-        </div>
-
-        <div className="flex flex-col items-start gap-3.5 sm:ml-auto sm:items-end">
-          <p className="text-base text-muted">
-            <span className="text-4xl font-medium tracking-[-0.03em] text-ink">{stats.totalCards}</span> of 100 cards
-          </p>
-          <details className="group/legal relative text-right">
-            <summary
-              className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 cursor-pointer list-none items-center rounded-full border px-4 text-sm font-medium ${
-                legality.legal ? "border-accent-text text-accent-text" : "border-add-line text-add-text"
-              }`}
-            >
-              {legality.legal ? "Legal in Commander" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"} for Commander`}
-            </summary>
-            <div className="absolute right-0 z-30 mt-2 w-[min(360px,90vw)] rounded-2xl border border-line bg-bg p-4 text-left text-sm shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
-              {legality.legal ? (
-                <p>100 cards, one commander, one copy of each card, all inside the commander&apos;s colors.</p>
-              ) : (
-                <ul className="list-disc space-y-1.5 pl-5">
-                  {legality.issues.map((issue) => (
-                    <li key={issue}>{issue}</li>
-                  ))}
-                </ul>
+          <div className="mt-2.5 space-y-1 text-[13px] leading-snug text-muted">
+            <div className="flex flex-wrap items-center gap-x-2">
+              <span className="capitalize">{deck.format}</span>
+              <span aria-hidden="true">|</span>
+              <details className="group/legal relative inline-block">
+                <summary className={`cursor-pointer list-none underline-offset-4 hover:underline ${legality.legal ? "" : "text-add-text"}`}>
+                  {legality.legal ? "Legal" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"}`}
+                </summary>
+                <div className="absolute left-0 z-30 mt-2 w-[min(360px,90vw)] rounded-2xl border border-line bg-bg p-4 text-sm text-ink shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                  {legality.legal ? (
+                    <p>100 cards, one commander, one copy of each card, all inside the commander&apos;s colors.</p>
+                  ) : (
+                    <ul className="list-disc space-y-1.5 pl-5">
+                      {legality.issues.map((issue) => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-3 text-muted">The banned list is not checked.</p>
+                </div>
+              </details>
+              {version && (
+                <>
+                  <span aria-hidden="true">|</span>
+                  <span>{version.branchName}</span>
+                </>
               )}
-              <p className="mt-3 text-muted">The banned list is not checked.</p>
+              {!hasCommander && lines.length > 0 && (
+                <>
+                  <span aria-hidden="true">|</span>
+                  <span>No commander chosen</span>
+                </>
+              )}
             </div>
-          </details>
-        </div>
-
-        {/*
-          Its own row, so a long set of controls wraps under the title instead of squeezing the count.
-          With nothing to save it is a single quiet line; the draft controls appear once there is a draft.
-        */}
-        {showDraft ? (
-          <div className="flex w-full flex-wrap items-center justify-end gap-2.5">
-            <label className="sr-only" htmlFor="version-note">
-              Version note
-            </label>
-            <input
-              id="version-note"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              maxLength={200}
-              placeholder="What changed? (optional)"
-              className={`${field} w-full sm:w-64`}
-            />
-            {needsBranch && (
-              <>
-                <label className="sr-only" htmlFor="branch-name">
-                  New branch name
-                </label>
-                <input
-                  id="branch-name"
-                  value={branchName}
-                  onChange={(event) => setBranchName(event.target.value)}
-                  maxLength={40}
-                  placeholder="Name the new branch"
-                  className={`${field} w-full border-accent-text sm:w-52`}
-                />
-              </>
-            )}
-            {!viewingOlder && (
-              <button type="button" aria-pressed={branching} onClick={() => setBranching((value) => !value)} className={btn.quiet}>
-                {branching ? "Keep on this branch" : "Branch off"}
-              </button>
-            )}
-            {dirty && (
-              <button type="button" disabled={saving} onClick={() => setLines(baseLines)} className={btn.quiet}>
-                Discard
-              </button>
-            )}
-            {version && dirty && (
-              <button
-                type="button"
-                disabled={saving || !applyCheck.ok || lines.length === 0}
-                onClick={() => (versionIsPublic ? setConfirmApply(true) : void applyChanges())}
-                title={applyCheck.ok ? `Save these changes over version ${version.versionNumber} without adding a new version` : (applyCheck.reason ?? undefined)}
-                className={btn.secondary}
-              >
-                Apply to v{version.versionNumber}
-              </button>
-            )}
-            <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
-              {saving ? "Saving" : needsBranch ? "Save as new branch" : "Save version"}
-            </button>
-          </div>
-        ) : (
-          <div className="-ml-4 flex w-full flex-wrap items-center gap-x-4 gap-y-2 sm:ml-0 sm:justify-end">
-            <p className="pl-4 text-sm text-muted sm:pl-0">
-              {version ? `Everything is saved in v${version.versionNumber} on ${version.branchName}.` : "Add cards to save the first version."}
+            <p>
+              Size: {stats.totalCards} | Est. Cost: ${stats.totalPriceUsd.toFixed(2)}
             </p>
-            {version && (
-              <button type="button" aria-pressed={false} onClick={() => setBranching(true)} className={btn.quiet}>
-                Branch off
-              </button>
-            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {viewingOlder && (
-        <p className="mb-6 rounded-2xl border border-line bg-surface px-5 py-3.5 text-[15px] text-muted">
-          You are looking at version {version.versionNumber} on {version.branchName}, which is not its latest. Saving from here
-          starts a new branch, so nothing you already saved is changed.
-        </p>
-      )}
       {checkCollection && owned.size === 0 && (
         <p className="mb-6 rounded-2xl border border-line bg-surface px-5 py-3.5 text-[15px] text-muted">
           Your collection is empty, so every card counts as missing.{" "}
@@ -791,22 +841,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       )}
 
       {/* Version timeline, collapsible */}
-      <section aria-labelledby="timeline-heading" className="mb-10 rounded-card border border-line bg-surface px-4 py-4 sm:px-6">
+      <section aria-labelledby="timeline-heading" className="relative z-10 mb-10 rounded-card border border-line bg-surface/60 px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-          <h2 id="timeline-heading" className="text-lg font-medium">
+          <h2 id="timeline-heading" title="Press [ and ] to step through versions" className="text-lg font-medium">
             Versions
           </h2>
-          {version && (
-            <p className="order-last w-full text-sm text-muted sm:order-none sm:w-auto sm:min-w-0 sm:flex-1 sm:truncate" title={version.note ?? undefined}>
-              v{version.versionNumber} on {version.branchName}
-              {versionSummary ? `, ${versionSummary.cardCount} cards` : ""}
-              {version.note ? `, "${version.note}"` : ""}
-            </p>
-          )}
           <div className="-mr-3 ml-auto flex items-center">
-            <button type="button" onClick={() => setBranchesOpen(true)} className={`${btn.quiet} text-sm`}>
-              Branches
-            </button>
             <button
               type="button"
               aria-expanded={timelineOpen}
@@ -814,14 +854,23 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               onClick={toggleTimeline}
               className={`${btn.quiet} text-sm`}
             >
-              {timelineOpen ? "Hide timeline" : "Show timeline"}
+              {timelineOpen ? "Hide" : "Show"}
             </button>
           </div>
         </div>
+        {viewingOlder && !showDraft && (
+          <p className="pt-1 text-sm text-muted">Viewing an older version. Changes you save start a new branch.</p>
+        )}
         {timelineOpen && (
-          <div id="timeline-body" className="pt-2 pb-2">
-            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} />
-            {version && (
+          <div id="timeline-body" className="pt-2">
+            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} onCompare={(n) => router.push(`/decks/${deck.id}/diff?from=${Math.min(n, version?.versionNumber ?? n)}&to=${Math.max(n, version?.versionNumber ?? n)}`)} />
+          </div>
+        )}
+        <div ref={footerRef}>
+          {showDraft ? (
+            <div className="mt-4 border-t border-line pt-4 pb-1">{renderDraft("bar")}</div>
+          ) : (
+            timelineOpen && version && (
               <VersionActions
                 deckId={deck.id}
                 version={version}
@@ -832,11 +881,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 onReload={onReload}
                 onPublish={(n) => void publishVersion(n)}
                 onToast={setToast}
+                comparing={comparing}
+                onToggleCompare={() => setComparing((value) => !value)}
+                versionCount={timeline.branches.reduce((sum, branch) => sum + branch.versions.length, 0)}
+                onDeleted={setUndoDelete}
+                onBranchOff={() => setBranching(true)}
+                onBranches={() => setBranchesOpen(true)}
               />
-            )}
-          </div>
-        )}
+            )
+          )}
+        </div>
       </section>
+      </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-b border-line">
@@ -1028,10 +1084,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setMergeBranch(null)}
         deckId={deck.id}
         branch={mergeBranch}
+          into={mergeInto}
         onMerged={(merged, deleted) => {
           setMergeBranch(null);
           setBranchesOpen(false);
-          setToast(deleted ? "Merged, and the branch was deleted" : "Merged into main");
+          setToast(deleted ? "Merged, and the branch was deleted" : `Merged into ${mergeInto?.name ?? "main"}`);
           onSelectVersion(merged.versionNumber);
         }}
       />
@@ -1065,7 +1122,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         timeline={timeline}
         currentBranchId={version?.branchId ?? null}
         locked={dirty}
-        onMerge={setMergeBranch}
+        onMerge={(branch, into) => {
+            setMergeBranch(branch);
+            setMergeInto(into ?? null);
+          }}
         onChanged={(next, deletedId) => {
           if (deletedId !== null && deletedId === version?.branchId) {
             // The open version went with its branch: move to the end of the first line.
@@ -1122,7 +1182,20 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={importCards} />
 
-      {toast && (
+      {showDraft && !footerSeen && (
+        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-[980px] rounded-[28px] border border-line bg-bg/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.5)] backdrop-blur">
+          {renderDraft("float")}
+        </div>
+      )}
+      {undoDelete !== null && (
+        <div role="status" className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-bg py-1.5 pr-1.5 pl-5 text-sm shadow-2xl">
+          Deleted v{undoDelete}
+          <button type="button" onClick={() => void undoDeleteVersion(undoDelete)} className={`${btn.secondary} !min-h-9 px-4 text-sm`}>
+            Undo
+          </button>
+        </div>
+      )}
+      {toast && undoDelete === null && (
         <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">
           {toast}
         </p>

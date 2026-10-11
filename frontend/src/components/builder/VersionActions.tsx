@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import type { DeckCardLine, Timeline, VersionDetail } from "@/lib/types";
@@ -22,12 +22,45 @@ interface Props {
   onReload: () => void;
   onPublish: (versionNumber: number) => void;
   onToast: (message: string) => void;
+  /** True while the timeline waits for a second version to compare with. */
+  comparing: boolean;
+  onToggleCompare: () => void;
+  /** How many versions the deck has, so Compare only shows when there is something to compare with. */
+  versionCount: number;
+  /** Tells the builder a version was deleted, so it can offer to undo it. */
+  onDeleted: (versionNumber: number) => void;
+  onBranchOff: () => void;
+  onBranches: () => void;
 }
 
+const item = "flex min-h-11 w-full items-center rounded-xl px-3 text-left transition-colors hover:bg-surface disabled:opacity-40";
 const button = "pill inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
-export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast }: Props) {
+export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, onBranchOff, onBranches, comparing, onToggleCompare, versionCount }: Props) {
+  const menu = useRef<HTMLDetailsElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Close the menu on a click outside it or on Escape. Safari and Firefox do not focus a button when it is clicked,
+  // so closing on blur would shut the menu before the click on an item landed.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const away = (event: PointerEvent) => {
+      if (menu.current && !menu.current.contains(event.target as Node)) menu.current.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && menu.current) menu.current.open = false;
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [menuOpen]);
+  const run = (fn: () => void) => () => {
+    if (menu.current) menu.current.open = false;
+    fn();
+  };
   const [noteOpen, setNoteOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -72,7 +105,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
     try {
       const timeline = await api<Timeline>(`/api/decks/${deckId}/versions/${number}`, { method: "DELETE" });
       setConfirmDelete(false);
-      onToast(`Deleted v${number}`);
+      onDeleted(number);
       // Move to what the deleted version grew from, or the newest version of the first branch.
       const parent = version.parentVersion;
       const exists = (n: number) => timeline.branches.some((branch) => branch.versions.some((v) => v.versionNumber === n));
@@ -92,29 +125,63 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
 
   return (
     <div className="mt-4 border-t border-line pt-4">
-      <div className="grid grid-cols-2 items-center gap-2.5 sm:flex sm:flex-wrap">
-        <p className="col-span-2 mr-2 text-sm text-muted">Version {number}</p>
-        {version.parentVersion !== null && (
-          <Link href={`/decks/${deckId}/diff?from=${version.parentVersion}&to=${number}`} className={button}>
-            Compare with v{version.parentVersion}
-          </Link>
+      <div className="flex flex-wrap items-center gap-2.5">
+        {comparing ? (
+          <>
+            <p className="px-2 text-sm text-ink">Pick a version on the timeline</p>
+            {version.parentVersion !== null && (
+              <Link href={`/decks/${deckId}/diff?from=${version.parentVersion}&to=${number}`} className={`${btn.quiet} text-sm`}>
+                or use v{version.parentVersion}
+              </Link>
+            )}
+            <button type="button" onClick={onToggleCompare} className={`${btn.quiet} text-sm`}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          versionCount > 1 && (
+            <button type="button" onClick={onToggleCompare} className={button}>
+              Compare
+            </button>
+          )
         )}
-        <button type="button" onClick={() => setNoteOpen(true)} className={button}>
-          Edit note
-        </button>
-        {!version.head && branchHead !== null && (
-          <button type="button" onClick={() => void restore()} disabled={busy || dirty} title={lockedHint} className={`${button} col-span-2`}>
-            Restore as latest on {version.branchName}
+        {!comparing && (
+          <button type="button" onClick={onBranchOff} className={button}>
+            Branch off
           </button>
         )}
-        {!isPublished && (
-          <button type="button" onClick={() => onPublish(number)} className={button}>
-            Show on Explore
-          </button>
-        )}
-        <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy || dirty} title={lockedHint} className={`${btn.danger} col-span-2 text-sm sm:ml-auto`}>
-          Delete version
-        </button>
+        <details ref={menu} className="relative" onToggle={(event) => setMenuOpen(event.currentTarget.open)}>
+          <summary className={`${btn.quiet} cursor-pointer list-none`} aria-label="More version actions">
+            More
+          </summary>
+          <div className="absolute bottom-full left-0 z-30 mb-2 flex w-60 flex-col rounded-2xl border border-line bg-bg p-1.5 text-sm shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+            <button type="button" onClick={run(() => setNoteOpen(true))} className={item}>
+              Edit note
+            </button>
+            {!isPublished && (
+              <button type="button" onClick={run(() => onPublish(number))} className={item}>
+                Show on Explore
+              </button>
+            )}
+            {!version.head && branchHead !== null && (
+              <button type="button" onClick={run(() => void restore())} disabled={busy || dirty} title={lockedHint} className={item}>
+                <span>
+                  Restore as latest
+                  {dirty && <span className="block text-xs text-muted">Save or discard your changes first</span>}
+                </span>
+              </button>
+            )}
+            <button type="button" onClick={run(onBranches)} className={item}>
+              Manage branches
+            </button>
+            <button type="button" onClick={run(() => setConfirmDelete(true))} disabled={busy || dirty} title={lockedHint} className={`${item} text-danger`}>
+              <span>
+                Delete version
+                {dirty && <span className="block text-xs text-muted">Save or discard your changes first</span>}
+              </span>
+            </button>
+          </div>
+        </details>
       </div>
 
       {error && (
