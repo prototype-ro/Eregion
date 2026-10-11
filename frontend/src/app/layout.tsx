@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Fragment_Mono, Pirata_One } from "next/font/google";
 import "mana-font/css/mana.min.css";
 import "./globals.css";
+import { DevTools } from "@/components/dev/DevTools";
 
 const display = Pirata_One({ subsets: ["latin"], weight: "400", variable: "--font-pirata", display: "swap" });
 const mono = Fragment_Mono({ subsets: ["latin"], weight: "400", variable: "--font-fragment-mono", display: "swap" });
@@ -21,7 +22,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-screen font-sans">{children}</body>
+      <body className="min-h-screen font-sans">
+        {children}
+        <DevTools />
+      </body>
     </html>
   );
 }
