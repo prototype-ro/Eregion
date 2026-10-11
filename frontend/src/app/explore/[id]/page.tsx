@@ -18,6 +18,7 @@ import { GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type Sort
 import { checkLegality } from "@/lib/legality";
 import { exploreCommanderUrl, formatPrice, sortColors } from "@/lib/links";
 import type { DeckDetail, PublicDeckDetail, User } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 type View = "list" | "stacks" | "gallery";
 const VIEWS: Array<[View, string]> = [["list", "List"], ["stacks", "Stacks"], ["gallery", "Gallery"]];
@@ -142,17 +143,17 @@ export default function PublicDeckPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               {commander && (
-                <Link href={exploreCommanderUrl(commander.cardId)} className="pill inline-flex min-h-12 items-center rounded-full border border-ink px-6 text-sm font-medium">
+                <Link href={exploreCommanderUrl(commander.cardId)} className={btn.large.secondary}>
                   More decks with this commander
                 </Link>
               )}
-              <button type="button" onClick={() => void share()} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium">
+              <button type="button" onClick={() => void share()} className={btn.large.secondary}>
                 {shared ?? "Share link"}
               </button>
-              <button type="button" onClick={() => setExportOpen(true)} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium">
+              <button type="button" onClick={() => setExportOpen(true)} className={btn.large.secondary}>
                 Export
               </button>
-              <button type="button" onClick={() => void copy()} disabled={copying} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+              <button type="button" onClick={() => void copy()} disabled={copying} className={btn.large.primary}>
                 {copying ? "Copying" : me === null ? "Sign in to copy" : "Copy to my decks"}
               </button>
             </div>
@@ -163,7 +164,7 @@ export default function PublicDeckPage() {
               <label htmlFor="pub-group" className="text-sm text-muted">
                 Group by
               </label>
-              <select id="pub-group" value={group} onChange={(event) => setGroup(event.target.value as GroupMode)} className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none">
+              <select id="pub-group" value={group} onChange={(event) => setGroup(event.target.value as GroupMode)} className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none">
                 {GROUP_MODES.map(([mode, label]) => (
                   <option key={mode} value={mode}>
                     {label}
@@ -175,7 +176,7 @@ export default function PublicDeckPage() {
               <label htmlFor="pub-sort" className="text-sm text-muted">
                 Sort by
               </label>
-              <select id="pub-sort" value={sort} onChange={(event) => setSort(event.target.value as SortMode)} className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none">
+              <select id="pub-sort" value={sort} onChange={(event) => setSort(event.target.value as SortMode)} className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none">
                 {SORT_MODES.map(([mode, label]) => (
                   <option key={mode} value={mode}>
                     {label}
@@ -185,7 +186,7 @@ export default function PublicDeckPage() {
               <SortDirectionButton direction={sortDirection} onFlip={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))} />
             </div>
             {view !== "list" && (
-              <label className="flex min-h-11 items-center gap-3 text-sm text-muted">
+              <label className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm text-muted">
                 Size
                 <input type="range" min={120} max={360} step={10} value={size} onChange={(event) => setSize(Number(event.target.value))} aria-label="Card size" className="w-32 accent-[var(--accent-text)]" />
               </label>

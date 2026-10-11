@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import type { DeckDetail, Timeline, Visibility } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 interface Props {
   open: boolean;
@@ -86,7 +87,7 @@ function Form({ onClose, deckId, timeline, visibility, publishedVersion, current
               id="published-version"
               value={versionNumber ?? ""}
               onChange={(event) => setVersionNumber(Number(event.target.value))}
-              className="min-h-12 rounded-full border border-line bg-surface px-4 text-[15px] text-ink focus:border-ink focus:outline-none"
+              className={field.lg}
             >
               {versions.map((version) => (
                 <option key={version.versionNumber} value={version.versionNumber}>
@@ -106,10 +107,10 @@ function Form({ onClose, deckId, timeline, visibility, publishedVersion, current
       )}
 
       <div className="flex flex-wrap gap-2.5">
-        <button type="button" onClick={() => void save()} disabled={saving || needsVersion || unchanged} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="button" onClick={() => void save()} disabled={saving || needsVersion || unchanged} className={btn.large.primary}>
           {saving ? "Saving" : "Save"}
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>

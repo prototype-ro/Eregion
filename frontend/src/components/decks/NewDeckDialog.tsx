@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { useCardSearch } from "@/lib/useCardSearch";
 import type { Card } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 export interface NewDeckDraft {
   name: string;
@@ -61,7 +62,7 @@ function Form({ onClose, busy, error, onCreate, onFromList }: Props) {
           maxLength={80}
           autoFocus
           placeholder={commander ? commander.name : ""}
-          className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+          className={field.lg}
         />
       </div>
 
@@ -76,7 +77,7 @@ function Form({ onClose, busy, error, onCreate, onFromList }: Props) {
               <p className="truncate text-[17px] font-medium">{commander.name}</p>
               <p className="truncate font-mono text-xs text-muted">{commander.typeLine}</p>
             </div>
-            <button type="button" onClick={() => { setCommander(null); setQuery(""); }} className="pill min-h-11 rounded-full border border-ink px-4 text-sm font-medium">
+            <button type="button" onClick={() => { setCommander(null); setQuery(""); }} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-4 text-sm font-medium">
               Change
             </button>
           </div>
@@ -91,7 +92,7 @@ function Form({ onClose, busy, error, onCreate, onFromList }: Props) {
               onChange={(event) => setQuery(event.target.value)}
               autoComplete="off"
               placeholder="Search legendary creatures"
-              className="min-h-12 w-full rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+              className={field.lg}
             />
             {searchable && (
               <div className="mt-2 rounded-2xl border border-line p-1.5">
@@ -126,13 +127,13 @@ function Form({ onClose, busy, error, onCreate, onFromList }: Props) {
       )}
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <button type="submit" disabled={!canCreate} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={!canCreate} className={btn.large.primary}>
           {busy ? "Creating" : "Create and open"}
         </button>
-        <button type="button" onClick={() => onFromList({ name: draft.name, commander })} disabled={busy} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium disabled:opacity-50">
+        <button type="button" onClick={() => onFromList({ name: draft.name, commander })} disabled={busy} className={btn.large.secondary}>
           Start from a list
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-line px-6 text-sm font-medium text-muted">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>

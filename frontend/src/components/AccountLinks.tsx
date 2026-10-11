@@ -35,12 +35,12 @@ export function AccountLinks() {
     }
   }
 
-  if (user === undefined) return <span className="min-h-11 w-24" aria-hidden="true" />;
+  if (user === undefined) return <span className="min-h-9 [@media(pointer:coarse)]:min-h-11 w-24" aria-hidden="true" />;
 
   if (user) {
     return (
       <>
-        <Link href="/account" className="hidden min-h-11 min-w-11 max-w-[160px] items-center justify-center truncate text-sm text-muted hover:text-ink sm:inline-flex" title="Your account">
+        <Link href="/account" className="hidden min-h-9 [@media(pointer:coarse)]:min-h-11 min-w-11 max-w-[160px] items-center justify-center truncate text-sm text-muted hover:text-ink sm:inline-flex" title="Your account">
           {user.displayName}
         </Link>
         <button type="button" onClick={() => void leave()} className={`${btn.quiet} text-sm`}>

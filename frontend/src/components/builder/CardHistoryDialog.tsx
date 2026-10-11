@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import { buildHistory } from "@/lib/history";
 import type { CardAppearance, DeckCardLine, Timeline } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 interface Props {
   line: DeckCardLine | null;
@@ -127,7 +128,7 @@ function Body({ line, deckId, timeline, current, onClose, onOpenVersion }: Props
       )}
 
       <div>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Close
         </button>
       </div>

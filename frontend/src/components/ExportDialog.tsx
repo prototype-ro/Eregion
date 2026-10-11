@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { EXPORT_FORMATS, exportDeck, type ExportFormat } from "@/lib/export";
 import type { DeckCardLine } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 const FORMAT_KEY = "eregion-export-format";
 
@@ -82,7 +83,7 @@ function Body({ onClose, deckName, lines }: Props) {
         <label htmlFor="export-format" className="text-sm text-muted">
           Format
         </label>
-        <select id="export-format" value={format} onChange={(event) => choose(event.target.value as ExportFormat)} className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink focus:border-ink focus:outline-none">
+        <select id="export-format" value={format} onChange={(event) => choose(event.target.value as ExportFormat)} className={field.lg}>
           {EXPORT_FORMATS.map((entry) => (
             <option key={entry.id} value={entry.id}>
               {entry.label}
@@ -121,13 +122,13 @@ function Body({ onClose, deckName, lines }: Props) {
       )}
 
       <div className="flex flex-wrap gap-2.5">
-        <button type="button" onClick={() => void copy()} disabled={result.text === ""} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="button" onClick={() => void copy()} disabled={result.text === ""} className={btn.large.primary}>
           Copy
         </button>
-        <button type="button" onClick={download} disabled={result.text === ""} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium disabled:opacity-50">
+        <button type="button" onClick={download} disabled={result.text === ""} className={btn.large.secondary}>
           Download {info.extension === "csv" ? ".csv" : ".txt"}
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-line px-7 text-sm font-medium text-muted">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Close
         </button>
       </div>

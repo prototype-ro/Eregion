@@ -5,6 +5,7 @@ import { useState } from "react";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { ManaCost } from "@/components/Mana";
 import { DECK_SORTS, isFiltering, NO_FILTERS, type DeckDirection, type DeckFilters, type DeckSort } from "@/lib/deckfilter";
+import { btn, field } from "@/lib/ui";
 
 interface Props {
   filters: DeckFilters;
@@ -19,7 +20,7 @@ interface Props {
   onView: (view: "grid" | "list") => void;
 }
 
-const select = "min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none";
+const select = field.md;
 const COLORS = ["W", "U", "B", "R", "G", "C"];
 const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", C: "Colorless" };
 
@@ -50,7 +51,7 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
             onChange={(event) => set({ query: event.target.value })}
             placeholder="Search by deck or commander"
             autoComplete="off"
-            className="min-h-12 w-full rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+            className={field.lg}
           />
         </div>
 
@@ -59,7 +60,7 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
           aria-expanded={open}
           aria-controls="deck-filters"
           onClick={() => setOpen((value) => !value)}
-          className="flex min-h-12 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium md:hidden"
+          className={`${btn.secondary} md:hidden`}
         >
           <SlidersHorizontal size={18} aria-hidden />
           Filters{active > 0 ? ` (${active})` : ""}

@@ -176,7 +176,7 @@ export function ImportDialog({
               className="sr-only"
               onChange={(event) => void loadFile(event.target.files?.[0])}
             />
-            <label htmlFor="decklist-file" className="pill inline-flex min-h-11 cursor-pointer items-center rounded-full border border-ink px-5 text-[15px] font-medium focus-within:outline-2">
+            <label htmlFor="decklist-file" className="pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 cursor-pointer items-center rounded-full border border-ink px-5 text-[13px] [@media(pointer:coarse)]:text-[15px] font-medium focus-within:outline-2">
               Choose a file
             </label>
             <span className="text-sm text-muted">.txt or .csv, up to 512 KB</span>
@@ -185,11 +185,11 @@ export function ImportDialog({
           {replaceLabel !== null && (
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-sm text-muted">When importing</legend>
-            <label className="flex min-h-11 items-center gap-3 text-[15px]">
+            <label className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-[15px]">
               <input type="radio" name="mode" checked={!replace} onChange={() => setReplace(false)} className="h-4 w-4 accent-[var(--accent-text)]" />
               {addLabel}
             </label>
-            <label className="flex min-h-11 items-center gap-3 text-[15px]">
+            <label className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-[15px]">
               <input type="radio" name="mode" checked={replace} onChange={() => setReplace(true)} className="h-4 w-4 accent-[var(--accent-text)]" />
               {replaceLabel}
             </label>
@@ -203,10 +203,10 @@ export function ImportDialog({
           )}
 
           <div className="flex flex-wrap justify-end gap-2.5">
-            <button type="button" onClick={close} className="pill min-h-11 rounded-full border border-ink px-6 text-[15px] font-medium">
+            <button type="button" onClick={close} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-medium">
               Cancel
             </button>
-            <button type="button" onClick={() => void run()} disabled={text.trim() === ""} className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent disabled:opacity-50">
+            <button type="button" onClick={() => void run()} disabled={text.trim() === ""} className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-bold text-on-accent disabled:opacity-50">
               Import
             </button>
           </div>
@@ -258,7 +258,7 @@ export function ImportDialog({
           )}
 
           <div className="flex flex-wrap justify-end gap-2.5">
-            <button type="button" onClick={() => setStep({ kind: "edit" })} className="pill min-h-11 rounded-full border border-ink px-6 text-[15px] font-medium">
+            <button type="button" onClick={() => setStep({ kind: "edit" })} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-medium">
               Back
             </button>
             <button
@@ -268,7 +268,7 @@ export function ImportDialog({
                 onImport(step.found, replace, step.source);
                 close();
               }}
-              className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent disabled:opacity-50"
+              className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-bold text-on-accent disabled:opacity-50"
             >
               {confirmLabel(cardCount)}
             </button>

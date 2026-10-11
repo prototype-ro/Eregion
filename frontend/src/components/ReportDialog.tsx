@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
+import { btn } from "@/lib/ui";
 
 interface Props {
   open: boolean;
@@ -42,7 +43,7 @@ function Form({ onClose, deckId }: Props) {
       <div className="flex flex-col gap-5">
         <h2 className="font-display text-[44px] leading-none">Report sent</h2>
         <p className="text-muted">Thank you. Someone will look at this deck.</p>
-        <button type="button" onClick={onClose} className="pill min-h-12 self-start rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={`${btn.large.secondary} self-start`}>
           Close
         </button>
       </div>
@@ -70,10 +71,10 @@ function Form({ onClose, deckId }: Props) {
         </p>
       )}
       <div className="flex gap-2.5">
-        <button type="submit" disabled={busy || reason.trim() === ""} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={busy || reason.trim() === ""} className={btn.large.primary}>
           Send report
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>

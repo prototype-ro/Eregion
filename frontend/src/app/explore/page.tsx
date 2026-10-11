@@ -8,6 +8,7 @@ import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { Card, PublicDeck } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 const PAGE = 24;
 
@@ -108,11 +109,11 @@ function Explore() {
               onChange={(event) => setText(event.target.value)}
               maxLength={80}
               placeholder="Search by deck, commander or author"
-              className="min-h-12 w-full rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+              className={field.lg}
             />
           </div>
           {commanderId && (
-            <p className="flex min-h-12 items-center gap-3 rounded-full border border-accent-text pr-2 pl-5 text-[15px]">
+            <p className="flex min-h-11 items-center gap-3 rounded-full border border-accent-text pr-2 pl-5 text-[15px]">
               <span>
                 Commander: <span className="font-medium">{commander?.name ?? "this card"}</span>
               </span>
@@ -162,7 +163,7 @@ function Explore() {
         )}
 
         {more && (
-          <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="pill mt-12 min-h-12 rounded-full border border-ink px-7 text-sm font-medium disabled:opacity-50">
+          <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className={`${btn.large.secondary} mt-12`}>
             {loadingMore ? "Loading" : "Show more"}
           </button>
         )}

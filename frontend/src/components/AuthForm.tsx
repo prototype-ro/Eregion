@@ -6,9 +6,9 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { refreshMe } from "@/lib/me";
 import type { User } from "@/lib/types";
+import { field } from "@/lib/ui";
 
-const input =
-  "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none";
+const input = field.lg;
 
 /** Where to go after signing in: the page the player came from, but only a page of this site. */
 export function safeNext(next: string | null): string {
@@ -84,7 +84,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         />
         {isRegister && !fields.password && <p className="text-sm text-muted">At least 10 characters, and not a common password.</p>}
         {!isRegister && (
-          <Link href="/forgot-password" className="inline-flex min-h-11 items-center self-start text-sm text-muted underline underline-offset-4 hover:text-ink">
+          <Link href="/forgot-password" className="inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center self-start text-sm text-muted underline underline-offset-4 hover:text-ink">
             Forgot your password?
           </Link>
         )}

@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { artProblem, ART_TYPES, uploadArt } from "@/components/CustomArtSection";
 import { api, ApiError } from "@/lib/api";
 import type { Card } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 interface Props {
   open: boolean;
@@ -128,7 +129,7 @@ function Body({ onClose, owned, onDone }: Props) {
           </div>
         )}
         <div>
-          <button type="button" onClick={onClose} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent">
+          <button type="button" onClick={onClose} className={btn.large.primary}>
             Done
           </button>
         </div>
@@ -145,7 +146,7 @@ function Body({ onClose, owned, onDone }: Props) {
       </p>
 
       <div>
-        <label className="pill inline-flex min-h-12 cursor-pointer items-center rounded-full border border-ink px-6 text-sm font-medium focus-within:outline-2 focus-within:outline-accent-text">
+        <label className={`${btn.large.secondary} cursor-pointer focus-within:outline-2 focus-within:outline-accent-text`}>
           Choose images
           <input ref={input} type="file" accept={ART_TYPES.join(",")} multiple className="sr-only" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} aria-label="Choose images" />
         </label>
@@ -181,10 +182,10 @@ function Body({ onClose, owned, onDone }: Props) {
       )}
 
       <div className="flex flex-wrap gap-2.5">
-        <button type="button" onClick={() => void run()} disabled={busy || files.length === 0} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="button" onClick={() => void run()} disabled={busy || files.length === 0} className={btn.large.primary}>
           {busy ? "Importing" : "Import"}
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>

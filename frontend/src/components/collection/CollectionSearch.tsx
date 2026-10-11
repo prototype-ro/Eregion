@@ -70,7 +70,7 @@ export function CollectionSearch({ quantities, onAdd }: Props) {
                   <button
                     type="button"
                     onClick={() => onAdd(card)}
-                    className="press min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
+                    className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
                   >
                     Add one
                   </button>

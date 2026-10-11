@@ -75,11 +75,11 @@ export function CardPeek({ line, showCollection, onClose, onChangePrinting }: Pr
               <button
                 type="button"
                 onClick={() => onChangePrinting(line)}
-                className="pill min-h-11 rounded-full border border-ink px-5 text-[15px] font-medium"
+                className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-5 text-[13px] [@media(pointer:coarse)]:text-[15px] font-medium"
               >
                 Change printing
               </button>
-              <button type="button" onClick={onClose} className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent">
+              <button type="button" onClick={onClose} className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-bold text-on-accent">
                 Close
               </button>
             </div>

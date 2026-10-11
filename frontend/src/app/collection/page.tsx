@@ -14,6 +14,7 @@ import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
 import { customArtUrl, formatPrice } from "@/lib/links";
 import type { Card, CustomPrinting } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 interface Entry {
   card: Card;
@@ -216,7 +217,7 @@ export default function CollectionPage() {
               Nothing here yet. Search for a card above, or use Import list to paste what you own. Once it has cards, switch on
               Check collection in a deck to see which of its cards you still need.
             </p>
-            <Link href="/decks" className="mt-2 inline-flex min-h-11 items-center text-accent-text underline underline-offset-4">
+            <Link href="/decks" className="mt-2 inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center text-accent-text underline underline-offset-4">
               Back to your decks
             </Link>
           </div>
@@ -234,7 +235,7 @@ export default function CollectionPage() {
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
                   placeholder="Part of a name"
-                  className="min-h-11 w-64 rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                  className="min-h-9 [@media(pointer:coarse)]:min-h-11 w-64 rounded-full border border-line bg-surface px-5 text-[13px] [@media(pointer:coarse)]:text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
                 />
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -246,7 +247,7 @@ export default function CollectionPage() {
                     id="collection-sort"
                     value={sort}
                     onChange={(event) => setSort(event.target.value as Sort)}
-                    className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+                    className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
                   >
                     {SORTS.map(([value, label]) => (
                       <option key={value} value={value}>
@@ -287,7 +288,7 @@ export default function CollectionPage() {
                     <p className="hidden text-right text-[15px] sm:block">{formatPrice(card.priceUsd)}</p>
                     <p className="hidden font-mono text-xs text-muted sm:block">{card.setCode.toUpperCase()}</p>
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => setArtFor(card)} aria-label={`Custom art for ${card.name}`} className="pill mr-2 hidden min-h-11 items-center rounded-full border border-line px-4 text-sm sm:inline-flex">
+                      <button type="button" onClick={() => setArtFor(card)} aria-label={`Custom art for ${card.name}`} className="pill mr-2 hidden min-h-9 [@media(pointer:coarse)]:min-h-11 items-center rounded-full border border-line px-4 text-sm sm:inline-flex">
                         Custom art{artsByCard.get(card.id) ? ` (${artsByCard.get(card.id)?.length})` : ""}
                       </button>
                       <button type="button" aria-label={`Remove one ${card.name}`} className={stepper} onClick={() => void setQuantity(card, quantity - 1)}>
@@ -324,7 +325,7 @@ export default function CollectionPage() {
                     <div className="flex items-center justify-between gap-2 px-1">
                       <p className="min-w-0 truncate text-sm">{card.name}</p>
                       <div className="flex shrink-0 items-center gap-1">
-                        <button type="button" onClick={() => setArtFor(card)} aria-label={`Custom art for ${card.name}`} className="pill min-h-11 rounded-full border border-line px-3 text-xs">
+                        <button type="button" onClick={() => setArtFor(card)} aria-label={`Custom art for ${card.name}`} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line px-3 text-xs">
                           Art{artsByCard.get(card.id) ? ` (${artsByCard.get(card.id)?.length})` : ""}
                         </button>
                         <button type="button" aria-label={`Remove one ${card.name}`} className={stepper} onClick={() => void setQuantity(card, quantity - 1)}>
@@ -350,7 +351,7 @@ export default function CollectionPage() {
             <h2 className="font-display text-[44px] leading-none">{artFor.name}</h2>
             <CustomArtSection cardId={artFor.id} onChanged={() => void loadArts()} />
             <div>
-              <button type="button" onClick={() => setArtFor(null)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+              <button type="button" onClick={() => setArtFor(null)} className={btn.large.secondary}>
                 Done
               </button>
             </div>

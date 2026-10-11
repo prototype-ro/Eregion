@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
+import { field } from "@/lib/ui";
 
-const input =
-  "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none";
+const input = field.lg;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

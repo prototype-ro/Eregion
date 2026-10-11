@@ -14,7 +14,7 @@ export interface DeckActions {
 }
 
 const item =
-  "flex min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none disabled:opacity-40";
+  "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none disabled:opacity-40";
 
 /** The "..." button of a deck and the menu of things to do with it. */
 export function DeckMenu({ deck, actions, className = "relative" }: { deck: DeckSummary; actions: DeckActions; className?: string }) {

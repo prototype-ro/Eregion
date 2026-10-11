@@ -27,6 +27,7 @@ import {
   type DeckSort,
 } from "@/lib/deckfilter";
 import type { DeckDetail, DeckSummary } from "@/lib/types";
+import { btn } from "@/lib/ui";
 
 const VIEW_KEY = "eregion-decks-view";
 
@@ -323,7 +324,7 @@ export default function DecksPage() {
 
         {shown.length > limit && (
           <div className="mt-12 flex flex-wrap items-center gap-4">
-            <button type="button" onClick={() => setLimit((current) => current + PAGE_SIZE)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+            <button type="button" onClick={() => setLimit((current) => current + PAGE_SIZE)} className={btn.large.secondary}>
               Show {Math.min(PAGE_SIZE, shown.length - limit)} more
             </button>
             <p className="text-sm text-muted">

@@ -8,9 +8,9 @@ import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
 import type { DeckDetail, DeckDiff, Timeline, VersionSummary } from "@/lib/types";
+import { field } from "@/lib/ui";
 
-const select =
-  "min-h-11 rounded-full border border-line bg-surface px-4 text-[15px] text-ink focus:border-ink focus:outline-none";
+const select = field.md;
 
 export default function DiffPage() {
   // useSearchParams needs a Suspense boundary in the App Router.

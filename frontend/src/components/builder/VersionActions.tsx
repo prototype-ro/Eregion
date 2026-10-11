@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { CaretUp, ClockCounterClockwise } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import type { DeckCardLine, Timeline, VersionDetail } from "@/lib/types";
-import { btn } from "@/lib/ui";
+import { Presence } from "@/components/motion/Presence";
+import { btn, field } from "@/lib/ui";
 
 interface Props {
   deckId: string;
@@ -29,26 +31,47 @@ interface Props {
   versionCount: number;
   /** Tells the builder a version was deleted, so it can offer to undo it. */
   onDeleted: (versionNumber: number) => void;
-  onBranchOff: () => void;
+  /** Save over this version, when nothing else grew from it. */
+  canApply: boolean;
+  applyHint?: string;
+  onApply: () => void;
+  /** Save as a new version, or as a new branch when the draft started from an older version. */
+  canSaveNew: boolean;
+  saveNewLabel: string;
+  onSaveNew: () => void;
+  /** The next save starts a new branch. */
+  branching: boolean;
+  /** Saving from an older version always branches, so there is nothing to switch. */
+  branchLocked: boolean;
+  onToggleBranch: () => void;
   onBranches: () => void;
 }
 
-const item = "flex min-h-11 w-full items-center rounded-xl px-3 text-left transition-colors hover:bg-surface disabled:opacity-40";
-const button = "pill inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
+const item = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center rounded-xl px-3 text-left transition-colors hover:bg-surface disabled:opacity-40";
+const button = "pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
-export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, onBranchOff, onBranches, comparing, onToggleCompare, versionCount }: Props) {
-  const menu = useRef<HTMLDetailsElement>(null);
+export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, canSaveNew, saveNewLabel, onSaveNew, branching, branchLocked, onToggleBranch, onBranches, comparing, onToggleCompare, versionCount }: Props) {
+  const menu = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // What was last shown in the alerts, so their text stays while they animate away.
+  const lastError = useRef<string | null>(null);
+  // Content that swaps in (compare mode, back to the normal buttons) animates in once the person has used it.
+  const swapped = useRef(false);
+  if (comparing) swapped.current = true;
   // Close the menu on a click outside it or on Escape. Safari and Firefox do not focus a button when it is clicked,
   // so closing on blur would shut the menu before the click on an item landed.
   useEffect(() => {
     if (!menuOpen) return;
     const away = (event: PointerEvent) => {
-      if (menu.current && !menu.current.contains(event.target as Node)) menu.current.open = false;
+      if (menu.current && !menu.current.contains(event.target as Node)) setMenuOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && menu.current) menu.current.open = false;
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        trigger.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", escape);
@@ -58,13 +81,14 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
     };
   }, [menuOpen]);
   const run = (fn: () => void) => () => {
-    if (menu.current) menu.current.open = false;
+    setMenuOpen(false);
     fn();
   };
   const [noteOpen, setNoteOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  if (error !== null) lastError.current = error;
 
   const number = version.versionNumber;
   const lockedHint = dirty ? "Save or discard your changes first" : undefined;
@@ -127,7 +151,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
     <div className="mt-4 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-2.5">
         {comparing ? (
-          <>
+          <Presence key="comparing" show appear y={6} exit={false} className="flex flex-wrap items-center gap-2.5">
             <p className="px-2 text-sm text-ink">Pick a version on the timeline</p>
             {version.parentVersion !== null && (
               <Link href={`/decks/${deckId}/diff?from=${version.parentVersion}&to=${number}`} className={`${btn.quiet} text-sm`}>
@@ -137,72 +161,108 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             <button type="button" onClick={onToggleCompare} className={`${btn.quiet} text-sm`}>
               Cancel
             </button>
-          </>
+          </Presence>
         ) : (
-          versionCount > 1 && (
-            <button type="button" onClick={onToggleCompare} className={button}>
-              Compare
+          <Presence key="normal" show appear={swapped.current} y={6} exit={false} className="flex flex-wrap items-center gap-2.5">
+            <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} className={button}>
+              Save
             </button>
-          )
+            <button type="button" disabled={!canSaveNew} onClick={onSaveNew} className={`${btn.primary} !min-h-9 [@media(pointer:coarse)]:min-h-11`}>
+              {saveNewLabel}
+            </button>
+            <button
+              type="button"
+              aria-pressed={branching}
+              disabled={branchLocked}
+              onClick={onToggleBranch}
+              title={branchLocked ? "Saving from an older version always starts a new branch" : undefined}
+              className={`${button} ${branching ? "!border-accent-text !text-accent-text" : ""}`}
+            >
+              Branch off
+            </button>
+            {versionCount > 1 && (
+              <button type="button" onClick={onToggleCompare} className={button}>
+                Compare
+              </button>
+            )}
+          </Presence>
         )}
-        {!comparing && (
-          <button type="button" onClick={onBranchOff} className={button}>
-            Branch off
-          </button>
-        )}
-        <details ref={menu} className="relative" onToggle={(event) => setMenuOpen(event.currentTarget.open)}>
-          <summary className={`${btn.quiet} cursor-pointer list-none`} aria-label="More version actions">
+        <div ref={menu} className="relative">
+          <button
+            ref={trigger}
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="More version actions"
+            onClick={() => setMenuOpen((open) => !open)}
+            className={`${btn.quiet} gap-1.5`}
+          >
             More
-          </summary>
-          <div className="absolute bottom-full left-0 z-30 mb-2 flex w-60 flex-col rounded-2xl border border-line bg-bg p-1.5 text-sm shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
-            <button type="button" onClick={run(() => setNoteOpen(true))} className={item}>
+            <CaretUp size={14} aria-hidden className={`transition-transform duration-300 motion-reduce:transition-none ${menuOpen ? "" : "rotate-180"}`} />
+          </button>
+          <Presence
+            show={menuOpen}
+            role="menu"
+            y={10}
+            scale={0.96}
+            origin="bottom left"
+            stagger=".menu-item"
+            className="absolute bottom-full left-0 z-30 mb-2 flex w-60 flex-col rounded-2xl border border-line bg-bg p-1.5 text-sm shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
+          >
+            <button type="button" role="menuitem" onClick={run(() => setNoteOpen(true))} className={`${item} menu-item`}>
               Edit note
             </button>
             {!isPublished && (
-              <button type="button" onClick={run(() => onPublish(number))} className={item}>
+              <button type="button" role="menuitem" onClick={run(() => onPublish(number))} className={`${item} menu-item`}>
                 Show on Explore
               </button>
             )}
             {!version.head && branchHead !== null && (
-              <button type="button" onClick={run(() => void restore())} disabled={busy || dirty} title={lockedHint} className={item}>
+              <button type="button" role="menuitem" onClick={run(() => void restore())} disabled={busy || dirty} title={lockedHint} className={`${item} menu-item`}>
                 <span>
                   Restore as latest
                   {dirty && <span className="block text-xs text-muted">Save or discard your changes first</span>}
                 </span>
               </button>
             )}
-            <button type="button" onClick={run(onBranches)} className={item}>
+            <button type="button" role="menuitem" onClick={run(onBranches)} className={`${item} menu-item`}>
               Manage branches
             </button>
-            <button type="button" onClick={run(() => setConfirmDelete(true))} disabled={busy || dirty} title={lockedHint} className={`${item} text-danger`}>
+            <button type="button" role="menuitem" onClick={run(() => setConfirmDelete(true))} disabled={busy || dirty} title={lockedHint} className={`${item} menu-item text-danger`}>
               <span>
                 Delete version
                 {dirty && <span className="block text-xs text-muted">Save or discard your changes first</span>}
               </span>
             </button>
-          </div>
-        </details>
+          </Presence>
+        </div>
+        {!version.head && (
+          <p className="flex items-center gap-2 text-sm text-muted sm:ml-auto">
+            <ClockCounterClockwise size={16} aria-hidden className="shrink-0" />
+            Older version. Changes you save start a new branch.
+          </p>
+        )}
       </div>
 
-      {error && (
+      <Presence show={error !== null} collapse>
         <p role="alert" className="mt-3 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
-          {error}
+          {error ?? lastError.current}
         </p>
-      )}
+      </Presence>
 
-      {confirmDelete && (
+      <Presence show={confirmDelete} collapse>
         <div role="alertdialog" aria-label={`Delete version ${number}`} className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm">
           <span className="min-w-0 flex-1">
             Delete v{number} for good? Versions and branches that grew from it will grow from {version.parentVersion !== null ? `v${version.parentVersion}` : "the start"} instead.
           </span>
-          <button type="button" disabled={busy} onClick={() => void remove()} className="inline-flex min-h-11 items-center rounded-full bg-danger px-5 text-sm font-bold text-bg disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => void remove()} className="inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center rounded-full bg-danger px-5 text-sm font-bold text-bg disabled:opacity-50">
             Delete v{number}
           </button>
           <button type="button" onClick={() => setConfirmDelete(false)} className={`${btn.quiet} text-sm text-ink`}>
             Keep it
           </button>
         </div>
-      )}
+      </Presence>
 
       <NoteDialog
         open={noteOpen}
@@ -264,7 +324,7 @@ function NoteForm({ onClose, deckId, number, initial, onSaved }: { onClose: () =
           onChange={(event) => setText(event.target.value)}
           maxLength={200}
           autoFocus
-          className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink focus:border-ink focus:outline-none"
+          className={field.lg}
         />
       </div>
       {error && (
@@ -273,10 +333,10 @@ function NoteForm({ onClose, deckId, number, initial, onSaved }: { onClose: () =
         </p>
       )}
       <div className="flex gap-2.5">
-        <button type="submit" disabled={busy} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={busy} className={btn.large.primary}>
           Save note
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>

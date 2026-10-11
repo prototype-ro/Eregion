@@ -43,7 +43,7 @@ export function VerifyNotice() {
       {state === "sent" ? (
         <span className="text-accent-text">Sent again. Check your inbox.</span>
       ) : (
-        <button type="button" onClick={() => void resend()} disabled={state === "sending"} className="inline-flex min-h-11 items-center text-accent-text underline underline-offset-4 disabled:opacity-50">
+        <button type="button" onClick={() => void resend()} disabled={state === "sending"} className="inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center text-accent-text underline underline-offset-4 disabled:opacity-50">
           {state === "sending" ? "Sending" : "Send the link again"}
         </button>
       )}

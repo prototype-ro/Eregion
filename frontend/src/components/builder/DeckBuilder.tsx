@@ -1,8 +1,9 @@
 "use client";
 
-import { GlobeSimple, LockSimple, PencilSimpleLine, SlidersHorizontal } from "@phosphor-icons/react";
+import { CaretUp, GlobeSimple, LockSimple, PencilSimpleLine, SlidersHorizontal } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Presence } from "@/components/motion/Presence";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ExportDialog } from "@/components/ExportDialog";
@@ -30,6 +31,7 @@ import { PrintingPicker } from "./PrintingPicker";
 import { StatsSection } from "./StatsSection";
 import { TagEditor } from "./TagEditor";
 import { BranchesDialog } from "./BranchesDialog";
+import { BranchMenu } from "./BranchMenu";
 import { CardHistoryDialog } from "./CardHistoryDialog";
 import { MergeDialog } from "./MergeDialog";
 import { SortDirectionButton } from "./SortDirectionButton";
@@ -101,7 +103,7 @@ const signature = (lines: DeckCardLine[]) =>
     .join(",");
 
 const field =
-  "min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none";
+  "min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none";
 
 /** Removes one copy of a line, dropping the line when that was the last copy. */
 function takeOne(lines: DeckCardLine[], target: DeckCardLine): DeckCardLine[] {
@@ -141,18 +143,25 @@ interface Props {
   onSelectVersion: (versionNumber: number) => void;
   /** Reloads the deck, its timeline and the open version after branches changed. */
   onReload: () => void;
+  /**
+   * The version that was just deleted and can still be undone. It lives in the page, because deleting a version opens
+   * another one, which remounts the builder and would otherwise throw the Undo pill away.
+   */
+  undoDelete: number | null;
+  onUndoDeleteChange: (versionNumber: number | null) => void;
 }
 
-export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectVersion, onReload }: Props) {
+export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectVersion, onReload, undoDelete, onUndoDeleteChange: setUndoDelete }: Props) {
   const baseLines = useMemo(() => version?.cards ?? [], [version]);
 
   const [lines, setLines] = useState<DeckCardLine[]>(baseLines);
   const versionNumber = version?.versionNumber ?? 0;
   // Edits kept from an earlier visit that ended before they were saved. Offered once, then restored or dropped.
-  const [recovered, setRecovered] = useState(() => {
-    const kept = loadDraft(deck.id, versionNumber, signature(baseLines));
-    return kept && signature(kept.lines) !== signature(baseLines) ? kept : null;
-  });
+  const recoveredFor = (number: number, base: DeckCardLine[]) => {
+    const kept = loadDraft(deck.id, number, signature(base));
+    return kept && signature(kept.lines) !== signature(base) ? kept : null;
+  };
+  const [recovered, setRecovered] = useState(() => recoveredFor(versionNumber, baseLines));
   const [sessionEnded, setSessionEnded] = useState(false);
   const [tab, setTab] = useState<Tab>("main");
   const [group, setGroup] = useState<GroupMode>("type");
@@ -167,6 +176,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
+  // The small menu opened from a branch name on the timeline. What it showed last is kept while it animates away.
+  const [branchMenu, setBranchMenu] = useState<{ branchId: string; anchor: HTMLElement } | null>(null);
+  const lastBranchMenu = useRef<{ branchId: string; anchor: HTMLElement } | null>(null);
+  if (branchMenu) lastBranchMenu.current = branchMenu;
   const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
   const [mergeInto, setMergeInto] = useState<Branch | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
@@ -190,9 +203,35 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [importOpen, setImportOpen] = useState(false);
   const router = useRouter();
   const [comparing, setComparing] = useState(false);
+  // The timeline puts its branch and zoom controls in the panel's title row.
+  const [controlsSlot, setControlsSlot] = useState<HTMLElement | null>(null);
   // Whether the save controls under the timeline are on screen. When they are not, a copy floats at the bottom.
   const footerRef = useRef<HTMLDivElement>(null);
   const [footerSeen, setFooterSeen] = useState(true);
+  // Opening another version starts a fresh draft from it. The builder itself stays mounted, so the view, the timeline
+  // and everything on screen carry on instead of resetting and flashing back to defaults.
+  const [shownVersion, setShownVersion] = useState(versionNumber);
+  if (shownVersion !== versionNumber) {
+    setShownVersion(versionNumber);
+    setLines(baseLines);
+    setRecovered(recoveredFor(versionNumber, baseLines));
+    setNote("");
+    setBranching(false);
+    setBranchName("");
+    setConfirmApply(false);
+    setPendingVersion(null);
+    setSelectedKey(null);
+    setMenu(null);
+    setPeekKey(null);
+    setPrintingKey(null);
+    setTagKey(null);
+    setHistoryKey(null);
+    setComparing(false);
+    setError(null);
+    setSessionEnded(false);
+    setVisibility(deck.visibility);
+    setPublishedVersion(deck.publishedVersion);
+  }
   useEffect(() => {
     const element = footerRef.current;
     if (!element || typeof IntersectionObserver === "undefined") return;
@@ -202,7 +241,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   }, []);
   const [toast, setToast] = useState<string | null>(null);
   // A deleted version can be brought back for a few seconds right here, and for 30 days on the server.
-  const [undoDelete, setUndoDelete] = useState<number | null>(null);
+  // The version shown in the undo pill, kept while the pill animates away.
+  const undoShown = useRef(0);
+  if (undoDelete !== null) undoShown.current = undoDelete;
 
   // Remember the chosen view and whether the timeline is open.
   useEffect(() => {
@@ -390,6 +431,26 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       remember(TIMELINE_KEY, open ? "closed" : "open");
       return !open;
     });
+  }
+
+  /** After a branch was renamed or deleted from either menu. */
+  function branchesChanged(next: Timeline, deletedId: string | null) {
+    if (deletedId !== null && deletedId === version?.branchId) {
+      // The open version went with its branch: move to the end of the first line.
+      setBranchesOpen(false);
+      const first = next.branches.find((branch) => branch.main) ?? next.branches[0];
+      const tip = first?.versions[first.versions.length - 1];
+      if (tip) onSelectVersion(tip.versionNumber);
+    } else {
+      onReload();
+    }
+    setToast(deletedId !== null ? "Branch deleted" : "Branch renamed");
+  }
+
+  function startMerge(branch: Branch, into?: Branch) {
+    setBranchMenu(null);
+    setMergeBranch(branch);
+    setMergeInto(into ?? null);
   }
 
   // ---- editing ----
@@ -646,9 +707,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   });
 
   /** The controls for saving a draft. They sit under the timeline, and float at the bottom of the screen when that spot is out of view. */
-  function renderDraft(where: "bar" | "float") {
+  /** The note, the new branch's name and Discard. They appear only while there is something to save. */
+  function renderFields(where: "bar" | "float") {
     return (
-          <div className="flex w-full flex-wrap items-center gap-2.5">
+      <div className="flex w-full flex-wrap items-center gap-2.5">
         <label className="sr-only" htmlFor={`version-note-${where}`}>
           Version note
         </label>
@@ -675,46 +737,42 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             />
           </>
         )}
-        {!viewingOlder && (
-          <button type="button" aria-pressed={branching} onClick={() => setBranching((value) => !value)} className={btn.quiet}>
-            {branching ? "Keep on this branch" : "Branch off"}
-          </button>
-        )}
         {dirty && (
           <button type="button" disabled={saving} onClick={() => setLines(baseLines)} className={btn.quiet}>
             Discard
           </button>
         )}
-        {version && dirty && (
-          <button
-            type="button"
-            disabled={saving || !applyCheck.ok || lines.length === 0}
-            onClick={() => (versionIsPublic ? setConfirmApply(true) : void applyChanges())}
-            title={applyCheck.ok ? `Save these changes over version ${version.versionNumber} without adding a new version` : (applyCheck.reason ?? undefined)}
-            className={btn.secondary}
-          >
-            Apply to v{version.versionNumber}
-          </button>
-        )}
-        <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
-          {saving ? "Saving" : needsBranch ? "Save as new branch" : "Save version"}
-        </button>
       </div>
+    );
+  }
+
+  const canApply = version !== null && dirty && !saving && applyCheck.ok && lines.length > 0;
+  const saveNewLabel = saving ? "Saving" : needsBranch ? "Save as new branch" : "Save new version";
+  const applyHint = !version ? undefined : !dirty ? "Nothing changed yet" : applyCheck.ok ? `Save these changes over version ${version.versionNumber}, without adding a version` : (applyCheck.reason ?? undefined);
+  const onApply = () => (versionIsPublic ? setConfirmApply(true) : void applyChanges());
+
+  /** Save and Save new version, for the floating bar. The footer has the same two buttons among its others. */
+  function renderSaveButtons() {
+    return (
+      <>
+        <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} className={btn.secondary}>
+          Save
+        </button>
+        <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
+          {saveNewLabel}
+        </button>
+      </>
     );
   }
 
   return (
     <div className="relative">
       <div className="relative">
-        {/* Backdrop art. Placeholder until the art library exists. It spans the header and the Versions panel and fades out before the board tabs. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/art/nobg-knight.png"
-          alt=""
-          aria-hidden="true"
-          className="art-fade pointer-events-none absolute top-0 left-[18%] z-0 hidden w-auto max-w-none select-none md:block"
-          style={{ height: "max(100%, 720px)" }}
-        />
+        {/* Backdrop art. Placeholder until the art library exists. It keeps one size whatever the panel does, and is cut and faded where the header and panel end. */}
+        <div aria-hidden="true" className="art-clip pointer-events-none absolute inset-0 z-0 hidden overflow-hidden md:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/art/nobg-knight.png" alt="" className="absolute top-0 left-[18%] h-[720px] w-auto max-w-none select-none" />
+        </div>
       {/* Header */}
       <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-3">
         <div className="min-w-0">
@@ -822,7 +880,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 setLines(recovered.lines);
                 setRecovered(null);
               }}
-              className="press min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
+              className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
             >
               Restore them
             </button>
@@ -832,7 +890,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 clearDraft(deck.id, versionNumber);
                 setRecovered(null);
               }}
-              className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
+              className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-5 text-sm font-medium"
             >
               Discard
             </button>
@@ -846,31 +904,29 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           <h2 id="timeline-heading" title="Press [ and ] to step through versions" className="text-lg font-medium">
             Versions
           </h2>
-          <div className="-mr-3 ml-auto flex items-center">
+          <div ref={setControlsSlot} className="ml-auto flex min-w-0 items-center" />
+          <div className="-mr-3 flex items-center">
             <button
               type="button"
               aria-expanded={timelineOpen}
               aria-controls="timeline-body"
               onClick={toggleTimeline}
-              className={`${btn.quiet} text-sm`}
+              className={`${btn.quiet} gap-1.5 text-sm`}
             >
               {timelineOpen ? "Hide" : "Show"}
+              <CaretUp size={14} aria-hidden className={`transition-transform duration-300 motion-reduce:transition-none ${timelineOpen ? "" : "rotate-180"}`} />
             </button>
           </div>
         </div>
-        {viewingOlder && !showDraft && (
-          <p className="pt-1 text-sm text-muted">Viewing an older version. Changes you save start a new branch.</p>
-        )}
-        {timelineOpen && (
-          <div id="timeline-body" className="pt-2">
-            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} onCompare={(n) => router.push(`/decks/${deck.id}/diff?from=${Math.min(n, version?.versionNumber ?? n)}&to=${Math.max(n, version?.versionNumber ?? n)}`)} />
-          </div>
-        )}
+        <Presence show={timelineOpen} collapse id="timeline-body" className="pt-2">
+          <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} controlsSlot={controlsSlot} deckId={deck.id} menuBranchId={branchMenu?.branchId ?? null} artUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} onBranchClick={(branchId, anchor) => setBranchMenu((open) => (open?.branchId === branchId ? null : { branchId, anchor }))} onCompare={(n) => router.push(`/decks/${deck.id}/diff?from=${Math.min(n, version?.versionNumber ?? n)}&to=${Math.max(n, version?.versionNumber ?? n)}`)} />
+        </Presence>
         <div ref={footerRef}>
-          {showDraft ? (
-            <div className="mt-4 border-t border-line pt-4 pb-1">{renderDraft("bar")}</div>
-          ) : (
-            timelineOpen && version && (
+          <Presence show={showDraft} collapse appear className="mt-4 border-t border-line pt-4 pb-1">
+            {renderFields("bar")}
+          </Presence>
+          <Presence show={timelineOpen && version !== null} collapse>
+            {version && (
               <VersionActions
                 deckId={deck.id}
                 version={version}
@@ -885,11 +941,19 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 onToggleCompare={() => setComparing((value) => !value)}
                 versionCount={timeline.branches.reduce((sum, branch) => sum + branch.versions.length, 0)}
                 onDeleted={setUndoDelete}
-                onBranchOff={() => setBranching(true)}
+                canApply={canApply}
+                applyHint={applyHint}
+                onApply={onApply}
+                canSaveNew={canSave}
+                saveNewLabel={saveNewLabel}
+                onSaveNew={save}
+                branching={needsBranch}
+                branchLocked={viewingOlder}
+                onToggleBranch={() => setBranching((value) => !value)}
                 onBranches={() => setBranchesOpen(true)}
               />
-            )
-          )}
+            )}
+          </Presence>
         </div>
       </section>
       </div>
@@ -930,7 +994,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 id="group-by"
                 value={group}
                 onChange={(event) => chooseGroup(event.target.value as GroupMode)}
-                className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+                className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
               >
                 {GROUP_MODES.map(([mode, label]) => (
                   <option key={mode} value={mode}>
@@ -948,7 +1012,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               id="sort-by"
               value={sort}
               onChange={(event) => chooseSort(event.target.value as SortMode)}
-              className="min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+              className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
             >
               {SORT_MODES.map(([mode, label]) => (
                 <option key={mode} value={mode}>
@@ -963,7 +1027,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             role="switch"
             aria-checked={checkCollection}
             onClick={toggleCollectionCheck}
-            className="flex min-h-11 items-center gap-3 text-sm"
+            className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm"
           >
             <span
               aria-hidden="true"
@@ -974,7 +1038,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             Check collection
           </button>
           {view !== "list" && (
-            <label className="flex min-h-11 items-center gap-3 text-sm text-muted">
+            <label className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm text-muted">
               Size
               <input
                 type="range"
@@ -1062,10 +1126,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             Version {version?.versionNumber} is the one everyone sees on Explore. Applying your changes updates it for them too. To keep the public version as it is, save a new version instead.
           </p>
           <div className="flex flex-wrap gap-2.5">
-            <button type="button" onClick={() => void applyChanges()} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent">
+            <button type="button" onClick={() => void applyChanges()} className={btn.large.primary}>
               Apply and update the public version
             </button>
-            <button type="button" onClick={() => setConfirmApply(false)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+            <button type="button" onClick={() => setConfirmApply(false)} className={btn.large.secondary}>
               Cancel
             </button>
           </div>
@@ -1080,6 +1144,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onOpenVersion={selectVersion}
       />
       <MergeDialog
+        timeline={timeline}
+        publishedVersion={visibility === "public" ? publishedVersion : null}
         open={mergeBranch !== null}
         onClose={() => setMergeBranch(null)}
         deckId={deck.id}
@@ -1104,11 +1170,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 setPendingVersion(null);
                 if (target !== null) onSelectVersion(target);
               }}
-              className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent"
+              className={btn.large.primary}
             >
               Discard and open v{pendingVersion}
             </button>
-            <button type="button" onClick={() => setPendingVersion(null)} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+            <button type="button" onClick={() => setPendingVersion(null)} className={btn.large.secondary}>
               Keep editing
             </button>
           </div>
@@ -1118,26 +1184,27 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         open={branchesOpen}
         onClose={() => setBranchesOpen(false)}
         deckId={deck.id}
-       
         timeline={timeline}
         currentBranchId={version?.branchId ?? null}
+        publishedVersion={visibility === "public" ? publishedVersion : null}
         locked={dirty}
         onMerge={(branch, into) => {
-            setMergeBranch(branch);
-            setMergeInto(into ?? null);
-          }}
-        onChanged={(next, deletedId) => {
-          if (deletedId !== null && deletedId === version?.branchId) {
-            // The open version went with its branch: move to the end of the first line.
-            setBranchesOpen(false);
-            const first = next.branches.find((branch) => branch.main) ?? next.branches[0];
-            const tip = first?.versions[first.versions.length - 1];
-            if (tip) onSelectVersion(tip.versionNumber);
-          } else {
-            onReload();
-          }
-          setToast(deletedId !== null ? "Branch deleted" : "Branch renamed");
+          setBranchesOpen(false);
+          startMerge(branch, into);
         }}
+        onChanged={branchesChanged}
+      />
+      <BranchMenu
+        open={branchMenu !== null}
+        anchor={(branchMenu ?? lastBranchMenu.current)?.anchor ?? null}
+        branch={timeline.branches.find((branch) => branch.id === (branchMenu ?? lastBranchMenu.current)?.branchId)}
+        deckId={deck.id}
+        timeline={timeline}
+        publishedVersion={visibility === "public" ? publishedVersion : null}
+        locked={dirty}
+        onMerge={startMerge}
+        onChanged={branchesChanged}
+        onClose={() => setBranchMenu(null)}
       />
       <VisibilityDialog
         open={visibilityOpen}
@@ -1182,19 +1249,22 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={importCards} />
 
-      {showDraft && !footerSeen && (
-        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-[980px] rounded-[28px] border border-line bg-bg/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.5)] backdrop-blur">
-          {renderDraft("float")}
-        </div>
-      )}
-      {undoDelete !== null && (
-        <div role="status" className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-bg py-1.5 pr-1.5 pl-5 text-sm shadow-2xl">
-          Deleted v{undoDelete}
-          <button type="button" onClick={() => void undoDeleteVersion(undoDelete)} className={`${btn.secondary} !min-h-9 px-4 text-sm`}>
+      <Presence
+        show={showDraft && !footerSeen}
+        y={18}
+        className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-[980px] rounded-[28px] border border-line bg-bg/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.5)] backdrop-blur"
+      >
+        {renderFields("float")}
+        <div className="mt-3 flex flex-wrap items-center gap-2.5">{renderSaveButtons()}</div>
+      </Presence>
+      <Presence show={undoDelete !== null} y={14} className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+        <div role="status" className="flex items-center gap-2 rounded-full border border-line bg-bg py-1.5 pr-1.5 pl-5 text-sm shadow-2xl">
+          Deleted v{undoShown.current}
+          <button type="button" onClick={() => void undoDeleteVersion(undoShown.current)} className={`${btn.secondary} !min-h-9 px-4 text-sm`}>
             Undo
           </button>
         </div>
-      )}
+      </Presence>
       {toast && undoDelete === null && (
         <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">
           {toast}

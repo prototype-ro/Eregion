@@ -28,7 +28,7 @@ interface Props {
 }
 
 const item =
-  "flex min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none";
+  "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none";
 
 /** The quick menu for a card, opened from its three dots or by right-clicking it. */
 export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onSetPartner, onHistory, onRemove, onNotify }: Props) {
@@ -157,12 +157,12 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
               max={99}
               value={amount}
               onChange={(event) => setAmount(Math.max(1, Math.min(99, Number(event.target.value) || 1)))}
-              className="min-h-11 w-16 rounded-full border border-line bg-surface px-3 text-center text-[15px] text-ink focus:border-ink focus:outline-none"
+              className="min-h-9 [@media(pointer:coarse)]:min-h-11 w-16 rounded-full border border-line bg-surface px-3 text-center text-[13px] [@media(pointer:coarse)]:text-[15px] text-ink focus:border-ink focus:outline-none"
             />
-            <button role="menuitem" className="press min-h-11 flex-1 rounded-full bg-accent text-sm font-bold text-on-accent" onClick={act(() => onQuantity(line, amount))}>
+            <button role="menuitem" className="press min-h-9 [@media(pointer:coarse)]:min-h-11 flex-1 rounded-full bg-accent text-sm font-bold text-on-accent" onClick={act(() => onQuantity(line, amount))}>
               Add
             </button>
-            <button role="menuitem" className="pill min-h-11 flex-1 rounded-full border border-ink text-sm font-medium" onClick={act(() => onQuantity(line, -amount))}>
+            <button role="menuitem" className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 flex-1 rounded-full border border-ink text-sm font-medium" onClick={act(() => onQuantity(line, -amount))}>
               Remove
             </button>
           </div>

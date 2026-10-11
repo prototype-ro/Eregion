@@ -58,7 +58,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, onSelect, onMen
       <button
         type="button"
         onClick={() => onSelect(line, "click")}
-        className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left text-[15px]"
+        className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left text-[15px]"
       >
         {line.quantity > 1 && <span className="font-mono text-[13px] text-muted">{line.quantity}x</span>}
         <span className="truncate">{line.name}</span>

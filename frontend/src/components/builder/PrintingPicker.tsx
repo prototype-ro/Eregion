@@ -98,7 +98,7 @@ export function PrintingPicker({ line, onClose, onChoose, onChooseCustom }: Prop
           )}
 
           <div className="mt-8 flex justify-end">
-            <button type="button" onClick={onClose} className="pill min-h-11 rounded-full border border-ink px-6 text-[15px] font-medium">
+            <button type="button" onClick={onClose} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-medium">
               Close
             </button>
           </div>

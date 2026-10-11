@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
-import type { Branch, MergeConflict, MergePreview, MergeSide, VersionDetail } from "@/lib/types";
+import { deleteBlocker } from "@/lib/branches";
+import type { Branch, MergeConflict, MergePreview, MergeSide, Timeline, VersionDetail } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   deckId: string;
+  timeline: Timeline;
+  /** The version shown on Explore, when public. A branch holding it cannot be deleted. */
+  publishedVersion: number | null;
   /** The branch whose changes come in. */
   branch: Branch | null;
   /** The branch that receives them. Main when left out. */
@@ -40,12 +45,14 @@ export function MergeDialog(props: Props) {
   );
 }
 
-function Body({ onClose, deckId, branch, into, onMerged }: Props & { branch: Branch }) {
+function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMerged }: Props & { branch: Branch }) {
   const target = into?.name ?? "main";
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [note, setNote] = useState("");
   const [deleteAfter, setDeleteAfter] = useState(false);
+  // Said up front, so the option is not offered when the server would refuse the whole merge for it.
+  const blocker = deleteBlocker(timeline, branch, publishedVersion);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,10 +88,10 @@ function Body({ onClose, deckId, branch, into, onMerged }: Props & { branch: Bra
           expectedSourceVersion: preview.sourceVersion,
           resolutions: choices,
           note: note.trim() || undefined,
-          deleteBranch: deleteAfter,
+          deleteBranch: deleteAfter && blocker === null,
         },
       });
-      onMerged(version, deleteAfter);
+      onMerged(version, deleteAfter && blocker === null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "The merge did not go through.");
       setBusy(false);
@@ -212,18 +219,24 @@ function Body({ onClose, deckId, branch, into, onMerged }: Props & { branch: Bra
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
               placeholder={`Merged ${branch.name} into ${target}`}
-              className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+              className={field.lg}
             />
           </div>
 
           {!branch.main && (
-          <label className="flex items-start gap-3.5">
-            <input type="checkbox" checked={deleteAfter} onChange={(event) => setDeleteAfter(event.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent-text)]" />
-            <span>
-              <span className="block text-[15px]">Delete {branch.name} after merging</span>
-              <span className="mt-1 block text-sm text-muted">Its versions are removed for good. The merge on {target} stays.</span>
-            </span>
-          </label>
+            <label className={`flex items-start gap-3.5 ${blocker ? "opacity-60" : ""}`}>
+              <input
+                type="checkbox"
+                checked={deleteAfter && blocker === null}
+                disabled={blocker !== null}
+                onChange={(event) => setDeleteAfter(event.target.checked)}
+                className="mt-1 h-5 w-5 accent-[var(--accent-text)]"
+              />
+              <span>
+                <span className="block text-[15px]">Delete {branch.name} after merging</span>
+                <span className="mt-1 block text-sm text-muted">{blocker ?? `Its versions are removed for good. The merge on ${target} stays.`}</span>
+              </span>
+            </label>
           )}
         </>
       )}
@@ -234,12 +247,12 @@ function Body({ onClose, deckId, branch, into, onMerged }: Props & { branch: Bra
             type="button"
             onClick={() => void merge()}
             disabled={busy || unresolved > 0}
-            className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50"
+            className={btn.large.primary}
           >
             {busy ? "Merging" : `Merge into ${target}`}
           </button>
         )}
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           {preview?.upToDate ? "Close" : "Cancel"}
         </button>
       </div>

@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { refreshMe } from "@/lib/me";
+import { btn } from "@/lib/ui";
 
 export default function VerifyEmailPage() {
   return (
@@ -50,7 +51,7 @@ function Verify() {
         {state === "done" && (
           <div role="status" className="max-w-[520px]">
             <p className="text-lg leading-normal">Thanks. You can share decks now.</p>
-            <Link href="/decks" className="press mt-6 inline-flex min-h-12 items-center rounded-full bg-accent px-7 text-sm font-bold text-on-accent">
+            <Link href="/decks" className={`${btn.large.primary} mt-6`}>
               Go to your decks
             </Link>
           </div>

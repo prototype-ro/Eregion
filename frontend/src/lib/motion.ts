@@ -1,9 +1,10 @@
 "use client";
 
 import gsap from "gsap";
+import { Flip } from "gsap/Flip";
 import { useGSAP } from "@gsap/react";
 
-gsap.registerPlugin(useGSAP);
+gsap.registerPlugin(useGSAP, Flip);
 
 /*
  * Motion has one rhythm across the app and only ever moves transform and opacity. Every use
@@ -25,4 +26,4 @@ export function whenMotionAllowed(fn: () => void) {
   return mm;
 }
 
-export { gsap, useGSAP };
+export { gsap, useGSAP, Flip };

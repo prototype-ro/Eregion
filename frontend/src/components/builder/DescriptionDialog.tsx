@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
+import { btn } from "@/lib/ui";
 
 const MAX = 2000;
 
@@ -75,10 +76,10 @@ function Form({ onClose, deckId, description, onSaved }: Props) {
         </p>
       )}
       <div className="flex gap-2.5">
-        <button type="submit" disabled={busy || text === description} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={busy || text === description} className={btn.large.primary}>
           Save
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>

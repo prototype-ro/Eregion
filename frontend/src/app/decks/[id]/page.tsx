@@ -29,6 +29,7 @@ export default function DeckPage() {
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [undoDelete, setUndoDelete] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -81,9 +82,9 @@ export default function DeckPage() {
       )}
       {!error && !loaded && <p className="py-16 text-muted">Loading the deck.</p>}
       {loaded && (
-        // Remounting per version resets the draft to that version's snapshot.
+        // Stays mounted as versions change, so the view, the timeline and what is on screen do not reset. The builder starts a fresh draft itself.
         <DeckBuilder
-          key={loaded.version?.versionNumber ?? 0}
+          key={loaded.deck.id}
           deck={loaded.deck}
           version={loaded.version}
           timeline={loaded.timeline}
@@ -92,6 +93,8 @@ export default function DeckPage() {
           onSaved={openVersion}
           onSelectVersion={openVersion}
           onReload={() => void load()}
+          undoDelete={undoDelete}
+          onUndoDeleteChange={setUndoDelete}
         />
       )}
       </main>

@@ -103,7 +103,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                       <button
                         type="button"
                         onClick={() => onSetCommander(card)}
-                        className="pill min-h-11 rounded-full border border-ink px-4 text-sm font-medium"
+                        className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-4 text-sm font-medium"
                       >
                         Commander
                       </button>
@@ -111,7 +111,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                     <button
                       type="button"
                       onClick={() => onAdd(card)}
-                      className="press min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
+                      className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
                     >
                       {already ? "Add another" : "Add"}
                     </button>

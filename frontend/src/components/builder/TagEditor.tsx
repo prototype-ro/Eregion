@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import type { DeckCardLine } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 interface Props {
   line: DeckCardLine | null;
@@ -14,7 +15,7 @@ interface Props {
 
 const MAX_TAGS = 12;
 
-const chip = "flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm";
+const chip = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm";
 
 /** Custom tags for one card. Tags group cards in the deck however you like, such as Ramp or Win condition. */
 export function TagEditor({ line, suggestions, onClose, onChange }: Props) {
@@ -50,7 +51,7 @@ export function TagEditor({ line, suggestions, onClose, onChange }: Props) {
       <h2 className="font-display text-[40px] leading-none">Tags</h2>
       <p className="mt-2 text-[15px] text-muted">{line.name}</p>
 
-      <ul className="mt-6 flex min-h-11 flex-wrap gap-2" aria-label="Current tags">
+      <ul className="mt-6 flex min-h-9 [@media(pointer:coarse)]:min-h-11 flex-wrap gap-2" aria-label="Current tags">
         {tags.length === 0 && <li className="py-2.5 text-sm text-muted">No tags yet.</li>}
         {tags.map((tag) => (
           <li key={tag} className={chip}>
@@ -79,9 +80,9 @@ export function TagEditor({ line, suggestions, onClose, onChange }: Props) {
           maxLength={30}
           placeholder="Add a tag, then press Enter"
           autoFocus
-          className="min-h-12 flex-1 rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+          className={`${field.lg} flex-1`}
         />
-        <button type="submit" disabled={!draft.trim()} className="press min-h-12 rounded-full bg-accent px-6 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={!draft.trim()} className={btn.large.primary}>
           Add
         </button>
       </form>
@@ -104,7 +105,7 @@ export function TagEditor({ line, suggestions, onClose, onChange }: Props) {
       )}
 
       <div className="mt-8 flex justify-end">
-        <button type="button" onClick={onClose} className="press min-h-11 rounded-full bg-accent px-6 text-[15px] font-bold text-on-accent">
+        <button type="button" onClick={onClose} className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-bold text-on-accent">
           Done
         </button>
       </div>

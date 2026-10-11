@@ -8,8 +8,9 @@ import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { getMe, refreshMe } from "@/lib/me";
 import type { User } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
-const input = "min-h-12 w-full rounded-full border border-line bg-surface px-5 text-[15px] text-ink focus:border-ink focus:outline-none";
+const input = field.lg;
 const section = "grid gap-x-12 gap-y-5 border-t border-line py-10 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)]";
 
 function Message({ text, bad }: { text: string; bad?: boolean }) {
@@ -80,7 +81,7 @@ function Profile({ user }: { user: User }) {
         {!user.emailVerified && (
           <div className="flex flex-col items-start gap-3">
             <p className="text-sm leading-snug text-muted">Confirm your address to make decks public. Look for the email from us, or send it again.</p>
-            <button type="button" onClick={() => void resend()} disabled={state === "sending" || state === "sent"} className="pill min-h-11 rounded-full border border-ink px-5 text-sm font-medium disabled:opacity-50">
+            <button type="button" onClick={() => void resend()} disabled={state === "sending" || state === "sent"} className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-5 text-sm font-medium disabled:opacity-50">
               {state === "sent" ? "Sent. Check your inbox" : state === "sending" ? "Sending" : "Send the link again"}
             </button>
             {state === "failed" && error && <Message text={error} bad />}
@@ -127,7 +128,7 @@ function Password() {
           <p className="text-sm text-muted">At least 10 characters, and not a common password.</p>
         </div>
         {result && <Message text={result.text} bad={result.bad} />}
-        <button type="submit" disabled={busy || !current || !next} className="press min-h-12 self-start rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={busy || !current || !next} className={`${btn.large.primary} self-start`}>
           {busy ? "Saving" : "Change password"}
         </button>
       </form>
@@ -154,7 +155,7 @@ function Sessions() {
       <h2 id="sessions-heading" className="text-[28px] leading-tight font-medium tracking-[-0.02em]">Sign ins</h2>
       <div className="flex max-w-[560px] flex-col items-start gap-4">
         <p className="text-[15px] leading-snug text-muted">Lost a device, or used a shared computer? Sign out everywhere, this browser included, and sign in again.</p>
-        <button type="button" onClick={() => void endAll()} disabled={busy} className="pill min-h-12 rounded-full border border-ink px-6 text-sm font-medium disabled:opacity-50">
+        <button type="button" onClick={() => void endAll()} disabled={busy} className={btn.large.secondary}>
           Sign out everywhere
         </button>
       </div>
@@ -170,7 +171,7 @@ function DeleteAccount() {
       <h2 id="delete-heading" className="text-[28px] leading-tight font-medium tracking-[-0.02em]">Delete account</h2>
       <div className="flex max-w-[560px] flex-col items-start gap-4">
         <p className="text-[15px] leading-snug text-muted">Removes your account, decks, versions, collection and custom art for good. Public decks leave Explore at once. This cannot be undone.</p>
-        <button type="button" onClick={() => setOpen(true)} className="min-h-12 rounded-full border border-danger-line px-6 text-sm font-medium text-danger transition-colors hover:bg-danger/10">
+        <button type="button" onClick={() => setOpen(true)} className={btn.large.danger}>
           Delete my account
         </button>
       </div>
@@ -218,10 +219,10 @@ function DeleteForm({ onClose, onDeleted }: { onClose: () => void; onDeleted: ()
       </div>
       {error && <Message text={error} bad />}
       <div className="flex gap-2.5">
-        <button type="submit" disabled={busy || !password} className="min-h-12 rounded-full bg-danger px-7 text-sm font-bold text-bg disabled:opacity-50">
+        <button type="submit" disabled={busy || !password} className={btn.large.dangerSolid}>
           {busy ? "Deleting" : "Delete everything"}
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Keep my account
         </button>
       </div>

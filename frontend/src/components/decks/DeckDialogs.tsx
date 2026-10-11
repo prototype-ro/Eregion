@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import { plural } from "@/lib/deckfilter";
 import type { DeckSummary } from "@/lib/types";
+import { btn, field } from "@/lib/ui";
 
 interface Props {
   deck: DeckSummary | null;
@@ -53,7 +54,7 @@ function RenameForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
         <label htmlFor="rename-deck" className="text-sm text-muted">
           Deck name
         </label>
-        <input id="rename-deck" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoFocus className="min-h-12 rounded-full border border-line bg-surface px-5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+        <input id="rename-deck" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoFocus className={field.lg} />
       </div>
       {error && (
         <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
@@ -61,10 +62,10 @@ function RenameForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
         </p>
       )}
       <div className="flex gap-2.5">
-        <button type="submit" disabled={busy || unchanged} className="press min-h-12 rounded-full bg-accent px-7 text-sm font-bold text-on-accent disabled:opacity-50">
+        <button type="submit" disabled={busy || unchanged} className={btn.large.primary}>
           Rename
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Cancel
         </button>
       </div>
@@ -109,10 +110,10 @@ function DeleteForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
         </p>
       )}
       <div className="flex gap-2.5">
-        <button type="button" disabled={busy} onClick={() => void remove()} className="min-h-12 rounded-full bg-danger px-7 text-sm font-bold text-bg disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={() => void remove()} className={btn.large.dangerSolid}>
           {busy ? "Deleting" : "Delete deck"}
         </button>
-        <button type="button" onClick={onClose} className="pill min-h-12 rounded-full border border-ink px-7 text-sm font-medium">
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
           Keep it
         </button>
       </div>

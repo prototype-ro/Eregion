@@ -39,13 +39,13 @@ export default function Home() {
           <div className="flex flex-wrap gap-2.5">
             <Link
               href="/register"
-              className="press inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-accent px-7 text-base font-bold text-on-accent"
+              className="press inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center whitespace-nowrap rounded-full bg-accent px-7 text-base font-bold text-on-accent"
             >
               Start a deck
             </Link>
             <Link
               href="/login"
-              className="pill inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-ink px-7 text-base font-medium"
+              className="pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center whitespace-nowrap rounded-full border border-ink px-7 text-base font-medium"
             >
               View demo deck
             </Link>
@@ -159,7 +159,7 @@ export default function Home() {
         </h2>
         <Link
           href="/register"
-          className="press inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-[#0a0a0a] px-8 text-base font-bold text-[#f2f2f0]"
+          className="press inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center whitespace-nowrap rounded-full bg-[#0a0a0a] px-8 text-base font-bold text-[#f2f2f0]"
         >
           Start a deck
         </Link>
