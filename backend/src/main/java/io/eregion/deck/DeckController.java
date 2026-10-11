@@ -40,9 +40,11 @@ import jakarta.validation.Valid;
 public class DeckController {
 
 	private final DeckService service;
+	private final io.eregion.ratelimit.RateLimits limits;
 
-	public DeckController(DeckService service) {
+	public DeckController(DeckService service, io.eregion.ratelimit.RateLimits limits) {
 		this.service = service;
+		this.limits = limits;
 	}
 
 	@GetMapping
@@ -53,6 +55,7 @@ public class DeckController {
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public DeckDetail create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateDeckRequest request) {
+		limits.save(CurrentUser.id(jwt));
 		return service.create(CurrentUser.id(jwt), request);
 	}
 
@@ -75,6 +78,7 @@ public class DeckController {
 	@PostMapping("/{deckId}/duplicate")
 	@ResponseStatus(HttpStatus.CREATED)
 	public DeckDetail duplicate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		limits.save(CurrentUser.id(jwt));
 		return service.duplicate(deckId, CurrentUser.id(jwt));
 	}
 
@@ -95,6 +99,7 @@ public class DeckController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public VersionDetail saveVersion(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId,
 			@Valid @RequestBody SaveVersionRequest request) {
+		limits.save(CurrentUser.id(jwt));
 		return service.saveVersion(deckId, CurrentUser.id(jwt), request);
 	}
 
@@ -122,8 +127,9 @@ public class DeckController {
 
 	/** What merging a branch into main would do, without doing it. */
 	@GetMapping("/{deckId}/branches/{branchId}/merge")
-	public MergePreview mergePreview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID branchId) {
-		return service.mergePreview(deckId, CurrentUser.id(jwt), branchId);
+	public MergePreview mergePreview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID branchId,
+			@RequestParam(required = false) UUID into) {
+		return service.mergePreview(deckId, CurrentUser.id(jwt), branchId, into);
 	}
 
 	@GetMapping("/{deckId}/branches/status")
@@ -141,6 +147,7 @@ public class DeckController {
 	@PostMapping("/{deckId}/merge")
 	@ResponseStatus(HttpStatus.CREATED)
 	public VersionDetail merge(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody MergeRequest request) {
+		limits.save(CurrentUser.id(jwt));
 		return service.merge(deckId, CurrentUser.id(jwt), request);
 	}
 
@@ -154,12 +161,19 @@ public class DeckController {
 	@PutMapping("/{deckId}/versions/{number}")
 	public VersionDetail applyChanges(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number,
 			@Valid @RequestBody ApplyChangesRequest request) {
+		limits.save(CurrentUser.id(jwt));
 		return service.applyChanges(deckId, CurrentUser.id(jwt), number, request);
 	}
 
 	@DeleteMapping("/{deckId}/versions/{number}")
 	public Timeline deleteVersion(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number) {
 		return service.deleteVersion(deckId, CurrentUser.id(jwt), number);
+	}
+
+	/** Undoes the delete of a version, within 30 days. */
+	@PostMapping("/{deckId}/versions/{number}/undo-delete")
+	public Timeline undoDeleteVersion(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable int number) {
+		return service.undoDeleteVersion(deckId, CurrentUser.id(jwt), number);
 	}
 
 	@GetMapping("/{deckId}/versions/{number}")

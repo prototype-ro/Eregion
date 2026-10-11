@@ -268,7 +268,9 @@ public final class DeckDtos {
 			@NotNull Integer expectedSourceVersion,
 			Map<String, String> resolutions,
 			@Size(max = 200) String note,
-			Boolean deleteBranch) {
+			Boolean deleteBranch,
+			/** The branch that receives the merge. Left out, it is main. */
+			UUID targetBranchId) {
 	}
 
 	// ---- card history and branch status ----

@@ -68,6 +68,11 @@ public class RateLimits {
 		check("public:" + ip(request), properties.publicReadPerIpMinute(), MINUTE, "page loads");
 	}
 
+	/** Saving a version, merging or copying a deck: each one writes a whole card list. */
+	public void save(UUID user) {
+		check("save:" + user, properties.savePerUserMinute(), MINUTE, "saves");
+	}
+
 	public void report(UUID user) {
 		check("report:" + user, properties.reportPerUserHour(), HOUR, "reports");
 	}

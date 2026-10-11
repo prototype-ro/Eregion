@@ -44,7 +44,7 @@ public class ExploreRepository {
 			                  WHERE dc.version_id = v.id AND dc.board = 'commander'), '') AS color_identity,
 			       COALESCE((SELECT SUM(dc.quantity) FROM deck_version_cards dc
 			                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS card_count,
-			       COALESCE((SELECT SUM(COALESCE(c.price_usd, 0) * dc.quantity) FROM deck_version_cards dc
+			       COALESCE((SELECT SUM(COALESCE(dc.price_usd, c.price_usd, 0) * dc.quantity) FROM deck_version_cards dc
 			                   JOIN cards c ON c.id = dc.card_id
 			                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS price
 			  FROM decks d

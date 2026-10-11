@@ -38,6 +38,15 @@ public class DeckRepository {
 	public record BranchRow(UUID id, String name, Integer forkedFromVersion, boolean main) {
 	}
 
+	/** A deleted version kept for a while so the delete can be undone, with what was moved onto its parent. */
+	public record TrashRow(UUID id, int number, UUID branchId, String branchName, UUID branchForkedFromId, boolean branchRemoved,
+			UUID parentId, UUID mergeParentId, String note, Instant createdAt, List<UUID> movedChildren,
+			List<UUID> movedMergeChildren, List<UUID> movedBranches) {
+	}
+
+	private static final int TRASH_DAYS = 30;
+	private static final int TRASH_PER_DECK = 20;
+
 	private static final String VERSION_SELECT = """
 			SELECT v.id, v.version_number, v.note, v.created_at, v.branch_id, b.name AS branch_name,
 			       v.parent_version_id, b.is_main,
@@ -106,7 +115,7 @@ public class DeckRepository {
 				       (SELECT COUNT(*) FROM deck_branches y WHERE y.deck_id = d.id) AS branch_count,
 				       COALESCE((SELECT SUM(dc.quantity) FROM deck_version_cards dc
 				                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS card_count,
-				       COALESCE((SELECT SUM(COALESCE(CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END, 0) * dc.quantity)
+				       COALESCE((SELECT SUM(COALESCE(dc.price_usd, CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END, 0) * dc.quantity)
 				                   FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
 				                   LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
 				                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS price,
@@ -257,6 +266,10 @@ public class DeckRepository {
 				.optional();
 	}
 
+	public int deckCount(UUID ownerId) {
+		return jdbc.sql("SELECT COUNT(*) FROM decks WHERE owner_id = :owner").param("owner", ownerId).query(Integer.class).single();
+	}
+
 	public int versionCount(UUID deckId) {
 		return jdbc.sql("SELECT COUNT(*) FROM deck_versions WHERE deck_id = :deck").param("deck", deckId).query(Integer.class).single();
 	}
@@ -286,6 +299,104 @@ public class DeckRepository {
 		jdbc.sql("UPDATE deck_branches SET forked_from_version_id = :parent WHERE forked_from_version_id = :v")
 				.param("parent", parentId).param("v", versionId).update();
 		jdbc.sql("DELETE FROM deck_versions WHERE id = :v").param("v", versionId).update();
+	}
+
+	/** Keeps a copy of a version, its cards and what hangs off it, just before it is deleted. */
+	public void trashVersion(UUID deckId, UUID versionId, boolean branchRemoved) {
+		jdbc.sql("""
+				INSERT INTO trashed_versions (id, deck_id, version_number, branch_id, branch_name, branch_forked_from_id, branch_removed,
+				                              parent_version_id, merge_parent_version_id, note, created_at,
+				                              moved_children, moved_merge_children, moved_branches, cards)
+				SELECT v.id, v.deck_id, v.version_number, v.branch_id, b.name, b.forked_from_version_id, :removed,
+				       v.parent_version_id, v.merge_parent_version_id, v.note, v.created_at,
+				       ARRAY(SELECT id FROM deck_versions WHERE parent_version_id = v.id),
+				       ARRAY(SELECT id FROM deck_versions WHERE merge_parent_version_id = v.id),
+				       ARRAY(SELECT id FROM deck_branches WHERE forked_from_version_id = v.id),
+				       COALESCE((SELECT jsonb_agg(to_jsonb(dc) - 'version_id') FROM deck_version_cards dc WHERE dc.version_id = v.id), '[]'::jsonb)
+				  FROM deck_versions v JOIN deck_branches b ON b.id = v.branch_id
+				 WHERE v.id = :id AND v.deck_id = :deck
+				""").param("removed", branchRemoved).param("id", versionId).param("deck", deckId).update();
+		// Old and surplus copies go, so the trash cannot grow without bound.
+		jdbc.sql("DELETE FROM trashed_versions WHERE deck_id = :deck AND trashed_at < now() - make_interval(days => :days)")
+				.param("deck", deckId).param("days", TRASH_DAYS).update();
+		jdbc.sql("""
+				DELETE FROM trashed_versions WHERE deck_id = :deck AND id NOT IN
+				    (SELECT id FROM trashed_versions WHERE deck_id = :deck ORDER BY trashed_at DESC LIMIT :keep)
+				""").param("deck", deckId).param("keep", TRASH_PER_DECK).update();
+	}
+
+	public Optional<TrashRow> findTrashed(UUID deckId, int number) {
+		return jdbc.sql("""
+				SELECT id, version_number, branch_id, branch_name, branch_forked_from_id, branch_removed, parent_version_id,
+				       merge_parent_version_id, note, created_at, moved_children, moved_merge_children, moved_branches
+				  FROM trashed_versions
+				 WHERE deck_id = :deck AND version_number = :n AND trashed_at > now() - make_interval(days => :days)
+				""").param("deck", deckId).param("n", number).param("days", TRASH_DAYS)
+				.query((rs, n) -> new TrashRow(rs.getObject("id", UUID.class), rs.getInt("version_number"),
+						rs.getObject("branch_id", UUID.class), rs.getString("branch_name"), rs.getObject("branch_forked_from_id", UUID.class),
+						rs.getBoolean("branch_removed"), rs.getObject("parent_version_id", UUID.class),
+						rs.getObject("merge_parent_version_id", UUID.class), rs.getString("note"), rs.getTimestamp("created_at").toInstant(),
+						uuids(rs, "moved_children"), uuids(rs, "moved_merge_children"), uuids(rs, "moved_branches")))
+				.optional();
+	}
+
+	private static List<UUID> uuids(ResultSet rs, String column) throws SQLException {
+		return java.util.Arrays.asList((UUID[]) rs.getArray(column).getArray());
+	}
+
+	public boolean versionExists(UUID versionId) {
+		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM deck_versions WHERE id = :id)").param("id", versionId).query(Boolean.class).single();
+	}
+
+	public boolean branchExists(UUID branchId) {
+		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM deck_branches WHERE id = :id)").param("id", branchId).query(Boolean.class).single();
+	}
+
+	/**
+	 * Puts a trashed version back as it was: same number, same cards, and every version or branch that was moved
+	 * onto its parent moves back onto it. Throws DuplicateKeyException when the line has grown past the parent since.
+	 */
+	public void restoreVersion(UUID deckId, TrashRow row) {
+		if (row.branchRemoved()) {
+			boolean forkExists = row.branchForkedFromId() != null && versionExists(row.branchForkedFromId());
+			jdbc.sql("INSERT INTO deck_branches (id, deck_id, name, forked_from_version_id) VALUES (:id, :deck, :name, :fork)")
+					.param("id", row.branchId()).param("deck", deckId).param("name", row.branchName())
+					.param("fork", forkExists ? row.branchForkedFromId() : null).update();
+		}
+		UUID mergeParent = row.mergeParentId() != null && versionExists(row.mergeParentId()) ? row.mergeParentId() : null;
+		jdbc.sql("""
+				INSERT INTO deck_versions (id, deck_id, version_number, note, created_at, branch_id, parent_version_id, merge_parent_version_id)
+				VALUES (:id, :deck, :n, :note, :created, :branch, NULL, :merge)
+				""").param("id", row.id()).param("deck", deckId).param("n", row.number()).param("note", row.note())
+				.param("created", java.sql.Timestamp.from(row.createdAt())).param("branch", row.branchId()).param("merge", mergeParent).update();
+		for (UUID child : row.movedChildren()) {
+			jdbc.sql("UPDATE deck_versions SET parent_version_id = :id WHERE id = :child AND parent_version_id IS NOT DISTINCT FROM :parent")
+					.param("id", row.id()).param("child", child).param("parent", row.parentId()).update();
+		}
+		for (UUID child : row.movedMergeChildren()) {
+			jdbc.sql("UPDATE deck_versions SET merge_parent_version_id = :id WHERE id = :child AND merge_parent_version_id IS NOT DISTINCT FROM :parent")
+					.param("id", row.id()).param("child", child).param("parent", row.parentId()).update();
+		}
+		for (UUID branch : row.movedBranches()) {
+			jdbc.sql("UPDATE deck_branches SET forked_from_version_id = :id WHERE id = :branch AND forked_from_version_id IS NOT DISTINCT FROM :parent")
+					.param("id", row.id()).param("branch", branch).param("parent", row.parentId()).update();
+		}
+		jdbc.sql("UPDATE deck_versions SET parent_version_id = :parent WHERE id = :id")
+				.param("parent", row.parentId()).param("id", row.id()).update();
+		jdbc.sql("""
+				INSERT INTO deck_version_cards (version_id, card_id, board, quantity, printing_id, tags, custom_printing_id, price_usd)
+				SELECT :id, (e->>'card_id')::uuid, e->>'board', (e->>'quantity')::int,
+				       -- Art or a printing removed since the delete comes back as the card's default instead of failing.
+				       CASE WHEN EXISTS (SELECT 1 FROM card_printings pr WHERE pr.scryfall_id = (e->>'printing_id')::uuid)
+				            THEN (e->>'printing_id')::uuid END,
+				       ARRAY(SELECT jsonb_array_elements_text(COALESCE(e->'tags', '[]'::jsonb))),
+				       CASE WHEN EXISTS (SELECT 1 FROM custom_printings cp WHERE cp.id = (e->>'custom_printing_id')::uuid)
+				            THEN (e->>'custom_printing_id')::uuid END,
+				       (e->>'price_usd')::numeric
+				  FROM trashed_versions t, jsonb_array_elements(t.cards) e
+				 WHERE t.id = :id
+				""").param("id", row.id()).update();
+		jdbc.sql("DELETE FROM trashed_versions WHERE id = :id").param("id", row.id()).update();
 	}
 
 	/** True when another version, a merge or a branch starts from this version, so changing it would rewrite what they grew from. */
@@ -465,6 +576,18 @@ public class DeckRepository {
 						return cards.size();
 					}
 				});
+		// Freeze today's price on each line, so this version keeps its cost as the market moves.
+		jdbc.sql("""
+				UPDATE deck_version_cards dc
+				   SET price_usd = (SELECT CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END
+				                      FROM cards c LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
+				                     WHERE c.id = dc.card_id)
+				 WHERE dc.version_id = :version
+				""").param("version", versionId).update();
+	}
+
+	public Optional<VersionRow> findVersionById(UUID versionId) {
+		return jdbc.sql(VERSION_SELECT + " WHERE v.id = :id").param("id", versionId).query(DeckRepository::mapVersion).optional();
 	}
 
 	public Optional<VersionRow> findVersion(UUID deckId, int number) {
@@ -548,7 +671,7 @@ public class DeckRepository {
 				       CASE WHEN cp.id IS NOT NULL THEN 'custom' ELSE COALESCE(p.set_code, c.set_code) END AS set_code,
 				       CASE WHEN cp.id IS NOT NULL THEN cp.label ELSE COALESCE(p.set_name, c.set_name) END AS set_name,
 				       CASE WHEN cp.id IS NOT NULL THEN '' ELSE COALESCE(p.collector_number, c.collector_number) END AS collector_number,
-				       CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END AS price_usd,
+				       COALESCE(dc.price_usd, CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END) AS price_usd,
 				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned, dc.tags
 				  FROM deck_version_cards dc
 				  JOIN cards c ON c.id = dc.card_id
