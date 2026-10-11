@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timeline energy demo, shader</title>
+<style>
+  :root { color-scheme: dark; --bg:#0a0a0a; --surface:#141414; --line:#2a2a2a; --ink:#f2f2f0; --muted:#8d8d88; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui, sans-serif; padding:24px 16px 48px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { font-size:20px; font-weight:600; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 18px; max-width:74ch; }
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:28px; padding:18px 18px 8px; position:relative; overflow:hidden; }
+  .panel h2 { margin:0 0 6px; font-size:17px; font-weight:500; position:relative; z-index:2; }
+  .stage { position:relative; margin:0 -18px -8px; }
+  .stage canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; mix-blend-mode:screen; }
+  .stage .inner { position:relative; padding:0 18px 8px; }
+  .stage svg { display:block; width:100%; height:auto; overflow:visible; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 14px; margin:16px 0 0; align-items:center; font-size:14px; }
+  .controls .group { color:var(--muted); width:100%; margin-top:6px; font-size:13px; }
+  label.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; user-select:none; }
+  label.chip:has(input:checked) { border-color:#7fd6ff; color:#fff; background:rgba(127,214,255,.08); }
+  label.chip input { accent-color:#7fd6ff; margin:0; }
+  button.act { font:inherit; color:#fff; background:#0b4e66; border:0; border-radius:999px; padding:8px 16px; cursor:pointer; }
+  input[type=range] { accent-color:#7fd6ff; width:120px; }
+  .hint { color:var(--muted); font-size:13px; margin-top:12px; }
+  .pill { font:12px system-ui; fill:#cfcfca; }
+  .ver { font:11px ui-monospace, monospace; fill:#8d8d88; }
+  #fps { font:12px ui-monospace, monospace; color:var(--muted); margin-left:auto; }
+  #nogl { display:none; color:#ff9b9b; }
+  a { color:#7fd6ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Timeline energy: continuous light, no particles</h1>
+  <p class="sub">The lines themselves carry the energy. A shader paints a hot core, a smooth falloff and slow waves of brightness that travel along each strand, and the light spills onto the dot grid around it. Click a dot or a branch name, hover a dot, or press "Simulate save". Compare with the <a href="lines2.html">particle version</a>.</p>
+
+  <div class="panel">
+    <h2>Versions</h2>
+    <div class="stage" id="stage">
+      <canvas id="c"></canvas>
+      <div class="inner"><svg id="s" viewBox="0 0 1120 420" role="img" aria-label="Demo timeline"></svg></div>
+    </div>
+  </div>
+  <p id="nogl">WebGL is not available in this browser, so the shader cannot run.</p>
+
+  <div class="controls">
+    <div class="group">Layers</div>
+    <label class="chip"><input type="checkbox" id="flow" checked> flowing energy</label>
+    <label class="chip"><input type="checkbox" id="bloom" checked> bloom</label>
+    <label class="chip"><input type="checkbox" id="spill" checked> light on the grid</label>
+    <label class="chip"><input type="checkbox" id="wave" checked> ripples and surge</label>
+    <label class="chip"><input type="checkbox" id="hover" checked> hover light</label>
+    <button class="act" id="save" type="button">Simulate save</button>
+    <div class="group">Look</div>
+    <label class="chip"><input type="radio" name="pal" value="0" checked> full rainbow</label>
+    <label class="chip"><input type="radio" name="pal" value="1"> neon band</label>
+    <label class="chip"><input type="checkbox" id="every"> every lane alive</label>
+    <label class="chip"><input type="checkbox" id="calm"> reduced motion</label>
+    <label>flow speed <input type="range" id="speed" min="10" max="300" value="100"></label>
+    <label>glow <input type="range" id="glowAmt" min="20" max="220" value="100"></label>
+    <span id="fps"></span>
+  </div>
+  <p class="hint">"Reduced motion" keeps the colour and glow but stops the waves. The shader runs once per pixel on the graphics card, so the cost does not grow with the number of branches.</p>
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const W = 1120, H = 420, GUT = 150, STEP = 78, LANE = 84, TOP = 62, PAD = 18;
+const el = (name, attrs = {}, parent) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+
+const branches = [
+  { id: "main",   name: "main",   lane: 0, v: [1, 2, 3, 4, 5, 9, 10, 12] },
+  { id: "etb",    name: "etb",    lane: 1, v: [6, 7], from: 2 },
+  { id: "tokens", name: "tokens", lane: 2, v: [8, 11], from: 4 },
+  { id: "combo",  name: "combo",  lane: 3, v: [13], from: 7 },
+];
+const nodes = new Map();
+branches.forEach((b) => b.v.forEach((n) => nodes.set(n, { n, b, x: GUT + (n - 1) * STEP, y: TOP + b.lane * LANE, birth: 1 })));
+const edges = [];
+branches.forEach((b) => b.v.forEach((n, i) => {
+  const parent = i === 0 ? (b.from ? nodes.get(b.from) : null) : nodes.get(b.v[i - 1]);
+  if (parent) edges.push({ from: parent, to: nodes.get(n), kind: i === 0 && b.from ? "fork" : "line", branch: b });
+}));
+edges.push({ from: nodes.get(11), to: nodes.get(12), kind: "merge", branch: nodes.get(11).b });
+
+const run = (a, b) => Math.min(Math.max(b.x - a.x, 0), Math.max(44, Math.abs(b.y - a.y) * 0.9));
+function d(e) {
+  const a = e.from, b = e.to;
+  if (a.y === b.y) return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+  const r = run(a, b);
+  if (e.kind === "merge") return `M ${a.x} ${a.y} L ${b.x - r} ${a.y} C ${b.x - r * .5} ${a.y}, ${b.x - r * .5} ${b.y}, ${b.x} ${b.y}`;
+  return `M ${a.x} ${a.y} C ${a.x + r * .5} ${a.y}, ${a.x + r * .5} ${b.y}, ${a.x + r} ${b.y} L ${b.x} ${b.y}`;
+}
+
+const state = { pal: 0, every: false, calm: false, flow: true, bloom: true, spill: true, wave: true, hover: true, speed: 1, glow: 1 };
+const open = { branch: "etb", version: 7 };
+const color = (h, l = 62, a = 1) => `hsl(${((h % 360) + 360) % 360} 96% ${l}% / ${a})`;
+const norm = (v) => ((v % 1) + 1) % 1;
+const hueAt = (t) => (state.pal === 0 ? t * 300 : 185 + t * 135);
+let phase = 0;
+const uOfX = (x) => (x - GUT) / (W - GUT);
+const hueOfX = (x) => hueAt(norm(uOfX(x) + phase));
+
+/* ---------- SVG: only the clickable dots, the labels and the pills. The lines belong to the shader. ---------- */
+const svg = document.getElementById("s");
+const defs = el("defs", {}, svg);
+const lineG = el("g", {}, svg); // fallback lines, shown only when WebGL is missing
+const nodeG = el("g", {}, svg);
+const labelG = el("g", {}, svg);
+const grad = el("linearGradient", { id: "gt", gradientUnits: "userSpaceOnUse", x1: GUT, x2: W - 40, y1: 0, y2: 0 }, defs);
+const stops = Array.from({ length: 12 }, (_, i) => el("stop", { offset: i / 11, "stop-color": color(hueAt(i / 11)) }, grad));
+const fallback = edges.map((e) => el("path", { d: d(e), fill: "none", stroke: "url(#gt)", "stroke-width": 2.6, "stroke-linecap": "round", ...(e.kind === "merge" ? { "stroke-dasharray": "2 8" } : {}) }, lineG));
+nodes.forEach((nd) => {
+  nd.dot = el("circle", { cx: nd.x, cy: nd.y, r: 7, fill: "#0a0a0a", "stroke-width": 2.2, style: "cursor:pointer" }, nodeG);
+  const t = el("text", { x: nd.x, y: nd.y + 26, "text-anchor": "middle", class: "ver" }, labelG); t.textContent = "v" + nd.n;
+  nd.dot.addEventListener("click", () => openVersion(nd));
+});
+const pills = branches.map((b) => {
+  const g = el("g", { style: "cursor:pointer" }, labelG);
+  const w = b.name.length * 7 + 26;
+  const rect = el("rect", { x: 10, y: TOP + b.lane * LANE - 13, width: w, height: 26, rx: 13, fill: "#141414", "stroke-width": 1.2 }, g);
+  const t = el("text", { x: 10 + w / 2, y: TOP + b.lane * LANE + 4, "text-anchor": "middle", class: "pill" }, g); t.textContent = b.name;
+  g.addEventListener("click", () => openVersion(nodes.get(b.v[b.v.length - 1])));
+  return { b, rect };
+});
+
+/* ---------- The line map the shader reads: coverage in alpha, "is live" in red, position in time in green ---------- */
+const MS = 1.8, TEXW = 2048, TEXH = 1024; // a power-of-two texture, so the graphics card can build mipmaps from it
+const map = document.createElement("canvas"); map.width = TEXW; map.height = TEXH;
+const mctx = map.getContext("2d");
+const shapes = edges.map((e) => new Path2D(d(e)));
+const liveSet = () => (state.every ? new Set(edges.map((_, i) => i)) : new Set(edges.map((e, i) => (e.branch.id === open.branch || (e.kind === "merge" && e.to.b.id === open.branch) ? i : -1)).filter((i) => i >= 0)));
+function paintMap(live) {
+  mctx.setTransform(MS, 0, 0, MS, 0, 0); mctx.clearRect(0, 0, W, H); mctx.lineCap = "round"; mctx.lineJoin = "round";
+  const order = edges.map((_, i) => i).sort((a, b) => Number(live.has(a)) - Number(live.has(b))); // live lines on top at crossings
+  for (const i of order) {
+    const e = edges[i], on = live.has(i) ? 255 : 0;
+    const g = mctx.createLinearGradient(e.from.x, 0, Math.max(e.to.x, e.from.x + 1), 0);
+    g.addColorStop(0, `rgb(${on},${Math.round(uOfX(e.from.x) * 255)},0)`); g.addColorStop(1, `rgb(${on},${Math.round(uOfX(e.to.x) * 255)},0)`);
+    mctx.strokeStyle = g; mctx.lineWidth = live.has(i) ? 3.2 : 2.2;
+    mctx.setLineDash(e.kind === "merge" ? [2, 8] : []); mctx.stroke(shapes[i]);
+  }
+}
+
+/* ---------- WebGL 2 ---------- */
+const stage = document.getElementById("stage"), cv = document.getElementById("c");
+const gl = cv.getContext("webgl2", { antialias: false, alpha: false });
+const U = {};
+let blurProg = null, mainProg = null, mapTex = null, levels = [];
+if (!gl) { document.getElementById("nogl").style.display = "block"; }
+else {
+  lineG.style.display = "none";
+  const floatOK = !!gl.getExtension("EXT_color_buffer_float");
+  const vs = `#version 300 es
+out vec2 vUv;
+void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); vUv = p; gl_Position = vec4(p * 2. - 1., 0., 1.); }`;
+
+  // A separable gaussian. It reads the line map at a matching mip level, so even a thin line is averaged over its whole footprint first.
+  const blurFs = `#version 300 es
+precision highp float;
+uniform sampler2D uSrc; uniform vec2 uDir, uOut; uniform float uSigma, uLod;
+out vec4 o;
+void main(){
+  vec2 uv = gl_FragCoord.xy / uOut;
+  vec4 sum = vec4(0.); float tot = 0.;
+  for (int i = -18; i <= 18; i++){
+    float w = exp(-float(i * i) / (2. * uSigma * uSigma));
+    sum += textureLod(uSrc, uv + uDir * float(i), uLod) * w; tot += w;
+  }
+  o = sum / tot;
+}`;
+
+  const mainFs = `#version 300 es
+precision highp float;
+uniform sampler2D uMap, uB0, uB1, uB2;
+uniform vec2 uView, uOff, uPx, uTex;
+uniform float uScale, uDpr, uTime, uPhase, uPal, uFlow, uGlow, uSpill, uEvery, uCalm, uBloom, uFlowOn, uSurgeOn;
+uniform vec4 uRip[6];
+uniform vec3 uHover, uSurge;
+out vec4 o;
+
+vec3 hsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); return v*mix(vec3(1.),k,s); }
+float hueFor(float u){ float t = fract(u + uPhase); return uPal < .5 ? t*300./360. : (185. + t*135.)/360.; }
+float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hsh(i), hsh(i+vec2(1.,0.)), f.x), mix(hsh(i+vec2(0.,1.)), hsh(i+vec2(1.,1.)), f.x), f.y); }
+float fbm(vec2 p){ float a = .5, s = 0.; for(int i=0;i<4;i++){ s += a*vn(p); p *= 2.03; a *= .5; } return s; }
+
+void main(){
+  vec2 pxc = vec2(gl_FragCoord.x, uPx.y - gl_FragCoord.y) / uDpr;
+  vec2 p = (pxc - uOff) / uScale;
+  vec2 uv = p * uTex;
+
+  vec4 m0 = texture(uMap, uv);                         // the crisp line, premultiplied
+  vec4 halo = texture(uB0, uv) * .9 + texture(uB1, uv) * 1.5 + texture(uB2, uv) * 2.4;   // three gaussian blurs of it, narrow to wide
+  vec2 ul = m0.a > .02 ? vec2(m0.g, m0.r) / m0.a : vec2(halo.g, halo.r) / max(halo.a, 1e-5);
+  float live = mix(ul.y, 1., uEvery);
+  float L = mix(.3, 1., live);
+
+  float t = uTime * uFlow;
+  // The core carries the fast ripples. The halo only swells very slowly and over long distances, so it has no visible shapes of its own.
+  float n  = fbm(vec2(p.x * .010 - t * .55, p.y * .016 + t * .04));
+  float n2 = vn(vec2(p.x * .042 - t * 1.7, p.y * .05 + t * .1));
+  float energy = .55 + .95 * n + 1.5 * pow(n2, 3.);
+  float flow = mix(1., energy, live * uFlowOn * (1. - uCalm));
+  float swell = mix(1., .8 + .4 * vn(vec2(p.x * .0035 - t * .12, p.y * .002)) + .08 * sin(uTime * 1.6), live * uFlowOn * (1. - uCalm));
+
+  float glow = halo.a * uBloom * swell;
+  vec3 rgb = hsv(hueFor(ul.x), .88, 1.);
+  float core = m0.a;
+  float twist = .5 + .5 * sin(p.x * .52 - t * 2.4 + sin(p.y * .09) * 2.);
+  float twist2 = .5 + .5 * sin(p.x * .52 - t * 2.4 + 3.14159 + sin(p.y * .09) * 2.);
+  float filament = mix(1., .78 + .45 * max(twist, twist2), live * (1. - uCalm));
+  vec3 col = rgb * (core * L * flow * filament + glow * uGlow * L * .8);
+  col += vec3(1.) * pow(core, 1.6) * L * live * flow * .46;
+
+  vec2 g = mod(pxc, 18.) - 9.;
+  float dotm = smoothstep(1.9, .5, length(g));
+  vec2 e = min(pxc, uPx / uDpr - pxc);
+  float edge = smoothstep(0., 56., min(e.x, e.y));
+  col += vec3(.95) * dotm * .12 * edge;
+  col += rgb * dotm * glow * uGlow * L * uSpill * 2.6;
+
+  for (int i = 0; i < 6; i++){
+    vec4 r = uRip[i];
+    if (r.z > 0.){
+      float age = uTime - r.z;
+      if (age > 0. && age < 1.8){
+        float dd = length(p - r.xy) - age * 120.;
+        float wd = 6. + age * 14.;
+        col += hsv(hueFor(r.w), .85, 1.) * exp(-dd*dd / (2.*wd*wd)) * exp(-age * 2.3) * .95;
+      }
+    }
+  }
+  if (uSurgeOn > .5){
+    float age = uTime - uSurge.z;
+    float fx = mix(uSurge.x, uSurge.y, clamp(age / .8, 0., 1.));
+    float band = exp(-pow((p.x - fx) / 30., 2.)) * (1. - smoothstep(.7, 1.3, age));
+    col += rgb * band * (core * 3. + glow * 1.6 + dotm * glow * 2.) * live;
+  }
+  if (uHover.z > .01){
+    float dh = length(p - uHover.xy);
+    col += hsv(hueFor(uHover.x / 1120.), .8, 1.) * exp(-dh*dh / 1100.) * uHover.z * .5;
+  }
+  col = vec3(1.) - exp(-col * 1.25);
+  col += (hsh(gl_FragCoord.xy + uTime) - .5) / 255.;      // a hair of noise so smooth gradients cannot show 8-bit steps
+  o = vec4(col, 1.);
+}`;
+  const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(x)); return x; };
+  const prog = (f) => { const q = gl.createProgram(); gl.attachShader(q, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(q, sh(gl.FRAGMENT_SHADER, f)); gl.linkProgram(q); if (!gl.getProgramParameter(q, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(q)); return q; };
+  blurProg = prog(blurFs); mainProg = prog(mainFs);
+  gl.useProgram(mainProg);
+  for (const n of ["uMap", "uB0", "uB1", "uB2", "uTex", "uView", "uOff", "uPx", "uScale", "uDpr", "uTime", "uPhase", "uPal", "uFlow", "uGlow", "uSpill", "uEvery", "uCalm", "uBloom", "uFlowOn", "uSurgeOn", "uRip", "uHover", "uSurge"]) U[n] = gl.getUniformLocation(mainProg, n);
+  const BU = {}; for (const n of ["uSrc", "uDir", "uOut", "uSigma", "uLod"]) BU[n] = gl.getUniformLocation(blurProg, n);
+  gl.bindVertexArray(gl.createVertexArray());
+
+  const target = (w, h) => {
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, floatOK ? gl.RGBA16F : gl.RGBA8, w, h, 0, gl.RGBA, floatOK ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    return { t, f, w, h };
+  };
+  // ratio of the map, blur width in output texels: about 4, 11 and 27 units of the diagram.
+  levels = [[2, 4], [4, 5], [8, 6]].map(([ratio, sigma]) => ({ ratio, sigma, a: target(TEXW / ratio, TEXH / ratio), b: target(TEXW / ratio, TEXH / ratio) }));
+
+  mapTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, mapTex);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+
+  // Runs only when the lines change, not every frame: upload the map, then blur it into the three halo textures.
+  window.__uploadMap = () => {
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.bindTexture(gl.TEXTURE_2D, mapTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, map); gl.generateMipmap(gl.TEXTURE_2D);
+    gl.useProgram(blurProg); gl.activeTexture(gl.TEXTURE0); gl.uniform1i(BU.uSrc, 0);
+    for (const lv of levels) {
+      gl.viewport(0, 0, lv.a.w, lv.a.h); gl.uniform2f(BU.uOut, lv.a.w, lv.a.h); gl.uniform1f(BU.uSigma, lv.sigma);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, lv.a.f); gl.bindTexture(gl.TEXTURE_2D, mapTex);
+      gl.uniform2f(BU.uDir, 1 / lv.a.w, 0); gl.uniform1f(BU.uLod, Math.log2(lv.ratio)); gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, lv.b.f); gl.bindTexture(gl.TEXTURE_2D, lv.a.t);
+      gl.uniform2f(BU.uDir, 0, 1 / lv.a.h); gl.uniform1f(BU.uLod, 0); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height); gl.useProgram(mainProg);
+  };
+}
+
+let dpr = 1, scale = 1, offX = 0, offY = 0;
+function fit() {
+  dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const sr = stage.getBoundingClientRect(), vr = svg.getBoundingClientRect();
+  cv.width = Math.round(sr.width * dpr); cv.height = Math.round(sr.height * dpr);
+  scale = vr.width / W; offX = vr.left - sr.left; offY = vr.top - sr.top;
+  if (gl) gl.viewport(0, 0, cv.width, cv.height);
+}
+new ResizeObserver(fit).observe(stage); fit();
+
+/* ---------- Events ---------- */
+const ripples = []; // x, y, startTime, u
+let surge = null, hov = { x: 0, y: 0, a: 0, target: 0 }, clock = 0, hoveredNode = null;
+function ripple(x, y) { ripples.push([x, y, clock, uOfX(x)]); if (ripples.length > 6) ripples.shift(); }
+function openVersion(nd) {
+  const from = nodes.get(open.version);
+  open.branch = nd.b.id; open.version = nd.n; dirty = true;
+  if (state.calm || !state.wave) return;
+  ripple(nd.x, nd.y);
+  surge = { x0: from ? from.x : nd.x - 120, x1: nd.x, t: clock };
+}
+document.getElementById("save").addEventListener("click", () => {
+  const last = Math.max(...[...nodes.values()].filter((n) => n.b.id === open.branch).map((n) => n.n)), nd = nodes.get(last);
+  nd.birth = -1;
+  const inc = edges.find((e) => e.to === nd);
+  surge = { x0: inc ? inc.from.x : nd.x - 120, x1: nd.x, t: clock };
+  setTimeout(() => { nd.birth = 0; ripple(nd.x, nd.y); setTimeout(() => ripple(nd.x, nd.y), 140); }, 700);
+});
+svg.addEventListener("pointermove", (ev) => {
+  const r = svg.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * W, y = ((ev.clientY - r.top) / r.height) * H;
+  let best = null, bd = 26; nodes.forEach((nd) => { const dd = Math.hypot(nd.x - x, nd.y - y); if (dd < bd) { bd = dd; best = nd; } });
+  hoveredNode = best; if (best) { hov.x = best.x; hov.y = best.y; }
+});
+svg.addEventListener("pointerleave", () => (hoveredNode = null));
+
+for (const k of ["flow", "bloom", "spill", "wave", "hover", "every", "calm"]) document.getElementById(k).addEventListener("change", (ev) => { state[k] = ev.target.checked; if (k === "every") dirty = true; });
+document.getElementById("speed").addEventListener("input", (ev) => (state.speed = +ev.target.value / 100));
+document.getElementById("glowAmt").addEventListener("input", (ev) => (state.glow = +ev.target.value / 100));
+document.querySelectorAll("input[name=pal]").forEach((r) => r.addEventListener("change", () => r.checked && (state.pal = +r.value)));
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) { state.calm = true; document.getElementById("calm").checked = true; }
+
+let dirty = true, visible = true, last = performance.now(), frames = 0, fpsT = 0;
+new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe(stage);
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!visible || document.hidden) { last = now; return; }
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!state.calm) { clock += dt; phase = (clock * 0.035) % 1; }
+  frames++; fpsT += dt; if (fpsT > 1) { document.getElementById("fps").textContent = Math.round(frames / fpsT) + " fps"; frames = 0; fpsT = 0; }
+
+  nodes.forEach((nd) => {
+    if (nd.birth >= 0 && nd.birth < 1) nd.birth = Math.min(1, nd.birth + dt * 2.4);
+    const isOpen = nd.n === open.version, h = hueOfX(nd.x);
+    nd.dot.setAttribute("stroke", color(h)); nd.dot.setAttribute("fill", isOpen ? color(h) : "#0a0a0a");
+    nd.dot.setAttribute("r", nd.birth < 0 ? 0 : (isOpen ? 9 : 7) * (0.4 + 0.6 * nd.birth + 0.35 * Math.sin(nd.birth * Math.PI)));
+  });
+  pills.forEach(({ b, rect }) => { const c = color(hueOfX(GUT + 60) + b.lane * 38); rect.setAttribute("stroke", b.id === open.branch ? c : "#34343a"); rect.style.filter = b.id === open.branch ? `drop-shadow(0 0 7px ${color(hueOfX(GUT + 60) + b.lane * 38, 60, 0.7)})` : "none"; });
+
+  if (!gl) { stops.forEach((s, i) => s.setAttribute("stop-color", color(hueAt(norm(i / 11 + phase))))); lineG.style.display = ""; return; }
+  if (dirty) { paintMap(liveSet()); window.__uploadMap(); dirty = false; }
+  gl.useProgram(mainProg);
+
+  hov.target = state.hover && hoveredNode && !state.calm ? 1 : 0; hov.a += (hov.target - hov.a) * Math.min(1, dt * 9);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mapTex); gl.uniform1i(U.uMap, 0);
+  levels.forEach((lv, i) => { gl.activeTexture(gl.TEXTURE1 + i); gl.bindTexture(gl.TEXTURE_2D, lv.b.t); gl.uniform1i(U["uB" + i], 1 + i); });
+  gl.activeTexture(gl.TEXTURE0);
+  gl.uniform2f(U.uView, W, H); gl.uniform2f(U.uTex, MS / TEXW, MS / TEXH); gl.uniform2f(U.uOff, offX, offY); gl.uniform2f(U.uPx, cv.width, cv.height);
+  gl.uniform1f(U.uScale, scale); gl.uniform1f(U.uDpr, dpr); gl.uniform1f(U.uTime, clock); gl.uniform1f(U.uPhase, phase); gl.uniform1f(U.uPal, state.pal);
+  gl.uniform1f(U.uFlow, state.speed); gl.uniform1f(U.uGlow, state.glow); gl.uniform1f(U.uSpill, state.spill ? 1 : 0); gl.uniform1f(U.uEvery, state.every ? 1 : 0);
+  gl.uniform1f(U.uCalm, state.calm ? 1 : 0); gl.uniform1f(U.uBloom, state.bloom ? 1 : 0.35); gl.uniform1f(U.uFlowOn, state.flow ? 1 : 0);
+  const rip = new Float32Array(24); ripples.forEach((r, i) => rip.set(r, i * 4)); gl.uniform4fv(U.uRip, rip);
+  gl.uniform3f(U.uHover, hov.x, hov.y, hov.a);
+  const s = surge && state.wave && !state.calm && clock - surge.t < 1.4 ? surge : null;
+  gl.uniform1f(U.uSurgeOn, s ? 1 : 0); gl.uniform3f(U.uSurge, s ? s.x0 : 0, s ? s.x1 : 0, s ? s.t : 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

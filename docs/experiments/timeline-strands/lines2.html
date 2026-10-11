@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timeline energy demo, canvas layer</title>
+<style>
+  :root { color-scheme: dark; --bg:#0a0a0a; --surface:#141414; --line:#2a2a2a; --ink:#f2f2f0; --muted:#8d8d88; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui, sans-serif; padding:24px 16px 48px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { font-size:20px; font-weight:600; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 18px; max-width:72ch; }
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:28px; padding:18px 18px 8px; position:relative; overflow:hidden; }
+  .panel::before { content:""; position:absolute; inset:0; background-image:radial-gradient(rgba(242,242,240,.13) 1px, transparent 1.2px); background-size:18px 18px;
+    -webkit-mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 56px),transparent),linear-gradient(to bottom,transparent,#000 56px,#000 calc(100% - 56px),transparent);
+    -webkit-mask-composite:source-in; mask-composite:intersect; pointer-events:none; }
+  .panel h2 { margin:0 0 6px; font-size:17px; font-weight:500; position:relative; }
+  .stage { position:relative; }
+  .stage svg { display:block; width:100%; height:auto; position:relative; overflow:visible; }
+  .stage canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; mix-blend-mode:screen; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 14px; margin:16px 0 0; align-items:center; font-size:14px; }
+  .controls .group { color:var(--muted); width:100%; margin-top:6px; font-size:13px; letter-spacing:.02em; }
+  label.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; user-select:none; }
+  label.chip:has(input:checked) { border-color:#7fd6ff; color:#fff; background:rgba(127,214,255,.08); }
+  label.chip input { accent-color:#7fd6ff; margin:0; }
+  button.act { font:inherit; color:#fff; background:#0b4e66; border:0; border-radius:999px; padding:8px 16px; cursor:pointer; }
+  button.act:hover { background:#116485; }
+  input[type=range] { accent-color:#7fd6ff; width:120px; }
+  .hint { color:var(--muted); font-size:13px; margin-top:12px; }
+  .pill { font:12px system-ui; fill:#cfcfca; }
+  .ver { font:11px ui-monospace, monospace; fill:#8d8d88; }
+  #fps { font:12px ui-monospace, monospace; color:var(--muted); margin-left:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Timeline energy: canvas effects over the real lines</h1>
+  <p class="sub">The SVG keeps the lines and the clickable dots. A transparent canvas on top draws only the effects with additive light. Each effect has its own switch. Click a dot or a branch name to open it, hover a dot, or press "Simulate save".</p>
+
+  <div class="panel">
+    <h2>Versions</h2>
+    <div class="stage" id="stage">
+      <svg id="s" viewBox="0 0 1120 420" role="img" aria-label="Demo timeline"></svg>
+      <canvas id="c"></canvas>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">Effects on the open branch</div>
+    <label class="chip"><input type="checkbox" id="comets" checked> comets</label>
+    <label class="chip"><input type="checkbox" id="smooth" checked> smooth streaks</label>
+    <label class="chip"><input type="checkbox" id="split" checked> split and merge</label>
+    <label class="chip"><input type="checkbox" id="embers" checked> embers</label>
+    <label class="chip"><input type="checkbox" id="aura" checked> aura</label>
+    <label class="chip"><input type="checkbox" id="hover" checked> hover surge</label>
+    <label class="chip"><input type="checkbox" id="wave" checked> open shockwave</label>
+    <button class="act" id="save" type="button">Simulate save</button>
+    <div class="group">Look</div>
+    <label class="chip"><input type="radio" name="pal" value="full" checked> full rainbow</label>
+    <label class="chip"><input type="radio" name="pal" value="neon"> neon band</label>
+    <label class="chip"><input type="checkbox" id="every"> every lane alive</label>
+    <label class="chip"><input type="checkbox" id="calm"> reduced motion</label>
+    <label>speed <input type="range" id="speed" min="60" max="360" value="170"></label>
+    <label>density <input type="range" id="density" min="1" max="10" value="4"></label>
+    <span id="fps"></span>
+  </div>
+  <p class="hint">Particle count is capped at 140. Everything stops when the tab is hidden or this panel scrolls off screen. "Reduced motion" leaves only the static aura.</p>
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const W = 1120, H = 420, GUT = 150, STEP = 78, LANE = 84, TOP = 62;
+const el = (name, attrs = {}, parent) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+
+const branches = [
+  { id: "main",   name: "main",   lane: 0, v: [1, 2, 3, 4, 5, 9, 10, 12] },
+  { id: "etb",    name: "etb",    lane: 1, v: [6, 7], from: 2 },
+  { id: "tokens", name: "tokens", lane: 2, v: [8, 11], from: 4 },
+  { id: "combo",  name: "combo",  lane: 3, v: [13], from: 7 },
+];
+const nodes = new Map();
+branches.forEach((b) => b.v.forEach((n) => nodes.set(n, { n, b, x: GUT + (n - 1) * STEP, y: TOP + b.lane * LANE, birth: 1 })));
+const edges = [];
+branches.forEach((b) => b.v.forEach((n, i) => {
+  const parent = i === 0 ? (b.from ? nodes.get(b.from) : null) : nodes.get(b.v[i - 1]);
+  if (parent) edges.push({ from: parent, to: nodes.get(n), kind: i === 0 && b.from ? "fork" : "line", branch: b });
+}));
+edges.push({ from: nodes.get(11), to: nodes.get(12), kind: "merge", branch: nodes.get(11).b });
+
+const run = (a, b) => Math.min(Math.max(b.x - a.x, 0), Math.max(44, Math.abs(b.y - a.y) * 0.9));
+function d(e) {
+  const a = e.from, b = e.to;
+  if (a.y === b.y) return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+  const r = run(a, b);
+  if (e.kind === "merge") return `M ${a.x} ${a.y} L ${b.x - r} ${a.y} C ${b.x - r * .5} ${a.y}, ${b.x - r * .5} ${b.y}, ${b.x} ${b.y}`;
+  return `M ${a.x} ${a.y} C ${a.x + r * .5} ${a.y}, ${a.x + r * .5} ${b.y}, ${a.x + r} ${b.y} L ${b.x} ${b.y}`;
+}
+
+const state = { smooth: true, pal: "full", every: false, calm: false, speed: 170, density: 4, comets: true, split: true, embers: true, aura: true, hover: true, wave: true };
+const open = { branch: "etb", version: 7 };
+const color = (h, l = 62, a = 1) => `hsl(${((h % 360) + 360) % 360} 96% ${l}% / ${a})`;
+const hueAt = (t) => (state.pal === "full" ? t * 300 : 185 + t * 135);
+const norm = (v) => ((v % 1) + 1) % 1;
+let phase = 0;
+const hueOfX = (x) => hueAt(norm((x - GUT) / (W - GUT) + phase));
+
+/* ---------- SVG: the real lines, kept simple and static-ish ---------- */
+const svg = document.getElementById("s");
+const defs = el("defs", {}, svg);
+const glowG = el("g", { style: "mix-blend-mode:screen" }, svg);
+const lineG = el("g", {}, svg);
+const nodeG = el("g", {}, svg);
+const labelG = el("g", {}, svg);
+const grad = el("linearGradient", { id: "gt", gradientUnits: "userSpaceOnUse", x1: GUT, x2: W - 40, y1: 0, y2: 0 }, defs);
+const STOPS = 14;
+const stops = Array.from({ length: STOPS }, (_, i) => el("stop", { offset: i / (STOPS - 1) }, grad));
+const parts = edges.map((e) => {
+  const p = d(e);
+  const mk = (parent, extra) => el("path", { d: p, fill: "none", "stroke-linecap": "round", stroke: "url(#gt)", ...extra }, parent);
+  const wide = mk(glowG, { "stroke-width": 10, opacity: 0.1 });
+  const main = mk(lineG, { "stroke-width": 2.4, opacity: 0.62 });
+  if (e.kind === "merge") { main.setAttribute("stroke-dasharray", "2 8"); wide.setAttribute("stroke-dasharray", "2 8"); }
+  return { e, wide, main };
+});
+nodes.forEach((nd) => {
+  nd.dot = el("circle", { cx: nd.x, cy: nd.y, r: 7, fill: "#0a0a0a", "stroke-width": 2.2, style: "cursor:pointer" }, nodeG);
+  const t = el("text", { x: nd.x, y: nd.y + 26, "text-anchor": "middle", class: "ver" }, labelG); t.textContent = "v" + nd.n;
+  nd.dot.addEventListener("click", () => openVersion(nd));
+});
+const pills = branches.map((b) => {
+  const g = el("g", { style: "cursor:pointer" }, labelG);
+  const w = b.name.length * 7 + 26;
+  const rect = el("rect", { x: 10, y: TOP + b.lane * LANE - 13, width: w, height: 26, rx: 13, fill: "#141414", "stroke-width": 1.2 }, g);
+  const t = el("text", { x: 10 + w / 2, y: TOP + b.lane * LANE + 4, "text-anchor": "middle", class: "pill" }, g); t.textContent = b.name;
+  g.addEventListener("click", () => openVersion(nodes.get(b.v[b.v.length - 1])));
+  return { b, rect };
+});
+
+/* ---------- Geometry sampled once, for the canvas to walk along ---------- */
+const probe = el("path", {}, svg); probe.style.display = "none";
+const geo = edges.map((e) => {
+  probe.setAttribute("d", d(e));
+  const len = probe.getTotalLength(), n = Math.max(2, Math.ceil(len / 2) + 1), pts = [];
+  for (let i = 0; i < n; i++) { const p = probe.getPointAtLength((len * i) / (n - 1)); pts.push(p.x, p.y); }
+  return { len, n, pts };
+});
+const shapes = geo.map((g) => { const p = new Path2D(); for (let k = 0; k < g.n; k++) k ? p.lineTo(g.pts[k * 2], g.pts[k * 2 + 1]) : p.moveTo(g.pts[0], g.pts[1]); return p; });
+const at = (ei, dist) => {
+  const g = geo[ei], t = Math.min(Math.max(dist / g.len, 0), 1) * (g.n - 1), i = Math.min(Math.floor(t), g.n - 2), f = t - i;
+  return [g.pts[i * 2] + (g.pts[i * 2 + 2] - g.pts[i * 2]) * f, g.pts[i * 2 + 1] + (g.pts[i * 2 + 3] - g.pts[i * 2 + 1]) * f];
+};
+const chainOf = (branchId) => edges.map((e, i) => ({ e, i })).filter((x) => x.e.branch.id === branchId).sort((a, b) => a.e.from.x - b.e.from.x).map((x) => x.i);
+const aliveEdges = () => (state.every ? edges.map((_, i) => i) : chainOf(open.branch).concat(edges.map((e, i) => (e.kind === "merge" && e.to.b.id === open.branch ? i : -1)).filter((i) => i >= 0)));
+
+/* ---------- Canvas ---------- */
+const stage = document.getElementById("stage"), cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let scale = 1, dpr = 1;
+function fit() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = stage.clientWidth, h = stage.clientHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  scale = (w / W) * dpr;
+}
+new ResizeObserver(fit).observe(stage); fit();
+
+const sprites = new Map();
+function sprite(h) {
+  const k = Math.round(((h % 360) + 360) % 360 / 6);
+  if (sprites.has(k)) return sprites.get(k);
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32), hh = k * 6;
+  r.addColorStop(0, `hsla(${hh},100%,92%,1)`); r.addColorStop(0.18, `hsla(${hh},100%,70%,.85)`); r.addColorStop(0.5, `hsla(${hh},100%,55%,.25)`); r.addColorStop(1, `hsla(${hh},100%,50%,0)`);
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64); sprites.set(k, c); return c;
+}
+const stamp = (x, y, size, h, a) => { if (a <= 0.01) return; ctx.globalAlpha = Math.min(a, 1); ctx.drawImage(sprite(h), x - size / 2, y - size / 2, size, size); };
+
+const MAX = 140;
+const aura = document.createElement("canvas"); let auraKey = "";
+let comets = [], embers = [], rings = [], flashes = [], clock = 0, spawnT = 0, emberT = 0, hovered = null, hoverT = 0;
+
+function newComet(path, o = {}) {
+  if (comets.length >= MAX) return;
+  comets.push({ path, i: 0, d: 0, speed: state.speed * (o.fast || 1) * (0.88 + Math.random() * 0.24), size: o.size || 20, a: o.a ?? 1, end: o.end || "none", len: 11 });
+}
+function pos(c) { // the head's position, and the tail's, walking back across earlier edges
+  const out = [];
+  for (let k = 0; k < c.len; k++) {
+    let i = c.i, dist = c.d - k * 6.5;
+    while (dist < 0 && i > 0) { i--; dist += geo[c.path[i]].len; }
+    out.push(at(c.path[i], Math.max(dist, 0)));
+  }
+  return out;
+}
+// A continuous trail: points sampled every few units back along the path, so a streak can be drawn as one smooth shape.
+function trail(c, length, steps) {
+  const out = [];
+  for (let k = 0; k <= steps; k++) {
+    let i = c.i, dist = c.d - (k / steps) * length;
+    while (dist < 0 && i > 0) { i--; dist += geo[c.path[i]].len; }
+    out.push(at(c.path[i], Math.max(dist, 0)));
+  }
+  return out; // head first
+}
+// A softer sprite for streaks: no hard centre, so many overlapping stamps add up to a smooth ridge of light instead of beads.
+const soft = new Map();
+function softSprite(h) {
+  const k = Math.round(((h % 360) + 360) % 360 / 6);
+  if (soft.has(k)) return soft.get(k);
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32), hh = k * 6;
+  for (let i = 0; i <= 8; i++) { const t = i / 8, a = Math.exp(-t * t * 4.2); r.addColorStop(t, `hsla(${hh},100%,${68 + 24 * (1 - t)}%,${a})`); }
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64); soft.set(k, c); return c;
+}
+function streak(c) {
+  const L = 170 * (c.size / 20), STEPS = Math.round(L / 1.8), pts = trail(c, L, STEPS);
+  for (let k = STEPS; k >= 0; k--) {
+    const f = 1 - k / STEPS; // 1 at the head, 0 at the end of the tail
+    const a = c.a * Math.pow(f, 1.8), h = hueOfX(pts[k][0]) + 14 * f, spr = softSprite(h);
+    const core = c.size * (0.34 + 0.5 * Math.pow(f, 0.8)), halo = core * 3.6;
+    ctx.globalAlpha = Math.min(a * 0.16, 1); ctx.drawImage(spr, pts[k][0] - core / 2, pts[k][1] - core / 2, core, core);
+    ctx.globalAlpha = Math.min(a * 0.035, 1); ctx.drawImage(spr, pts[k][0] - halo / 2, pts[k][1] - halo / 2, halo, halo);
+  }
+  stamp(pts[0][0], pts[0][1], c.size * 1.3, hueOfX(pts[0][0]) + 16, c.a * 0.85); // head glow
+  stamp(pts[0][0], pts[0][1], c.size * 0.5, hueOfX(pts[0][0]) + 30, c.a); // bright core
+}
+function ring(x, y, h, big = 1) { rings.push({ x, y, h, r: 6, max: 34 * big, life: 0, dur: 0.75 }); }
+function burst(x, y, h, n = 14) {
+  for (let i = 0; i < n && embers.length < 220; i++) { const a = Math.random() * 6.283, s = 40 + Math.random() * 90; embers.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: 0.5 + Math.random() * 0.6, h: h + (Math.random() - 0.5) * 30, size: 5 + Math.random() * 5, drag: 2.2 }); }
+}
+function arrive(c) {
+  const e = edges[c.path[c.path.length - 1]], h = hueOfX(e.to.x);
+  if (c.end === "flash") { flashes.push({ x: e.to.x, y: e.to.y, h, life: 0, dur: 0.5, size: 54 }); }
+  if (c.end === "merge") { flashes.push({ x: e.to.x, y: e.to.y, h, life: 0, dur: 0.8, size: 90 }); ring(e.to.x, e.to.y, h, 1.3); burst(e.to.x, e.to.y, h, 12); }
+  if (c.end === "birth") { flashes.push({ x: e.to.x, y: e.to.y, h, life: 0, dur: 0.9, size: 110 }); ring(e.to.x, e.to.y, h, 1.8); ring(e.to.x, e.to.y, h + 40, 1); burst(e.to.x, e.to.y, h, 26); e.to.birth = 0; }
+}
+
+function openVersion(nd) {
+  const from = nodes.get(open.version);
+  open.branch = nd.b.id; open.version = nd.n;
+  if (state.calm) return;
+  const h = hueOfX(nd.x);
+  if (state.wave) {
+    ring(nd.x, nd.y, h, 1.5); flashes.push({ x: nd.x, y: nd.y, h, life: 0, dur: 0.6, size: 80 });
+    const incoming = edges.findIndex((e) => e.to === nd);
+    if (incoming >= 0) newComet([incoming], { fast: 3.2, size: 26, end: "flash" });
+    if (from && from !== nd) ring(from.x, from.y, hueOfX(from.x), 0.7);
+  }
+}
+document.getElementById("save").addEventListener("click", () => {
+  const last = Math.max(...nodes.values().filter ? [...nodes.values()].filter((n) => n.b.id === open.branch).map((n) => n.n) : [0]);
+  const nd = nodes.get(last), incoming = edges.findIndex((e) => e.to === nd);
+  if (incoming < 0) return;
+  nd.birth = -1; // hidden until the spark lands
+  newComet([incoming], { fast: 3.6, size: 30, end: "birth" });
+});
+
+svg.addEventListener("pointermove", (ev) => {
+  const r = svg.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * W, y = ((ev.clientY - r.top) / r.height) * H;
+  let best = null, bd = 26;
+  nodes.forEach((nd) => { const dd = Math.hypot(nd.x - x, nd.y - y); if (dd < bd) { bd = dd; best = nd; } });
+  hovered = best;
+});
+svg.addEventListener("pointerleave", () => (hovered = null));
+
+for (const k of ["smooth", "comets", "split", "embers", "aura", "hover", "wave", "every", "calm"]) document.getElementById(k).addEventListener("change", (ev) => (state[k] = ev.target.checked));
+document.getElementById("speed").addEventListener("input", (ev) => (state.speed = +ev.target.value));
+document.getElementById("density").addEventListener("input", (ev) => (state.density = +ev.target.value));
+document.querySelectorAll("input[name=pal]").forEach((r) => r.addEventListener("change", () => r.checked && (state.pal = r.value)));
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) { state.calm = true; document.getElementById("calm").checked = true; }
+
+let visible = true;
+new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe(stage);
+
+let last = performance.now(), frames = 0, fpsT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!visible || document.hidden) { last = now; return; }
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const moving = !state.calm;
+  if (moving) { clock += dt; phase = (clock * 0.04) % 1; }
+  frames++; fpsT += dt; if (fpsT > 1) { document.getElementById("fps").textContent = `${Math.round(frames / fpsT)} fps, ${comets.length + embers.length} particles`; frames = 0; fpsT = 0; }
+
+  /* SVG lines: gradient drift, open lane brighter */
+  stops.forEach((s, i) => s.setAttribute("stop-color", color(hueAt(norm(i / (STOPS - 1) + phase)))));
+  const live = new Set(aliveEdges());
+  parts.forEach((p, i) => {
+    const on = live.has(i);
+    p.main.setAttribute("stroke-width", on ? 3.4 : 2.2); p.main.setAttribute("opacity", on ? 1 : 0.62);
+    p.wide.setAttribute("opacity", 0);
+  });
+  nodes.forEach((nd) => {
+    if (nd.birth < 1 && nd.birth >= 0) nd.birth = Math.min(1, nd.birth + dt * 2.2);
+    const h = hueOfX(nd.x), isOpen = nd.n === open.version, vis = nd.birth >= 0;
+    nd.dot.setAttribute("stroke", color(h)); nd.dot.setAttribute("fill", isOpen ? color(h) : "#0a0a0a");
+    nd.dot.setAttribute("r", vis ? (isOpen ? 9 : 7) * (0.4 + 0.6 * nd.birth + 0.35 * Math.sin(nd.birth * Math.PI)) : 0);
+  });
+  pills.forEach(({ b, rect }) => {
+    rect.setAttribute("stroke", b.id === open.branch ? color(hueOfX(GUT + 60) + b.lane * 38) : "#34343a");
+    rect.style.filter = b.id === open.branch ? `drop-shadow(0 0 7px ${color(hueOfX(GUT + 60) + b.lane * 38, 60, 0.7)})` : "none";
+  });
+
+  /* Canvas effects */
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.globalCompositeOperation = "lighter";
+  const chain = state.every ? edges.map((_, i) => i).filter((i) => edges[i].kind !== "merge") : chainOf(open.branch);
+
+  if (state.aura) { // light that falls off gradually. Drawn once into its own canvas and re-drawn only when the colours have drifted, since it barely changes.
+    const key = [...live].join(",") + "|" + state.pal + "|" + Math.round(phase * 50) + "|" + cv.width;
+    if (key !== auraKey) {
+      auraKey = key;
+      if (aura.width !== cv.width || aura.height !== cv.height) { aura.width = cv.width; aura.height = cv.height; }
+      const a = aura.getContext("2d"); a.setTransform(1, 0, 0, 1, 0, 0); a.clearRect(0, 0, aura.width, aura.height);
+      a.setTransform(scale, 0, 0, scale, 0, 0); a.globalCompositeOperation = "lighter"; a.lineCap = "round"; a.lineJoin = "round";
+      const LAYERS = 16;
+      for (let i = 0; i < edges.length; i++) {
+        const on = live.has(i), strength = on ? 1 : 0.28;
+        a.strokeStyle = color(hueOfX((edges[i].from.x + edges[i].to.x) / 2), 58, 1);
+        for (let l = 0; l < LAYERS; l++) {
+          const t = l / (LAYERS - 1);
+          a.globalAlpha = 0.0155 * strength; a.lineWidth = (on ? 70 : 34) * Math.pow(1 - t, 1.25) + 5; a.stroke(shapes[i]);
+        }
+      }
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = moving ? 0.82 + 0.18 * Math.sin(clock * 2.1) : 0.92;
+    ctx.drawImage(aura, 0, 0);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  }
+
+  if (moving) {
+    if (state.comets && chain.length) { // one stream per live chain, starting at its first edge
+      spawnT -= dt;
+      if (spawnT <= 0) {
+        spawnT = 1.5 / state.density * (0.7 + Math.random() * 0.6);
+        if (state.every) branches.forEach((b) => { const c = chainOf(b.id); if (c.length) newComet(c, { size: 17, a: 0.85, end: "flash" }); });
+        else newComet(chain, { size: 20, end: "flash" });
+      }
+    }
+    if (state.embers) {
+      emberT -= dt;
+      if (emberT <= 0 && live.size) {
+        emberT = 0.07 + Math.random() * 0.1;
+        const ids = [...live], ei = ids[Math.floor(Math.random() * ids.length)], p = at(ei, Math.random() * geo[ei].len);
+        if (embers.length < 220) embers.push({ x: p[0], y: p[1], vx: (Math.random() - 0.5) * 14, vy: -(10 + Math.random() * 22), life: 0, max: 1 + Math.random() * 1.1, h: hueOfX(p[0]) + (Math.random() - 0.5) * 24, size: 5 + Math.random() * 6, drag: 0.4 });
+      }
+    }
+    hoverT -= dt;
+    if (state.hover && hovered && hoverT <= 0) { // energy gathers toward the dot under the pointer
+      hoverT = 0.09;
+      const inc = edges.findIndex((e) => e.to === hovered);
+      if (inc >= 0) newComet([inc], { fast: 1.9, size: 14, a: 0.8, end: "none" });
+      const h = hueOfX(hovered.x), a = Math.random() * 6.283;
+      embers.push({ x: hovered.x + Math.cos(a) * 22, y: hovered.y + Math.sin(a) * 22, vx: -Math.cos(a) * 55, vy: -Math.sin(a) * 55, life: 0, max: 0.4, h, size: 6, drag: 0 });
+    }
+  }
+
+  for (let n = comets.length - 1; n >= 0; n--) {
+    const c = comets[n];
+    if (moving) c.d += c.speed * dt;
+    while (c.i < c.path.length && c.d >= geo[c.path[c.i]].len) {
+      const e = edges[c.path[c.i]];
+      c.d -= geo[c.path[c.i]].len; c.i++;
+      if (state.split) { // at a node, branches leaving it get a dimmer comet of their own
+        edges.forEach((o, oi) => {
+          if (o.from !== e.to || oi === c.path[c.i - 1] || (c.path.includes(oi))) return;
+          if (o.kind === "fork" && c.path.length > 1) newComet([oi], { size: 14, a: 0.7, end: "flash", fast: 1.1 });
+          if (o.kind === "merge") newComet([oi], { size: 20, a: 0.95, end: "merge", fast: 1.1 });
+        });
+      }
+    }
+    if (c.i >= c.path.length) { arrive(c); comets.splice(n, 1); continue; }
+    if (state.smooth) { streak(c); continue; }
+    const tail = pos(c);
+    for (let k = tail.length - 1; k >= 0; k--) {
+      const f = 1 - k / tail.length, h = hueOfX(tail[k][0]);
+      stamp(tail[k][0], tail[k][1], c.size * (0.35 + 0.65 * f), h, c.a * Math.pow(f, 1.7) * 0.9);
+    }
+    stamp(tail[0][0], tail[0][1], c.size * 0.45, hueOfX(tail[0][0]) + 20, c.a); // hot white-ish core
+  }
+
+  for (let n = embers.length - 1; n >= 0; n--) {
+    const m = embers[n]; m.life += dt;
+    if (m.life >= m.max) { embers.splice(n, 1); continue; }
+    m.vx *= 1 - Math.min(m.drag * dt, 1); m.vy *= 1 - Math.min(m.drag * dt, 1);
+    m.x += m.vx * dt; m.y += m.vy * dt;
+    const f = 1 - m.life / m.max; stamp(m.x, m.y, m.size * (0.5 + f), m.h, f * 0.9);
+  }
+  for (let n = rings.length - 1; n >= 0; n--) {
+    const r = rings[n]; r.life += dt / r.dur;
+    if (r.life >= 1) { rings.splice(n, 1); continue; }
+    const e = 1 - Math.pow(1 - r.life, 3);
+    const rad = 6 + (r.max - 6) * e, fade = 1 - r.life;
+    ctx.strokeStyle = color(r.h, 68);
+    for (let l = 0; l < 7; l++) { // a soft band: wide and faint underneath, narrow and brighter on top
+      ctx.globalAlpha = fade * (0.05 + l * 0.02); ctx.lineWidth = (16 - l * 2.1) * (0.5 + fade * 0.7);
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, 6.283); ctx.stroke();
+    }
+  }
+  for (let n = flashes.length - 1; n >= 0; n--) {
+    const f = flashes[n]; f.life += dt / f.dur;
+    if (f.life >= 1) { flashes.splice(n, 1); continue; }
+    stamp(f.x, f.y, f.size * (0.6 + 0.6 * f.life), f.h, (1 - f.life) * 0.95);
+  }
+  if (!moving && hovered === null) { /* the static aura above is all that remains */ }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
