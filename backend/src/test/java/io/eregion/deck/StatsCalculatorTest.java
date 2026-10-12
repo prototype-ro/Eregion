@@ -3,6 +3,7 @@ package io.eregion.deck;
 import static io.eregion.deck.Lines.line;
 import static io.eregion.deck.Lines.main;
 import static io.eregion.deck.Lines.priced;
+import static io.eregion.deck.Lines.withRole;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -98,5 +99,18 @@ class StatsCalculatorTest {
 				line("Mana Drain", "Instant", 2, "maybe", 1, 0)));
 
 		assertThat(stats.totalPriceUsd()).isEqualTo(2.5);
+	}
+
+	@Test
+	void rolesAreCountedWithoutLandsAndTheUntaggedAreUncategorized() {
+		DeckStats stats = StatsCalculator.compute(List.of(
+				withRole(main("Sol Ring", "Artifact", 1, 1), "Ramp"),
+				withRole(main("Cultivate", "Sorcery", 3, 2), "Ramp"),
+				withRole(main("Swords to Plowshares", "Instant", 1, 1), "Removal"),
+				main("Grizzly Bears", "Creature", 2, 1),
+				withRole(main("Command Tower", "Land", 0, 1), "Ramp")));
+
+		assertThat(stats.roles()).containsExactly(
+				java.util.Map.entry("Removal", 1), java.util.Map.entry("Ramp", 3), java.util.Map.entry("Uncategorized", 1));
 	}
 }

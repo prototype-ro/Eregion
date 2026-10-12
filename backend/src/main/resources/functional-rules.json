@@ -1,0 +1,28 @@
+{
+  "_about": "Guesses from a card's rules text: patterns matched, in any order, against a card's rules text (lower-cased). A card gets a row for every category one of its patterns matches, with that pattern's confidence (0 to 1, always below the 1.0 of a community tag). When a card matches several, the most confident wins, then the category higher in functional-tags.json. On a card Scryfall has tagged, a guess only adds a secondary role (it never replaces a community tag or becomes the main role). Lands are skipped. Edit, then restart; the guesses are recomputed.",
+  "rules": [
+    { "category": "Win Condition", "pattern": "you win the game", "confidence": 0.7 },
+    { "category": "Board Wipe", "pattern": "(destroy|exile) all (other )?(non[a-z]+ )?(creatures|permanents)", "confidence": 0.7 },
+    { "category": "Board Wipe", "pattern": "deals? \\d+ damage to each creature", "confidence": 0.6 },
+    { "category": "Board Wipe", "pattern": "all creatures get -\\d+/-\\d+", "confidence": 0.6 },
+    { "category": "Counterspell", "pattern": "counter target ([a-z]+ )*(spell|ability)", "confidence": 0.7 },
+    { "category": "Removal", "pattern": "(destroy|exile) target ([a-z']+ )*(creature|permanent|artifact|enchantment|planeswalker)", "confidence": 0.6 },
+    { "category": "Removal", "pattern": "target creature gets -\\d+/-\\d+", "confidence": 0.5 },
+    { "category": "Removal", "pattern": "deals? \\d+ damage to (any target|target creature)", "confidence": 0.5 },
+    { "category": "Removal", "pattern": "return target ([a-z']+ )*(creature|permanent) to its owner's hand", "confidence": 0.4 },
+    { "category": "Tutor", "pattern": "search your library for (a|an|up to [a-z]+) (?!basic land|land|[a-z ]*lands?\\b)[a-z ,]*card", "confidence": 0.6 },
+    { "category": "Ramp", "pattern": "search your library for (a|up to [a-z]+) (basic )?(land|[a-z ]+ lands?)", "confidence": 0.7 },
+    { "category": "Ramp", "pattern": "\\{t\\}: add \\{[wubrgc0-9x]+\\}", "confidence": 0.7 },
+    { "category": "Ramp", "pattern": "create (a|an|two|three) treasure tokens?", "confidence": 0.5 },
+    { "category": "Card Draw", "pattern": "you (may )?draw (a|\\d+|two|three|four|x) cards?", "confidence": 0.6 },
+    { "category": "Card Draw", "pattern": "draws? (a|two|three|four|\\d+) cards?", "confidence": 0.5 },
+    { "category": "Protection", "pattern": "(gains?|have|has|gets?) (hexproof|indestructible|protection from)", "confidence": 0.5 },
+    { "category": "Recursion", "pattern": "return (target|up to [a-z]+ target) ([a-z' ]+ )?cards? from (your|a) graveyard (to (the battlefield|your hand))", "confidence": 0.6 },
+    { "category": "Recursion", "pattern": "(dies|is put into a graveyard)[^.]*, return (that card|it|them) to the battlefield", "confidence": 0.5 },
+    { "category": "Extra Combat", "pattern": "additional combat phase", "confidence": 0.7 },
+    { "category": "Stax", "pattern": "(your opponents|each opponent|opponents|players) can't (cast|activate|search|draw)", "confidence": 0.5 },
+    { "category": "Stax", "pattern": "(spells|abilities)[a-z ,']* cost \\{\\d\\} more", "confidence": 0.5 },
+    { "category": "Tokens", "pattern": "creates? [^.]*creature tokens?", "confidence": 0.5 },
+    { "category": "Lifegain", "pattern": "you gain (\\d+|x|that much|life)[^.]* life|you gain life", "confidence": 0.4 }
+  ]
+}

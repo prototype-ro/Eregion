@@ -35,22 +35,26 @@ public class CardSearchService {
 		this.scryfall = scryfall;
 	}
 
-	public List<Card> search(String raw, int limit, boolean commandersOnly) {
+	public List<Card> search(String raw, int limit, boolean commandersOnly, boolean tokens) {
 		String cleaned = ScryfallQuery.sanitize(raw);
 		if (cleaned.isEmpty()) {
 			return List.of();
 		}
 
 		// A commander search is a different question from a plain one, so it is remembered separately.
-		String memory = commandersOnly ? "commander:" + cleaned : cleaned;
-		List<Card> local = cards.search(cleaned, limit, commandersOnly);
+		String memory = tokens ? "token:" + cleaned : commandersOnly ? "commander:" + cleaned : cleaned;
+		List<Card> local = cards.search(cleaned, limit, commandersOnly, tokens);
 		if (local.size() >= limit || recentlyAsked(memory)) {
 			return local;
 		}
 
 		try {
-			String query = ScryfallQuery.toScryfall(cleaned) + (commandersOnly ? " is:commander" : "");
+			String query = ScryfallQuery.toScryfall(cleaned) + (commandersOnly ? " is:commander" : "") + (tokens ? " t:token" : "");
 			for (ScryfallCard found : scryfall.search(query, MAX_FROM_SCRYFALL)) {
+				// Cards are kept one per name, so a token that shares a name with a real card would overwrite it. It is left out.
+				if (tokens && cards.realCardExists(found.name())) {
+					continue;
+				}
 				cards.upsert(ScryfallMapper.toCard(found));
 			}
 			remember(memory);
@@ -60,7 +64,7 @@ public class CardSearchService {
 			log.warn("Scryfall search failed for '{}', answering from the local catalog", cleaned, ex);
 			return local;
 		}
-		return cards.search(cleaned, limit, commandersOnly);
+		return cards.search(cleaned, limit, commandersOnly, tokens);
 	}
 
 	private boolean recentlyAsked(String cleaned) {

@@ -75,7 +75,23 @@ public final class DeckDtos {
 			String board,
 			int quantity,
 			int owned,
-			List<String> tags) {
+			List<String> tags,
+			/** What the card does in a deck (Ramp, Removal, ...), or null when nothing is known about it. */
+			String role,
+			/** Where the role came from: scryfall (community tagged) or regex (a guess from the rules text). */
+			String roleSource,
+			/** The card's other roles. Informational: stats and groups only ever use the main one. */
+			List<String> secondaryRoles) {
+
+		/** A line with no role, for code that does not know about roles. */
+		public DeckCardLine(UUID cardId, String name, String manaCost, double manaValue, String primaryType, String typeLine,
+				String colors, String colorIdentity, String oracleText, String commanderLegality, String rarity, String artist,
+				String imageSmall, String imageNormal, String imageArtCrop, UUID printingId, UUID customPrintingId, String setCode,
+				String setName, String collectorNumber, Double priceUsd, String board, int quantity, int owned, List<String> tags) {
+			this(cardId, name, manaCost, manaValue, primaryType, typeLine, colors, colorIdentity, oracleText, commanderLegality, rarity,
+					artist, imageSmall, imageNormal, imageArtCrop, printingId, customPrintingId, setCode, setName, collectorNumber, priceUsd,
+					board, quantity, owned, tags, null, null, List.of());
+		}
 	}
 
 	public record DeckStats(
@@ -86,7 +102,9 @@ public final class DeckDtos {
 			int lands,
 			int owned,
 			int missing,
-			double totalPriceUsd) {
+			double totalPriceUsd,
+			/** Cards per role, without lands, in the order roles are shown. Cards with no known role are counted under "Uncategorized". */
+			Map<String, Integer> roles) {
 	}
 
 	public record VersionDetail(
@@ -209,7 +227,8 @@ public final class DeckDtos {
 			List<Integer> curveDelta,
 			Map<String, Integer> typeDelta,
 			int totalDelta,
-			int landsDelta) {
+			int landsDelta,
+			Map<String, Integer> roleDelta) {
 	}
 
 	public record DeckDiff(

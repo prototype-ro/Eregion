@@ -16,8 +16,12 @@ public class ScryfallClient {
 
 	private final RestClient http;
 	private long lastCallAt;
+	/** The gap the background tag sync keeps between its requests: wider than a user's, so a person searching is never stuck behind it. */
+	private final long syncGapMs;
 
-	public ScryfallClient(@Value("${eregion.scryfall.user-agent}") String userAgent) {
+	public ScryfallClient(@Value("${eregion.scryfall.user-agent}") String userAgent,
+			@Value("${eregion.scryfall.sync-gap-ms:250}") long syncGapMs) {
+		this.syncGapMs = syncGapMs;
 		this.http = RestClient.builder()
 				.baseUrl("https://api.scryfall.com")
 				.defaultHeader("User-Agent", userAgent)
@@ -64,6 +68,80 @@ public class ScryfallClient {
 			return List.of();
 		}
 		return body.data().stream().filter(card -> card.id() != null).limit(max).toList();
+	}
+
+	/**
+	 * The names of every card a search matches, following Scryfall's pages until they run out or {@code maxPages} is reached.
+	 * Used by the functional tag sync, where one tag can have thousands of cards. A search that matches nothing is an empty list.
+	 */
+	public List<String> searchNames(String scryfallQuery, int maxPages) {
+		List<String> names = new java.util.ArrayList<>();
+		ScryfallList page = backingOff(() -> http.get()
+				.uri(uri -> uri.path("/cards/search")
+						.queryParam("q", scryfallQuery)
+						.queryParam("unique", "cards")
+						.queryParam("order", "name")
+						.build())
+				.retrieve()
+				.onStatus(status -> status.value() == 404, (request, response) -> {
+					// "No cards match" comes back as 404 with an error object that has no data.
+				})
+				.body(ScryfallList.class));
+		for (int fetched = 1; page != null && page.data() != null; fetched++) {
+			page.data().stream().filter(card -> card.id() != null).forEach(card -> names.add(card.name()));
+			if (!Boolean.TRUE.equals(page.has_more()) || page.next_page() == null || fetched >= maxPages) {
+				break;
+			}
+			String next = page.next_page();
+			page = backingOff(() -> http.get().uri(java.net.URI.create(next)).retrieve().body(ScryfallList.class));
+		}
+		return names;
+	}
+
+	/** Runs a request through the throttle. When Scryfall answers 429 it waits as long as it asks, then tries again a few times. */
+	private <T> T backingOff(java.util.function.Supplier<T> request) {
+		for (int attempt = 1;; attempt++) {
+			throttle(syncGapMs);
+			try {
+				return request.get();
+			}
+			catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests ex) {
+				if (attempt >= 4) {
+					throw ex;
+				}
+				String after = ex.getResponseHeaders() == null ? null : ex.getResponseHeaders().getFirst("Retry-After");
+				long seconds = after != null && after.matches("\\d+") ? Long.parseLong(after) : 30L * attempt;
+				try {
+					Thread.sleep(Math.min(seconds, 120) * 1000);
+				}
+				catch (InterruptedException interrupted) {
+					Thread.currentThread().interrupt();
+					throw ex;
+				}
+			}
+		}
+	}
+
+	/**
+	 * One page (up to 175 cards) of a search, one card per name, in the order asked for. Scryfall's own page number is used, so the
+	 * caller pages through it. No matches is an empty list. A search Scryfall cannot read raises a 400 error.
+	 */
+	public ScryfallList searchPage(String scryfallQuery, String order, String dir, int page) {
+		throttle();
+		ScryfallList body = http.get()
+				.uri(uri -> uri.path("/cards/search")
+						.queryParam("q", scryfallQuery)
+						.queryParam("unique", "cards")
+						.queryParam("order", order)
+						.queryParam("dir", dir)
+						.queryParam("page", page)
+						.build())
+				.retrieve()
+				.onStatus(status -> status.value() == 404, (request, response) -> {
+					// "No cards match" comes back as 404 with an error object that has no data.
+				})
+				.body(ScryfallList.class);
+		return body == null ? new ScryfallList(List.of(), false, null, 0) : body;
 	}
 
 	/** Fuzzy name lookup, for typos and names that are close but not exact. */
@@ -121,8 +199,12 @@ public class ScryfallClient {
 				body.not_found() == null ? List.of() : body.not_found());
 	}
 
-	private synchronized void throttle() {
-		long wait = lastCallAt + MIN_GAP_MS - System.currentTimeMillis();
+	private void throttle() {
+		throttle(MIN_GAP_MS);
+	}
+
+	private synchronized void throttle(long gapMs) {
+		long wait = lastCallAt + gapMs - System.currentTimeMillis();
 		if (wait > 0) {
 			try {
 				Thread.sleep(wait);

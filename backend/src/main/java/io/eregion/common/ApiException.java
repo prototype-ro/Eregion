@@ -24,6 +24,11 @@ public class ApiException extends RuntimeException {
 		return new ApiException(HttpStatus.BAD_REQUEST, message);
 	}
 
+	/** For when something we depend on, such as Scryfall, is busy or down. The client can try again later. */
+	public static ApiException unavailable(String message) {
+		return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, message);
+	}
+
 	public static ApiException conflict(String message) {
 		return new ApiException(HttpStatus.CONFLICT, message);
 	}

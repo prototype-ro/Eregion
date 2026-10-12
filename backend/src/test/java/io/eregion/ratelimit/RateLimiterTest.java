@@ -87,7 +87,7 @@ class RateLimiterTest {
 	// ---- the limits of the app
 
 	private RateLimits limits(int loginAccount) {
-		var props = new RateLimitProperties(true, false, 20, loginAccount, 10, 10, 3, 120, 20, 40, 30, 240, 10, 30);
+		var props = new RateLimitProperties(true, false, 20, loginAccount, 10, 10, 3, 120, 20, 40, 30, 240, 10, 30, 20);
 		return new RateLimits(props, limiter);
 	}
 
@@ -134,7 +134,7 @@ class RateLimiterTest {
 
 	@Test
 	void switchedOffMeansNoLimits() {
-		var off = new RateLimits(new RateLimitProperties(false, false, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), limiter);
+		var off = new RateLimits(new RateLimitProperties(false, false, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), limiter);
 		for (int i = 0; i < 10; i++) {
 			off.register(request("1.1.1.1"));
 		}

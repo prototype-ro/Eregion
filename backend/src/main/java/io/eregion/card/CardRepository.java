@@ -15,8 +15,8 @@ public class CardRepository {
 	private static final String COLUMNS = """
 			id, scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors, color_identity,
 			oracle_text, set_code, set_name, collector_number, rarity, artist, price_usd,
-			image_small, image_normal, image_art_crop, commander_legality
-			""";
+			image_small, image_normal, image_art_crop, commander_legality,
+			""" + FunctionalTagSql.columns("cards.id") + "\n";
 
 	private final JdbcClient jdbc;
 
@@ -32,11 +32,16 @@ public class CardRepository {
 	}
 
 	/** Prefix matches rank first, then any substring match, alphabetical within each group. */
-	public List<Card> search(String query, int limit, boolean commandersOnly) {
+	/**
+	 * Name search in our catalogue. Tokens live in the same table but are only found when asked for, so a search for a card never offers
+	 * a token of that name, and a search for a token never offers a card.
+	 */
+	public List<Card> search(String query, int limit, boolean commandersOnly, boolean tokens) {
 		String escaped = query.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 		return jdbc.sql("SELECT " + COLUMNS + """
 				 FROM cards
 				WHERE name ILIKE :contains
+				  AND ((type_line LIKE 'Token%') = :tokens)
 				  AND (:commandersOnly = false OR (type_line ILIKE '%legendary%'
 				       AND (type_line ILIKE '%creature%' OR oracle_text ILIKE '%can be your commander%')))
 				ORDER BY (name ILIKE :prefix) DESC, name
@@ -46,8 +51,17 @@ public class CardRepository {
 				.param("prefix", escaped + "%")
 				.param("limit", limit)
 				.param("commandersOnly", commandersOnly)
+				.param("tokens", tokens)
 				.query(CardRepository::map)
 				.list();
+	}
+
+	/** Whether a real card (not a token) already has this name. A token with the same name must not take its row over. */
+	public boolean realCardExists(String name) {
+		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM cards WHERE lower(name) = lower(:name) AND type_line NOT LIKE 'Token%')")
+				.param("name", name)
+				.query(Boolean.class)
+				.single();
 	}
 
 	/** Which of these card ids are in the catalog. */
@@ -167,6 +181,9 @@ public class CardRepository {
 				rs.getString("image_small"),
 				rs.getString("image_normal"),
 				rs.getString("image_art_crop"),
-				rs.getString("commander_legality"));
+				rs.getString("commander_legality"),
+				rs.getString("role"),
+				rs.getString("role_source"),
+				FunctionalTagSql.secondary(rs));
 	}
 }

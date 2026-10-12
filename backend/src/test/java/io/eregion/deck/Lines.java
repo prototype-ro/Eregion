@@ -48,4 +48,12 @@ final class Lines {
 				line.imageNormal(), line.imageArtCrop(), line.printingId(), line.customPrintingId(), line.setCode(), line.setName(), line.collectorNumber(),
 				line.priceUsd(), line.board(), line.quantity(), line.owned(), java.util.List.of(tags));
 	}
+
+	/** The same card with a functional role. */
+	static DeckCardLine withRole(DeckCardLine line, String role) {
+		return new DeckCardLine(line.cardId(), line.name(), line.manaCost(), line.manaValue(), line.primaryType(), line.typeLine(),
+				line.colors(), line.colorIdentity(), line.oracleText(), line.commanderLegality(), line.rarity(), line.artist(), line.imageSmall(),
+				line.imageNormal(), line.imageArtCrop(), line.printingId(), line.customPrintingId(), line.setCode(), line.setName(),
+				line.collectorNumber(), line.priceUsd(), line.board(), line.quantity(), line.owned(), line.tags(), role, null, java.util.List.of());
+	}
 }

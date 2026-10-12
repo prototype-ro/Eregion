@@ -23,5 +23,6 @@ public record RateLimitProperties(
 		@DefaultValue("30") int urlImportPerUserHour,
 		@DefaultValue("240") int publicReadPerIpMinute,
 		@DefaultValue("10") int reportPerUserHour,
-		@DefaultValue("30") int savePerUserMinute) {
+		@DefaultValue("30") int savePerUserMinute,
+		@DefaultValue("20") int advancedSearchPerUserMinute) {
 }

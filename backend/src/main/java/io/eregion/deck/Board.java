@@ -8,7 +8,8 @@ public enum Board {
 	COMMANDER("commander", true),
 	MAIN("main", true),
 	MAYBE("maybe", false),
-	CONSIDERING("considering", false);
+	CONSIDERING("considering", false),
+	TOKENS("tokens", false);
 
 	private final String db;
 	private final boolean counted;
@@ -28,7 +29,7 @@ public enum Board {
 				return board;
 			}
 		}
-		throw ApiException.badRequest("Unknown board '" + value + "'. Use commander, main, maybe or considering.");
+		throw ApiException.badRequest("Unknown board '" + value + "'. Use commander, main, maybe, considering or tokens.");
 	}
 
 	/** Lenient check for stored rows: unknown values never count. */

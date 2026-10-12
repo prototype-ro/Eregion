@@ -119,8 +119,18 @@ public final class DeckDiffer {
 			}
 		}
 
+		Set<String> roleNames = new LinkedHashSet<>(from.roles().keySet());
+		roleNames.addAll(to.roles().keySet());
+		Map<String, Integer> roleDelta = new LinkedHashMap<>();
+		for (String role : roleNames) {
+			int delta = to.roles().getOrDefault(role, 0) - from.roles().getOrDefault(role, 0);
+			if (delta != 0) {
+				roleDelta.put(role, delta);
+			}
+		}
+
 		return new StatsChange(from, to, StatsCalculator.round2(to.averageManaValue() - from.averageManaValue()),
-				List.copyOf(curveDelta), typeDelta, to.totalCards() - from.totalCards(), to.lands() - from.lands());
+				List.copyOf(curveDelta), typeDelta, to.totalCards() - from.totalCards(), to.lands() - from.lands(), roleDelta);
 	}
 
 	private static Map<Key, DeckCardLine> index(List<DeckCardLine> lines) {

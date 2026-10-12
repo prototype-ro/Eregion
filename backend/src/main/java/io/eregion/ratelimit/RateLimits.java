@@ -55,6 +55,11 @@ public class RateLimits {
 		check("search:" + user, properties.searchPerUserMinute(), MINUTE, "searches");
 	}
 
+	/** The structured search goes to Scryfall on every new question, so it is held to fewer a minute than a name search. */
+	public void advancedSearch(UUID user) {
+		check("advanced-search:" + user, properties.advancedSearchPerUserMinute(), MINUTE, "advanced searches");
+	}
+
 	public void resolve(UUID user) {
 		check("resolve:" + user, properties.resolvePerUserMinute(), MINUTE, "list lookups");
 	}

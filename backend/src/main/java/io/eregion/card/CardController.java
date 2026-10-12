@@ -34,15 +34,17 @@ public class CardController {
 
 	private final CardRepository cards;
 	private final CardSearchService search;
+	private final AdvancedSearchService advanced;
 	private final CardImportService importer;
 	private final CardResolveService resolver;
 	private final PrintingService printings;
 	private final RateLimits limits;
 
-	public CardController(CardRepository cards, CardSearchService search, CardImportService importer,
+	public CardController(CardRepository cards, CardSearchService search, AdvancedSearchService advanced, CardImportService importer,
 			CardResolveService resolver, PrintingService printings, RateLimits limits) {
 		this.cards = cards;
 		this.search = search;
+		this.advanced = advanced;
 		this.importer = importer;
 		this.resolver = resolver;
 		this.printings = printings;
@@ -52,12 +54,31 @@ public class CardController {
 	/** Searches our catalog and, when it has too few matches, Scryfall too. Saved cards come back with ids. */
 	@GetMapping("/search")
 	public List<Card> search(@AuthenticationPrincipal Jwt jwt, @RequestParam String q, @RequestParam(defaultValue = "20") int limit,
-			@RequestParam(defaultValue = "false") boolean commanders) {
+			@RequestParam(defaultValue = "false") boolean commanders, @RequestParam(defaultValue = "false") boolean tokens) {
 		limits.search(CurrentUser.id(jwt));
 		if (q.trim().length() < 2) {
 			throw ApiException.badRequest("Search needs at least 2 characters");
 		}
-		return search.search(q, Math.max(1, Math.min(limit, 50)), commanders);
+		return search.search(q, Math.max(1, Math.min(limit, 50)), commanders, tokens);
+	}
+
+	/**
+	 * Advanced search: any Scryfall filter the form builds (type, colours, mana value, text and so on), with options that are Eregion's
+	 * own (legal in Commander, a role) and the order. Covers all of Scryfall, and saves what it returns.
+	 */
+	@GetMapping("/advanced")
+	public AdvancedSearchService.Result advanced(@AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "") String q,
+			@RequestParam(defaultValue = "true") boolean legal, @RequestParam(required = false) String role,
+			@RequestParam(defaultValue = "name") String order, @RequestParam(defaultValue = "asc") String dir,
+			@RequestParam(defaultValue = "1") int page) {
+		limits.advancedSearch(CurrentUser.id(jwt));
+		return advanced.search(q, legal, role, order, dir, page);
+	}
+
+	/** The roles the advanced search can filter by. */
+	@GetMapping("/roles")
+	public List<String> roles() {
+		return advanced.roles();
 	}
 
 	@GetMapping("/{id}")

@@ -672,14 +672,16 @@ public class DeckRepository {
 				       CASE WHEN cp.id IS NOT NULL THEN cp.label ELSE COALESCE(p.set_name, c.set_name) END AS set_name,
 				       CASE WHEN cp.id IS NOT NULL THEN '' ELSE COALESCE(p.collector_number, c.collector_number) END AS collector_number,
 				       COALESCE(dc.price_usd, CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END) AS price_usd,
-				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned, dc.tags
+				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned, dc.tags,
+				       """ + io.eregion.card.FunctionalTagSql.columns("c.id") + """
+				       
 				  FROM deck_version_cards dc
 				  JOIN cards c ON c.id = dc.card_id
 				  LEFT JOIN card_printings p ON p.scryfall_id = dc.printing_id
 				  LEFT JOIN custom_printings cp ON cp.id = dc.custom_printing_id
 				  LEFT JOIN collection_entries e ON e.card_id = c.id AND e.user_id = :user
 				 WHERE dc.version_id = :version
-				 ORDER BY CASE dc.board WHEN 'commander' THEN 0 WHEN 'main' THEN 1 WHEN 'maybe' THEN 2 ELSE 3 END,
+				 ORDER BY CASE dc.board WHEN 'commander' THEN 0 WHEN 'main' THEN 1 WHEN 'maybe' THEN 2 WHEN 'considering' THEN 3 ELSE 4 END,
 				          c.name
 				""")
 				.param("version", versionId)
@@ -779,6 +781,9 @@ public class DeckRepository {
 				rs.getString("board"),
 				rs.getInt("quantity"),
 				rs.getInt("owned"),
-				tags);
+				tags,
+				rs.getString("role"),
+				rs.getString("role_source"),
+				io.eregion.card.FunctionalTagSql.secondary(rs));
 	}
 }
