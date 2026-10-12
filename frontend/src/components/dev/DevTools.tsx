@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { PaletteSwitch } from "./PaletteSwitch";
 
 // Only a development build ever contains the import. In a production build NODE_ENV is replaced at compile
 // time, the condition is false, and the annotation code and its libraries are left out of the bundle.
@@ -22,7 +21,6 @@ export function DevTools() {
     <>
       <AnnotateOverlay />
       <SessionRecorder />
-      <PaletteSwitch />
     </>
   );
 }

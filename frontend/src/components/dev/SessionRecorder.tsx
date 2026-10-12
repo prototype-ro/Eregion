@@ -230,7 +230,7 @@ export function SessionRecorder() {
     return () => clearTimeout(timer);
   }, [status]);
 
-  const pill = "rounded-full px-4 py-2 text-sm font-medium shadow-lg";
+  const pill = "rounded-full px-2.5 py-1 text-[11px] font-medium shadow-lg";
   return (
     <div data-annotate-ignore data-recorder-ignore>
       {!recording && (
@@ -238,7 +238,7 @@ export function SessionRecorder() {
           type="button"
           onClick={toggle}
           title="Record this tab with a log of what you do (Alt+Shift+R)"
-          className={`${pill} fixed bottom-4 left-[7.25rem] z-[99998] border border-line bg-bg text-muted opacity-60 hover:opacity-100`}
+          className={`${pill} fixed bottom-2 left-[4.9rem] z-[99998] border border-line bg-bg text-muted opacity-60 hover:opacity-100`}
         >
           Record
         </button>
