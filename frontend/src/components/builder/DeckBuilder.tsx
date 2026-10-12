@@ -24,7 +24,10 @@ import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
 import { CardPeek } from "./CardPeek";
 import { CardPreview } from "./CardPreview";
+import { AdvancedSearch } from "./AdvancedSearch";
 import { CardSearch } from "./CardSearch";
+import { CommandDock } from "./CommandDock";
+import { SideBoards, type SideBoard } from "./SideBoards";
 import { CardGallery, CardStacks } from "./CardViews";
 import { ImportDialog, type ImportedCard } from "./ImportDialog";
 import { PrintingPicker } from "./PrintingPicker";
@@ -37,15 +40,9 @@ import { MergeDialog } from "./MergeDialog";
 import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
 import { VersionTimeline } from "./VersionTimeline";
+import { exportDeck } from "@/lib/export";
 
-type Tab = "main" | "maybe" | "considering";
 type ViewMode = "list" | "stacks" | "gallery";
-
-const TABS: Array<[Tab, string]> = [
-  ["main", "Mainboard"],
-  ["maybe", "Maybeboard"],
-  ["considering", "Considering"],
-];
 
 const VIEWS: Array<[ViewMode, string]> = [
   ["list", "List"],
@@ -92,6 +89,9 @@ function lineFromCard(card: Card, board: Board, quantity = 1): DeckCardLine {
     quantity,
     owned: 0,
     tags: [],
+    role: card.role ?? null,
+    roleSource: card.roleSource ?? null,
+    secondaryRoles: card.secondaryRoles ?? [],
   };
 }
 
@@ -163,7 +163,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   };
   const [recovered, setRecovered] = useState(() => recoveredFor(versionNumber, baseLines));
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [tab, setTab] = useState<Tab>("main");
+  const [animateView, setAnimateView] = useState(false);
   const [group, setGroup] = useState<GroupMode>("type");
   const [sort, setSort] = useState<SortMode>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -201,6 +201,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [printingKey, setPrintingKey] = useState<string | null>(null);
   const [tagKey, setTagKey] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [editListOpen, setEditListOpen] = useState(false);
   const router = useRouter();
   const [comparing, setComparing] = useState(false);
   // The timeline puts its branch and zoom controls in the panel's title row.
@@ -208,6 +210,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   // Whether the save controls under the timeline are on screen. When they are not, a copy floats at the bottom.
   const footerRef = useRef<HTMLDivElement>(null);
   const [footerSeen, setFooterSeen] = useState(true);
+  // The dock belongs to the cards, so it stays away until the mainboard is about to come into view and stays once it has passed.
+  const mainboardRef = useRef<HTMLDivElement>(null);
+  const [dockShown, setDockShown] = useState(false);
   // Opening another version starts a fresh draft from it. The builder itself stays mounted, so the view, the timeline
   // and everything on screen carry on instead of resetting and flashing back to defaults.
   const [shownVersion, setShownVersion] = useState(versionNumber);
@@ -236,6 +241,13 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     const element = footerRef.current;
     if (!element || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(([entry]) => setFooterSeen(entry.isIntersecting), { threshold: 0.4 });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    const element = mainboardRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setDockShown(entry.isIntersecting || entry.boundingClientRect.top < 0), { rootMargin: "0px 0px -90px 0px" });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -363,15 +375,22 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const showDraft = dirty || branching;
   const canSave = lines.length > 0 && !saving && (needsBranch ? branchName.trim() !== "" : dirty);
 
-  const visible = withOwned.filter((line) => (tab === "main" ? line.board === "main" || line.board === "commander" : line.board === tab));
-  const groups = groupLines(visible, tab === "main" ? group : "type", sort, sortDirection);
+  // The deck itself: the commander and the mainboard. The other boards sit in their own module below.
+  const visible = withOwned.filter((line) => line.board === "main" || line.board === "commander");
+  const groups = groupLines(visible, group, sort, sortDirection);
+  const mainCount = visible.reduce((sum, line) => sum + line.quantity, 0);
+  const sideBoards: SideBoard[] = (
+    [
+      ["maybe", "Maybeboard", "Nothing here yet. Cards you might play go here."],
+      ["considering", "Considering", "Nothing here yet. Cards you are weighing up go here."],
+      ["tokens", "Tokens", "No tokens yet. Search for the tokens this deck makes."],
+    ] as const
+  ).map(([board, title, hint]) => {
+    const boardLines = withOwned.filter((line) => line.board === board);
+    return { board, title, hint, count: boardLines.reduce((sum, line) => sum + line.quantity, 0), groups: groupLines(boardLines, "type", sort, sortDirection) };
+  });
   const lineByKey = (key: string | null) => withOwned.find((line) => lineKey(line) === key) ?? null;
   const selected = lineByKey(selectedKey) ?? withOwned.find((line) => line.board === "commander") ?? null;
-
-  const tabCount = (target: Tab) =>
-    withOwned
-      .filter((line) => (target === "main" ? line.board === "main" || line.board === "commander" : line.board === target))
-      .reduce((sum, line) => sum + line.quantity, 0);
 
   const versionSummary = timeline.branches.flatMap((branch) => branch.versions).find((v) => v.versionNumber === version?.versionNumber);
 
@@ -397,6 +416,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   }
 
   function chooseView(next: ViewMode) {
+    // Only a switch the person makes plays the entrance, not the page loading with its saved view.
+    setAnimateView(true);
     setView(next);
     remember(VIEW_KEY, next);
   }
@@ -455,8 +476,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
   // ---- editing ----
 
-  function addCard(card: Card) {
-    const target: Board = tab;
+  function addCard(card: Card, board: Board = "main") {
+    const target: Board = board;
     setLines((previous) => {
       const index = previous.findIndex((line) => line.cardId === card.id && line.board === target);
       if (index === -1) return [...previous, lineFromCard(card, target)];
@@ -469,7 +490,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       ...previous.filter((line) => line.board !== "commander" && line.cardId !== card.id),
       lineFromCard(card, "commander"),
     ]);
-    setTab("main");
   }
 
   const changeQuantity = useCallback((target: DeckCardLine, delta: number) => {
@@ -577,12 +597,15 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     setPrintingKey(null);
   }
 
-  function importCards(cards: ImportedCard[], replace: boolean) {
+  function importCards(cards: ImportedCard[], replace: boolean, message?: string) {
     // Cards that were already in the deck keep the art that was chosen for them, whichever way the list is added.
-    const { lines: incoming, inherited } = inheritArt(
+    const { lines: asked, inherited } = inheritArt(
       lines,
       cards.map(({ card, quantity, board }) => lineFromCard(card, board, quantity)),
     );
+    // Replacing the deck from a list keeps the tags a card already had on the same board, since a list has no way to say them.
+    const tagsBefore = new Map(lines.map((line) => [lineKey(line), line.tags]));
+    const incoming = replace ? asked.map((line) => (tagsBefore.has(lineKey(line)) ? { ...line, tags: tagsBefore.get(lineKey(line)) ?? [] } : line)) : asked;
     setLines((previous) => {
       const base = replace ? [] : previous;
       let next = base;
@@ -601,7 +624,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       }
       return next;
     });
-    setToast(`Imported ${incoming.reduce((sum, line) => sum + line.quantity, 0)} cards${inherited > 0 ? `, ${inherited} kept their chosen art` : ""}`);
+    setToast(`${message ?? "Imported"} ${incoming.reduce((sum, line) => sum + line.quantity, 0)} cards${inherited > 0 ? `, ${inherited} kept their chosen art` : ""}`);
   }
 
   /** The cards of the draft as the server wants them. */
@@ -688,6 +711,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     onMenu: (line: DeckCardLine, x: number, y: number) => setMenu({ line, x, y }),
     checkCollection,
     cardSize,
+    // The other roles of a card show as small badges while the list is grouped by role, where they tell what else it does.
+    showRoles: group === "role",
   };
 
   // [ and ] step to the previous and next saved version, unless you are typing.
@@ -742,22 +767,42 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             Discard
           </button>
         )}
+        {/* A deck with no version yet has no version actions row to hold Save, so the first save sits here beside the note. */}
+        {where === "bar" && version === null && (
+          <button type="button" disabled={!canSave} onClick={save} className={`${btn.primary} sm:ml-auto`}>
+            {saveNewLabel}
+          </button>
+        )}
       </div>
     );
   }
 
   const canApply = version !== null && dirty && !saving && applyCheck.ok && lines.length > 0;
-  const saveNewLabel = saving ? "Saving" : needsBranch ? "Save as new branch" : "Save new version";
+  const saveNewLabel = saving ? "Saving" : needsBranch ? "Save as new branch" : version === null ? "Save first version" : "Save new version";
   const applyHint = !version ? undefined : !dirty ? "Nothing changed yet" : applyCheck.ok ? `Save these changes over version ${version.versionNumber}, without adding a version` : (applyCheck.reason ?? undefined);
   const onApply = () => (versionIsPublic ? setConfirmApply(true) : void applyChanges());
+
+  /** The cards of some groups, drawn the way the deck is being viewed. Switching the view plays a short entrance for the new one. */
+  function renderCards(boardGroups: typeof groups) {
+    const props = { ...viewProps, groups: boardGroups };
+    return (
+      <div key={view} className={animateView ? "view-enter" : undefined}>
+        {view === "list" && <CardList {...props} />}
+        {view === "stacks" && <CardStacks {...props} />}
+        {view === "gallery" && <CardGallery {...props} />}
+      </div>
+    );
+  }
 
   /** Save and Save new version, for the floating bar. The footer has the same two buttons among its others. */
   function renderSaveButtons() {
     return (
       <>
-        <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} className={btn.secondary}>
-          Save
-        </button>
+        {version && (
+          <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} className={btn.secondary}>
+            Save
+          </button>
+        )}
         <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
           {saveNewLabel}
         </button>
@@ -766,7 +811,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   }
 
   return (
-    <div className="relative">
+    <div className="relative pb-28">
       <div className="relative">
         {/* Backdrop art. Placeholder until the art library exists. It keeps one size whatever the panel does, and is cut and faded where the header and panel end. */}
         <div aria-hidden="true" className="art-clip pointer-events-none absolute inset-0 z-0 hidden overflow-hidden md:block">
@@ -958,152 +1003,53 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </section>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-b border-line">
-        <div className="-mb-px flex w-full gap-5 overflow-x-auto sm:gap-7 [scrollbar-width:none] md:w-auto" role="tablist" aria-label="Boards">
-          {TABS.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              onClick={() => setTab(key)}
-              className={`min-h-12 shrink-0 whitespace-nowrap border-b-2 py-2.5 text-[15px] sm:text-base ${tab === key ? "border-accent-text" : "border-transparent text-muted"}`}
-            >
-              {label} <span className="text-sm text-muted">{tabCount(key)}</span>
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          aria-expanded={optionsOpen}
-          aria-controls="board-options"
-          onClick={() => setOptionsOpen((open) => !open)}
-          className={`${btn.quiet} -ml-4 text-sm md:hidden`}
-        >
-          <SlidersHorizontal size={18} aria-hidden />
-          {optionsOpen ? "Hide display options" : "Display options"}
-        </button>
-        <div id="board-options" className={`${optionsOpen ? "flex" : "hidden"} flex-wrap items-center gap-x-6 gap-y-3 pb-3 md:flex md:pb-2`}>
-          {tab === "main" && (
-            <div className="flex items-center gap-3">
-              <label htmlFor="group-by" className="text-sm text-muted">
-                Group by
-              </label>
-              <select
-                id="group-by"
-                value={group}
-                onChange={(event) => chooseGroup(event.target.value as GroupMode)}
-                className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
-              >
-                {GROUP_MODES.map(([mode, label]) => (
-                  <option key={mode} value={mode}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <label htmlFor="sort-by" className="text-sm text-muted">
-              Sort by
-            </label>
-            <select
-              id="sort-by"
-              value={sort}
-              onChange={(event) => chooseSort(event.target.value as SortMode)}
-              className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
-            >
-              {SORT_MODES.map(([mode, label]) => (
-                <option key={mode} value={mode}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <SortDirectionButton direction={sortDirection} onFlip={flipSortDirection} />
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={checkCollection}
-            onClick={toggleCollectionCheck}
-            className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm"
-          >
-            <span
-              aria-hidden="true"
-              className={`relative h-6 w-11 rounded-full border transition-colors ${checkCollection ? "border-accent-text bg-accent" : "border-line bg-surface"}`}
-            >
-              <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-ink transition-all ${checkCollection ? "left-5.5" : "left-0.5"}`} />
-            </span>
-            Check collection
+      {/* The mainboard heading. Search, view and display options live in the dock at the bottom of the screen. */}
+      <div ref={mainboardRef} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line">
+        <h2 className="py-2.5 text-[15px] sm:text-base">
+          Mainboard <span className="text-sm text-muted">{mainCount}</span>
+        </h2>
+        <div className="-mr-3 flex flex-wrap items-center pb-1 md:pb-0">
+          <button type="button" onClick={() => setAdvancedOpen(true)} className={`${btn.quiet} text-sm`}>
+            Advanced search
           </button>
-          {view !== "list" && (
-            <label className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm text-muted">
-              Size
-              <input
-                type="range"
-                min={SIZE_MIN}
-                max={SIZE_MAX}
-                step={10}
-                value={cardSize}
-                onChange={(event) => chooseSize(Number(event.target.value))}
-                aria-label="Card size"
-                aria-valuetext={`${cardSize} pixels wide`}
-                className="w-32 accent-[var(--accent-text)]"
-              />
-            </label>
-          )}
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted">View</span>
-            <div className="flex gap-1 rounded-full border border-line p-1">
-              {VIEWS.map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={view === mode}
-                  onClick={() => chooseView(mode)}
-                  className={`min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full px-4 text-sm ${view === mode ? "bg-ink text-bg" : ""}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <button type="button" onClick={() => setEditListOpen(true)} className={`${btn.quiet} text-sm`}>
+            Edit list
+          </button>
+          <button type="button" onClick={() => setImportOpen(true)} className={`${btn.quiet} text-sm`}>
+            Import list
+          </button>
+          <button type="button" onClick={() => setExportOpen(true)} disabled={lines.length === 0} className={`${btn.quiet} text-sm`}>
+            Export
+          </button>
         </div>
       </div>
-
-      <div className="flex flex-wrap items-end gap-3 py-7">
-        <div className="min-w-[260px] flex-1">
-          <CardSearch inDeck={inDeck} owned={owned} showCollection={checkCollection} onAdd={addCard} onSetCommander={setCommander} />
-        </div>
-        <button
-          type="button"
-          onClick={() => setImportOpen(true)}
-          className={`${btn.secondary} min-h-14 px-6`}
-        >
-          Import list
-        </button>
-        <button
-          type="button"
-          onClick={() => setExportOpen(true)}
-          disabled={lines.length === 0}
-          className={`${btn.quiet} min-h-14`}
-        >
-          Export
-        </button>
-      </div>
+      <div className="h-7" />
 
       {/* Cards */}
       <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
         <div className="hidden lg:sticky lg:top-6 lg:block">
           <CardPreview line={selected} showCollection={checkCollection} />
         </div>
-        <div>
-          {view === "list" && <CardList {...viewProps} />}
-          {view === "stacks" && <CardStacks {...viewProps} />}
-          {view === "gallery" && <CardGallery {...viewProps} />}
-        </div>
+        <div>{renderCards(viewProps.groups)}</div>
       </div>
+
+      <SideBoards
+        boards={sideBoards}
+        renderCards={renderCards}
+        renderSearch={(board) => (
+          <CardSearch
+            compact
+            board={board}
+            label={`Add to ${board === "tokens" ? "tokens" : board === "maybe" ? "the maybeboard" : "considering"}`}
+            placeholder={board === "tokens" ? "Search for a token" : "Search by card name"}
+            inDeck={inDeck}
+            owned={owned}
+            showCollection={checkCollection}
+            onAdd={(card) => addCard(card, board)}
+            onSetCommander={setCommander}
+          />
+        )}
+      />
 
       <div className="mt-16">
         <StatsSection
@@ -1115,6 +1061,108 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           showCollection={checkCollection}
         />
       </div>
+
+      <CommandDock
+        shown={dockShown}
+        search={<CardSearch dock inDeck={inDeck} owned={owned} showCollection={checkCollection} onAdd={addCard} onSetCommander={setCommander} />}
+        views={<div role="group" aria-label="View" className="relative grid grid-cols-3 rounded-full border border-line p-1 bg-transparent">
+              {/* The highlight slides between the three equal cells, moving only by transform. */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/3)] rounded-full bg-ink transition-transform duration-300 ease-[cubic-bezier(0.34,1.35,0.64,1)] motion-reduce:transition-none"
+                style={{ transform: `translateX(${VIEWS.findIndex(([mode]) => mode === view) * 100}%)` }}
+              />
+              {VIEWS.map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={view === mode}
+                  onClick={() => chooseView(mode)}
+                  className={`relative min-h-8 min-w-[68px] [@media(pointer:coarse)]:min-h-10 rounded-full px-3.5 text-sm transition-colors duration-200 ${view === mode ? "text-bg" : "text-muted hover:text-ink"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>}
+        display={
+          <>
+            <div className="flex items-center gap-3">
+                        <label htmlFor="group-by" className="text-sm text-muted">
+                          Group by
+                        </label>
+                        <select
+                          id="group-by"
+                          value={group}
+                          onChange={(event) => chooseGroup(event.target.value as GroupMode)}
+                          className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+                        >
+                          {GROUP_MODES.map(([mode, label]) => (
+                            <option key={mode} value={mode}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label htmlFor="sort-by" className="text-sm text-muted">
+                          Sort by
+                        </label>
+                        <select
+                          id="sort-by"
+                          value={sort}
+                          onChange={(event) => chooseSort(event.target.value as SortMode)}
+                          className="min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none"
+                        >
+                          {SORT_MODES.map(([mode, label]) => (
+                            <option key={mode} value={mode}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <SortDirectionButton direction={sortDirection} onFlip={flipSortDirection} />
+                      </div>
+            <button
+                        type="button"
+                        role="switch"
+                        aria-checked={checkCollection}
+                        onClick={toggleCollectionCheck}
+                        className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`relative h-6 w-11 rounded-full border transition-colors ${checkCollection ? "border-accent-text bg-accent" : "border-line bg-surface"}`}
+                        >
+                          <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-ink transition-all ${checkCollection ? "left-5.5" : "left-0.5"}`} />
+                        </span>
+                        Check collection
+                      </button>
+            {view !== "list" && (
+                        <label className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center gap-3 text-sm text-muted">
+                          Size
+                          <input
+                            type="range"
+                            min={SIZE_MIN}
+                            max={SIZE_MAX}
+                            step={10}
+                            value={cardSize}
+                            onChange={(event) => chooseSize(Number(event.target.value))}
+                            aria-label="Card size"
+                            aria-valuetext={`${cardSize} pixels wide`}
+                            className="w-32 accent-[var(--accent-text)]"
+                          />
+                        </label>
+                      )}
+          </>
+        }
+        boards={sideBoards.map((entry) => ({ board: entry.board, title: entry.title, count: entry.count }))}
+        save={
+          showDraft ? (
+            renderSaveButtons()
+          ) : (
+            <span className="hidden px-3 text-xs text-muted sm:inline">{version ? "All changes saved" : "No cards yet"}</span>
+          )
+        }
+      />
 
       {/* Overlays */}
       <DescriptionDialog open={descriptionOpen} onClose={() => setDescriptionOpen(false)} deckId={deck.id} description={deck.description} onSaved={onReload} />
@@ -1247,17 +1295,37 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       />
       <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} onChooseCustom={chooseCustom} />
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
-      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={importCards} />
+      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={(cards, replace) => importCards(cards, replace)} />
+      <ImportDialog
+        open={editListOpen}
+        onClose={() => setEditListOpen(false)}
+        title="Edit list"
+        intro="The whole deck as text, one card per line. Change it by hand, or paste a new list over it."
+        initialText={editListOpen ? exportDeck(lines, "plain", deck.name, true).text : ""}
+        defaultReplace
+        replaceLabel={null}
+        submitLabel="Apply"
+        confirmLabel={(count) => `Apply ${count} cards`}
+        onImport={(cards) => importCards(cards, true, "Applied")}
+      />
+      <AdvancedSearch
+        open={advancedOpen}
+        onClose={() => setAdvancedOpen(false)}
+        inDeck={inDeck}
+        commanderIdentity={lines.find((line) => line.board === "commander")?.colorIdentity ?? null}
+        onAdd={addCard}
+        onSetCommander={setCommander}
+        onEditList={() => setEditListOpen(true)}
+      />
 
       <Presence
         show={showDraft && !footerSeen}
         y={18}
-        className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-[980px] rounded-[28px] border border-line bg-bg/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.5)] backdrop-blur"
+        className={`fixed inset-x-4 ${dockShown ? "bottom-[76px]" : "bottom-4"} z-30 mx-auto flex max-w-[920px] rounded-[28px] border border-line bg-bg/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.5)] backdrop-blur`}
       >
         {renderFields("float")}
-        <div className="mt-3 flex flex-wrap items-center gap-2.5">{renderSaveButtons()}</div>
       </Presence>
-      <Presence show={undoDelete !== null} y={14} className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+      <Presence show={undoDelete !== null} y={14} className={`fixed ${dockShown ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2`}>
         <div role="status" className="flex items-center gap-2 rounded-full border border-line bg-bg py-1.5 pr-1.5 pl-5 text-sm shadow-2xl">
           Deleted v{undoShown.current}
           <button type="button" onClick={() => void undoDeleteVersion(undoShown.current)} className={`${btn.secondary} !min-h-9 px-4 text-sm`}>
@@ -1266,7 +1334,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         </div>
       </Presence>
       {toast && undoDelete === null && (
-        <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">
+        <p role="status" className={`fixed ${dockShown ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl`}>
           {toast}
         </p>
       )}

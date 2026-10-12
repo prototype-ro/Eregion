@@ -17,6 +17,7 @@ const SECTIONS: Array<[RegExp, Board]> = [
   [/^(main(board)?|deck|maindeck)\s*:?$/i, "main"],
   [/^(side(board)?|maybe(board)?)\s*:?$/i, "maybe"],
   [/^(considering|consider)\s*:?$/i, "considering"],
+  [/^tokens?\s*:?$/i, "tokens"],
 ];
 
 // "1 Sol Ring", "1x Sol Ring", "4 Island (UNF) 280", "1 Sol Ring *F*"

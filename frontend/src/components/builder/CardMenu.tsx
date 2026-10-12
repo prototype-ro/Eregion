@@ -30,6 +30,14 @@ interface Props {
 const item =
   "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center rounded-xl px-3.5 text-left text-[15px] hover:bg-surface focus:bg-surface focus:outline-none";
 
+/** The boards a card can be moved to, in the order they sit on the page. */
+const MOVES: Array<[Board, string]> = [
+  ["main", "mainboard"],
+  ["maybe", "maybeboard"],
+  ["considering", "considering"],
+  ["tokens", "tokens"],
+];
+
 /** The quick menu for a card, opened from its three dots or by right-clicking it. */
 export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onSetPartner, onHistory, onRemove, onNotify }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -166,9 +174,11 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
               Remove
             </button>
           </div>
-          <button role="menuitem" className={item} onClick={act(() => onMove(line, line.board === "main" ? "maybe" : "main"))}>
-            {line.board === "main" ? "Move to maybeboard" : "Move to mainboard"}
-          </button>
+          {MOVES.filter(([board]) => board !== line.board).map(([board, name]) => (
+            <button key={board} role="menuitem" className={item} onClick={act(() => onMove(line, board))}>
+              Move to {name}
+            </button>
+          ))}
         </>
       )}
       <button role="menuitem" className={`${item} text-danger`} onClick={act(() => onRemove(line))}>

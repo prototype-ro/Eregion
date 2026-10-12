@@ -1,3 +1,4 @@
+import { ROLE_ORDER, UNCATEGORIZED } from "./roles.ts";
 import type { DeckCardLine, DeckStats } from "./types";
 
 /**
@@ -24,6 +25,7 @@ export function computeStats(lines: DeckCardLine[]): DeckStats {
   let price = 0;
   const curve = new Array<number>(CURVE_BUCKETS).fill(0);
   const counts = new Map<string, number>();
+  const roleCounts = new Map<string, number>();
 
   for (const line of lines) {
     if (!isCounted(line.board)) continue;
@@ -35,6 +37,8 @@ export function computeStats(lines: DeckCardLine[]): DeckStats {
     if (line.primaryType === "Land") {
       lands += line.quantity;
     } else {
+      const role = line.role ?? UNCATEGORIZED;
+      roleCounts.set(role, (roleCounts.get(role) ?? 0) + line.quantity);
       nonLand += line.quantity;
       manaValueSum += line.manaValue * line.quantity;
       curve[Math.min(Math.floor(line.manaValue), CURVE_BUCKETS - 1)] += line.quantity;
@@ -50,6 +54,13 @@ export function computeStats(lines: DeckCardLine[]): DeckStats {
     if (!(type in types) && count) types[type] = count;
   }
 
+  // Roles in the order they are shown: by priority, any others the server knows, then the cards with no known role.
+  const roles: Record<string, number> = {};
+  for (const role of [...ROLE_ORDER, ...[...roleCounts.keys()].filter((role) => !ROLE_ORDER.includes(role) && role !== UNCATEGORIZED), UNCATEGORIZED]) {
+    const count = roleCounts.get(role);
+    if (count) roles[role] = count;
+  }
+
   return {
     totalCards: total,
     averageManaValue: nonLand === 0 ? 0 : round2(manaValueSum / nonLand),
@@ -59,5 +70,6 @@ export function computeStats(lines: DeckCardLine[]): DeckStats {
     owned,
     missing: total - owned,
     totalPriceUsd: round2(price),
+    roles,
   };
 }

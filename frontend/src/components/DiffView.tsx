@@ -1,5 +1,6 @@
 import { ManaCost } from "@/components/Mana";
 import type { CardChange, DeckDiff, PrintingChange, QuantityChange, TagChange } from "@/lib/types";
+import { knownRoles } from "@/lib/roles";
 
 function signed(value: number, digits = 0): string {
   if (value === 0) return "no change";
@@ -100,6 +101,8 @@ function Retagged({ change }: { change: TagChange }) {
 
 export function DiffView({ diff }: { diff: DeckDiff }) {
   const { stats } = diff;
+  // Changes in what the cards do, such as +2 Ramp, -1 Removal. Cards with no known role are not a change worth reporting.
+  const roleChanges = knownRoles(stats.roleDelta);
   const maxCurve = Math.max(...stats.from.curve, ...stats.to.curve, 1);
 
   const tiles: Array<{ label: string; value: string; note: string; accent: boolean }> = [
@@ -229,6 +232,19 @@ export function DiffView({ diff }: { diff: DeckDiff }) {
                 </li>
               ))}
             </ul>
+          )}
+          {roleChanges.length > 0 && (
+            <>
+              <h3 className="mt-8 border-b border-line pb-3.5 text-[15px] text-muted">Roles</h3>
+              <p className="py-3.5 text-lg" aria-label="Role changes">
+                {roleChanges.map(([role, delta], index) => (
+                  <span key={role}>
+                    {index > 0 && ", "}
+                    <span className="font-mono text-sm text-accent-text">{delta > 0 ? `+${delta}` : delta}</span> {role}
+                  </span>
+                ))}
+              </p>
+            </>
           )}
         </section>
       </div>

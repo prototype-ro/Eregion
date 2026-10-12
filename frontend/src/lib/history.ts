@@ -17,7 +17,7 @@ export interface CardHistory {
   firstAdded: number | null;
 }
 
-const BOARD_NAMES: Record<Board, string> = { commander: "the commander slot", main: "the mainboard", maybe: "the maybeboard", considering: "considering" };
+const BOARD_NAMES: Record<Board, string> = { commander: "the commander slot", main: "the mainboard", maybe: "the maybeboard", considering: "considering", tokens: "the tokens" };
 const board = (name: Board) => BOARD_NAMES[name];
 const copies = (n: number) => `${n} ${n === 1 ? "copy" : "copies"}`;
 

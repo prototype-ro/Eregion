@@ -37,6 +37,13 @@ export function CardPreview({ line, showCollection }: { line: DeckCardLine | nul
           {line.setCode.toUpperCase()} {line.collectorNumber}
           {line.rarity ? `, ${line.rarity}` : ""}
         </p>
+        {line.role && (
+          <p className="mt-2.5 text-sm text-muted">
+            <span className="text-ink">{line.role}</span>
+            {line.roleSource === "regex" && <span title="Guessed from the rules text, not tagged by the community"> (guess)</span>}
+            {line.secondaryRoles.length > 0 && <>, also {line.secondaryRoles.join(", ")}</>}
+          </p>
+        )}
         {showCollection && (
           <p className={`mt-2.5 text-sm ${line.owned >= line.quantity ? "text-muted" : "text-add-text"}`}>
             {line.owned >= line.quantity

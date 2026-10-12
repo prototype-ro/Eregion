@@ -9,7 +9,7 @@ import type { Card } from "./types";
  * it does not know yet. The request waits for a short pause in typing, and a newer query cancels
  * the answer to an older one.
  */
-export function useCardSearch(query: string, limit = 8, commandersOnly = false) {
+export function useCardSearch(query: string, limit = 8, commandersOnly = false, tokens = false) {
   const [results, setResults] = useState<Card[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function useCardSearch(query: string, limit = 8, commandersOnly = false) 
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const found = await api<Card[]>(`/api/cards/search?q=${encodeURIComponent(trimmed)}&limit=${limit}${commandersOnly ? "&commanders=true" : ""}`);
+        const found = await api<Card[]>(`/api/cards/search?q=${encodeURIComponent(trimmed)}&limit=${limit}${commandersOnly ? "&commanders=true" : ""}${tokens ? "&tokens=true" : ""}`);
         if (!cancelled) {
           setResults(found);
           setError(null);
@@ -43,7 +43,7 @@ export function useCardSearch(query: string, limit = 8, commandersOnly = false) 
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [trimmed, searchable, limit, commandersOnly]);
+  }, [trimmed, searchable, limit, commandersOnly, tokens]);
 
   return { results, loading, error, searchable };
 }

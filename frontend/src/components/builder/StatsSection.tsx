@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatPrice } from "@/lib/links";
+import { foldedRoleCounts, knownRoles } from "@/lib/roles";
 import type { DeckCardLine, DeckStats } from "@/lib/types";
 
 interface Props {
@@ -86,6 +87,19 @@ export function StatsSection({ deckId, stats, saved, savedVersion, removed, show
               </li>
             ))}
           </ul>
+          {knownRoles(stats.roles).length > 0 && (
+            <>
+              <p className="mt-6 border-b border-line pb-2.5 text-[15px] text-muted">Roles</p>
+              <ul>
+                {Object.entries(foldedRoleCounts(stats.roles)).map(([role, count]) => (
+                  <li key={role} className="flex justify-between py-2.5 text-[15px]">
+                    <span className={role === "Uncategorized" ? "text-muted" : ""}>{role}</span>
+                    <span className="font-mono text-[13px] text-muted">{count}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
 
         {!readOnly && (

@@ -104,6 +104,7 @@ export default function PublicDeckPage() {
     checkCollection: false,
     cardSize: size,
     readOnly: true,
+    showRoles: group === "role",
     onSelect: (line: (typeof counted)[number]) => setSelectedKey(lineKey(line)),
     onMenu: noMenu,
   };

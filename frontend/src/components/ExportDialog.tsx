@@ -39,7 +39,7 @@ function Body({ onClose, deckName, lines }: Props) {
 
   const result = useMemo(() => exportDeck(lines, format, deckName, bench), [lines, format, deckName, bench]);
   const info = EXPORT_FORMATS.find((entry) => entry.id === format)!;
-  const hasBench = lines.some((line) => line.board === "maybe" || line.board === "considering");
+  const hasBench = lines.some((line) => line.board === "maybe" || line.board === "considering" || line.board === "tokens");
   const benchApplies = format === "plain" || format === "sets" || format === "csv";
 
   function choose(next: ExportFormat) {
@@ -96,7 +96,7 @@ function Body({ onClose, deckName, lines }: Props) {
       {hasBench && benchApplies && (
         <label className="flex items-center gap-3 text-[15px]">
           <input type="checkbox" checked={bench} onChange={(event) => setBench(event.target.checked)} className="h-5 w-5 accent-[var(--accent-text)]" />
-          Include the maybeboard and considering cards
+          Include the maybeboard, considering and token cards
         </label>
       )}
 

@@ -245,11 +245,44 @@ textarea:focus-visible {
 
 /* Card groups flow into as many columns as fit, and a group never splits across columns. */
 .group-columns {
-  column-width: 340px;
-  column-gap: clamp(28px, 3vw, 64px);
+  column-width: 300px;
+  column-gap: clamp(24px, 2.4vw, 48px);
 }
 .group-columns > * {
   break-inside: avoid;
+}
+/* The list view lets a long group continue into the next column, so a 60-card group does not leave the other columns empty. A title stays with its first rows, and a row is never cut in half. */
+.group-flow {
+  column-width: 270px;
+}
+.group-flow > * {
+  break-inside: auto;
+}
+.group-flow header {
+  break-after: avoid;
+}
+.group-flow li {
+  break-inside: avoid;
+}
+
+/* The entrance of a view the person has just switched to: it rises a few pixels into place while fading in. Opacity and transform only. */
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.view-enter {
+  animation: view-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-enter {
+    animation: none;
+  }
 }
 
 /* Frosted glass for controls that sit over backdrop art. CSS approximation, not true refraction. */
@@ -264,6 +297,24 @@ textarea:focus-visible {
 .glass:hover {
   background: color-mix(in srgb, var(--text) 15%, transparent);
   transform: scale(1.02);
+}
+
+/* The bottom dock sits over whatever card art scrolls under it, so its text is pulled toward the main color to stay readable. */
+.dock {
+  background: color-mix(in srgb, color-mix(in srgb, var(--bg), var(--text) var(--dock-lift, 14%)) var(--dock-fill, 50%), transparent);
+  -webkit-backdrop-filter: blur(var(--dock-blur, 10px)) saturate(var(--dock-sat, 1.6));
+  backdrop-filter: blur(var(--dock-blur, 10px)) saturate(var(--dock-sat, 1.6));
+  border: 1px solid color-mix(in srgb, var(--text) var(--dock-border, 24%), transparent);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 12px 36px color-mix(in srgb, #000 var(--dock-shadow, 40%), transparent);
+}
+.dock {
+  color: var(--text);
+  font-weight: var(--dock-weight, 400);
+}
+/* The quiet text in the dock (placeholder, buttons, counts) is pulled toward the main text color by this amount. */
+.dock .text-muted,
+.dock input::placeholder {
+  color: color-mix(in srgb, var(--text) var(--dock-text, 90%), var(--bg));
 }
 
 /* Very faint dot grid for panels that hold a diagram. */

@@ -1,6 +1,6 @@
 // Mirrors the backend DTOs. Keep in sync with io.eregion.*Dtos.
 
-export type Board = "commander" | "main" | "maybe" | "considering";
+export type Board = "commander" | "main" | "maybe" | "considering" | "tokens";
 
 export interface User {
   id: string;
@@ -32,6 +32,10 @@ export interface Card {
   imageArtCrop: string;
   /** legal, not_legal or banned in Commander, or unknown until read from Scryfall. */
   commanderLegality: string;
+  /** What the card does in a deck (Ramp, Removal, ...), or null when nothing is known about it. */
+  role?: string | null;
+  roleSource?: string | null;
+  secondaryRoles?: string[];
 }
 
 /** One printing of a card: a set, a collector number, its own art and price. */
@@ -110,6 +114,12 @@ export interface DeckCardLine {
   quantity: number;
   owned: number;
   tags: string[];
+  /** What the card does in a deck (Ramp, Removal, ...), or null when nothing is known about it. */
+  role: string | null;
+  /** Where the main role came from: scryfall (community tagged) or regex (a guess from the rules text). */
+  roleSource: string | null;
+  /** The card's other roles. Informational: the stats and the groups only use the main one. */
+  secondaryRoles: string[];
 }
 
 export interface DeckStats {
@@ -121,6 +131,8 @@ export interface DeckStats {
   owned: number;
   missing: number;
   totalPriceUsd: number;
+  /** Cards per role, lands left out, with the cards that have no known role under "Uncategorized". */
+  roles: Record<string, number>;
 }
 
 export interface VersionDetail {
@@ -204,6 +216,7 @@ export interface StatsChange {
   typeDelta: Record<string, number>;
   totalDelta: number;
   landsDelta: number;
+  roleDelta: Record<string, number>;
 }
 
 export interface DeckDiff {

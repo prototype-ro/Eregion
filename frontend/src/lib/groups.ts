@@ -1,9 +1,11 @@
+import { OTHER, ROLE_ORDER, roleFolder, UNCATEGORIZED } from "./roles.ts";
 import type { DeckCardLine } from "./types";
 
-export type GroupMode = "type" | "subtype" | "typeTags" | "color" | "identity" | "mv" | "rarity" | "set" | "tag";
+export type GroupMode = "type" | "role" | "subtype" | "typeTags" | "color" | "identity" | "mv" | "rarity" | "set" | "tag";
 
 export const GROUP_MODES: Array<[GroupMode, string]> = [
   ["type", "Type"],
+  ["role", "Role"],
   ["subtype", "Subtype"],
   ["typeTags", "Type & tags"],
   ["color", "Color"],
@@ -175,6 +177,18 @@ export function groupLines(lines: DeckCardLine[], mode: GroupMode, sort: SortMod
     case "type":
       groups.push(...typeGroups(rest, compare));
       break;
+    case "role": {
+      // What a card does in the deck. Lands have no role of their own, and a card nobody has classified says so
+      // instead of being guessed at. Both sit last.
+      const counts: Record<string, number> = {};
+      rest.forEach((line) => line.role && line.primaryType !== "Land" && (counts[line.role] = (counts[line.role] ?? 0) + line.quantity));
+      const shown = roleFolder(counts);
+      const roleOf = (line: DeckCardLine) => (line.primaryType === "Land" ? "Lands" : shown(line.role ?? UNCATEGORIZED));
+      const byRole = bucket(rest, (line) => [roleOf(line)], ROLE_ORDER, compare);
+      const tail = [OTHER, "Lands", UNCATEGORIZED];
+      groups.push(...byRole.filter((group) => !tail.includes(group.title)), ...tail.flatMap((title) => byRole.filter((group) => group.title === title)));
+      break;
+    }
     case "subtype": {
       const groupsBySubtype = bucket(rest, (line) => (subtypes(line.typeLine).length ? subtypes(line.typeLine) : [NO_SUBTYPE]), [], compare);
       groups.push(...groupsBySubtype.filter((group) => group.title !== NO_SUBTYPE), ...groupsBySubtype.filter((group) => group.title === NO_SUBTYPE));

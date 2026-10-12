@@ -23,6 +23,7 @@ const SECTION_TITLES: Array<[Board, string]> = [
   ["main", "Deck"],
   ["maybe", "Maybeboard"],
   ["considering", "Considering"],
+  ["tokens", "Tokens"],
 ];
 
 const byName = (a: DeckCardLine, b: DeckCardLine) => a.name.localeCompare(b.name);
@@ -42,11 +43,11 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 
 /**
  * Writes a deck in a format other sites and games read. Custom art is left out of the printing, since only
- * Eregion knows it. includeBench adds the maybeboard and considering cards to the formats that can hold them.
+ * Eregion knows it. includeBench adds the maybeboard, considering and token cards to the formats that can hold them.
  */
 export function exportDeck(lines: DeckCardLine[], format: ExportFormat, deckName: string, includeBench = false): ExportResult {
   const info = EXPORT_FORMATS.find((entry) => entry.id === format)!;
-  const wanted = (board: Board) => board === "commander" || board === "main" || (includeBench && (board === "maybe" || board === "considering"));
+  const wanted = (board: Board) => board === "commander" || board === "main" || (includeBench && (board === "maybe" || board === "considering" || board === "tokens"));
   const of = (board: Board) => lines.filter((line) => line.board === board).sort(byName);
   const count = (list: DeckCardLine[]) => list.reduce((sum, line) => sum + line.quantity, 0);
   let text: string;

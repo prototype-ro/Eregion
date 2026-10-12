@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import { parseDecklist, type ParsedEntry } from "@/lib/decklist";
@@ -28,6 +28,13 @@ interface Props {
   addLabel?: string;
   /** Pass null to hide the choice, for places where there is nothing to replace. */
   replaceLabel?: string | null;
+  /** Text to start with each time the dialog opens, for editing a list that already exists. */
+  initialText?: string;
+  /** Whether the list replaces the draft by default. A list that was opened for editing is the whole deck, so it does. */
+  defaultReplace?: boolean;
+  /** The line above the box, and the text of the button that reads the list. */
+  intro?: string;
+  submitLabel?: string;
   /** The text of the final button, given how many cards were found. */
   confirmLabel?: (count: number) => string;
   /** Called with the cards found. replace is true when the draft should be emptied first. */
@@ -47,17 +54,33 @@ export function ImportDialog({
   title = "Import a list",
   addLabel = "Add to the current draft",
   replaceLabel = "Replace the current draft",
+  initialText = "",
+  defaultReplace = false,
+  intro = "Paste a decklist, one card per line, or a link to a deck",
+  submitLabel = "Import",
   confirmLabel = (count) => `Add ${count} cards`,
 }: Props) {
-  const [text, setText] = useState("");
-  const [replace, setReplace] = useState(false);
+  const [text, setText] = useState(initialText);
+  const [replace, setReplace] = useState(defaultReplace);
   const [step, setStep] = useState<Step>({ kind: "edit" });
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // Every time the dialog opens it starts from the given text, which for an edit is the deck as it is now.
+  useEffect(() => {
+    if (open) {
+      setText(initialText);
+      setReplace(defaultReplace);
+      setStep({ kind: "edit" });
+      setError(null);
+    }
+    // The text is read when the dialog opens, not while it is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   function reset() {
-    setText("");
-    setReplace(false);
+    setText(initialText);
+    setReplace(defaultReplace);
     setStep({ kind: "edit" });
     setError(null);
   }
@@ -150,7 +173,7 @@ export function ImportDialog({
         <div className="mt-6 flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <label htmlFor="decklist" className="text-sm text-muted">
-              Paste a decklist, one card per line, or a link to a deck
+              {intro}
             </label>
             <textarea
               id="decklist"
@@ -207,7 +230,7 @@ export function ImportDialog({
               Cancel
             </button>
             <button type="button" onClick={() => void run()} disabled={text.trim() === ""} className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-bold text-on-accent disabled:opacity-50">
-              Import
+              {submitLabel}
             </button>
           </div>
         </div>
