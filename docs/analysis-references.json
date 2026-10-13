@@ -1,0 +1,91 @@
+{
+  "_about": "Decks whose estimated win turn is pinned so that a change to the analysis engine cannot quietly move an estimate that already works. 'otherSite' is the turn commanderbracket.app showed for the same list (null where it was not checked); 'pinned' is what this engine gave when it was accepted. scripts/reference-check.mjs fails when an estimate moves by more than the tolerance from its pinned value. Move a pin only on purpose, in the same commit as the change that moved it. Versions are saved snapshots, so the cards never change.",
+  "tolerance": 0.05,
+  "decks": [
+    {
+      "name": "Sauron, first version",
+      "version": "6550081f-9462-4b02-8566-92f9ee298292",
+      "otherSite": 6.4,
+      "pinned": 6.4
+    },
+    {
+      "name": "Sauron, reanimator rebuild",
+      "version": "c1e4ca8e-ef61-4c77-84f8-738d07f47df5",
+      "otherSite": 6.5,
+      "pinned": 6.5
+    },
+    {
+      "name": "Kaalia v34",
+      "version": "2cd910f2-7672-4456-85ff-42e426838454",
+      "otherSite": 6.6,
+      "pinned": 6.4
+    },
+    {
+      "name": "Teste",
+      "version": "879b7c99-149f-4125-bb3a-6bb920f31b86",
+      "otherSite": null,
+      "pinned": 6.6
+    },
+    {
+      "name": "Ceasar",
+      "version": "c4b681eb-46a9-4f5c-a278-21e471d5854e",
+      "otherSite": null,
+      "pinned": 7.3
+    },
+    {
+      "name": "Baby Lasagna (Archidekt B3)",
+      "version": "448bd663-5288-47a7-b827-a0ca2bd0e77a",
+      "otherSite": 7.5,
+      "pinned": 7.4
+    },
+    {
+      "name": "Sharuum slide (Archidekt B3)",
+      "version": "d0f69296-1f21-496b-96f5-bbcb28649832",
+      "otherSite": 8.1,
+      "pinned": 7.6
+    },
+    {
+      "name": "Knuck if you buck (Archidekt B3)",
+      "version": "4eb32db0-d2dc-4627-b9b0-62233298a263",
+      "otherSite": 6.0,
+      "pinned": 5.6
+    },
+    {
+      "name": "Malfegor's Mudpit Melee (Archidekt B3)",
+      "version": "f49ec00a-0695-4a77-bebf-928d4ad9feed",
+      "otherSite": 8.6,
+      "pinned": 8.3
+    },
+    {
+      "name": "Wilhelter Skelter (Archidekt B3)",
+      "version": "56109c4a-560a-4e7c-a8bf-7bc4221a88c1",
+      "otherSite": 8.0,
+      "pinned": 8.4
+    },
+    {
+      "name": "Biblically Accurate Beatdown (Archidekt B3)",
+      "version": "aa5df98b-b0c8-4f74-a177-88327ec1dfe1",
+      "otherSite": 8.5,
+      "pinned": 8.5
+    },
+    {
+      "name": "$100  Sauron (Archidekt B3)",
+      "version": "a366541c-64c6-4e54-bd4b-e9a06c2c992e",
+      "otherSite": 8.0,
+      "pinned": 7.6
+    },
+    {
+      "name": "Reki (Archidekt B3)",
+      "version": "fd882ee1-dab4-43b6-a61c-04158f119367",
+      "otherSite": 6.7,
+      "pinned": 6.8
+    },
+    {
+      "name": "Goth Girl Tribal (Archidekt B3)",
+      "version": "69890ac5-22d9-4035-9b16-610f45810aa1",
+      "otherSite": 6.6,
+      "pinned": 6.1
+    }
+  ],
+  "_notYetRunnable": "Raphael, Fiendish Savior (b3e4b643) showed 6.7 on both sites but was never saved, so its cards are not stored. Save a version of it and add it here."
+}
