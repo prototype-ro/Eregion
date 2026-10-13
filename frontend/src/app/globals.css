@@ -337,6 +337,32 @@ textarea:focus-visible {
   background: transparent !important;
 }
 
+/* Lightness and chroma of the colors that mark a selected card, one set for each theme. */
+:root { --sel-l: 0.74; --sel-c: 0.15; }
+:root[data-theme="light"] { --sel-l: 0.52; --sel-c: 0.16; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --sel-l: 0.52; --sel-c: 0.16; } }
+
+/* Strands and dots of the version timeline fade out before the branch names that stay put on the left, so nothing is drawn over a name. */
+.tl-fade {
+  -webkit-mask-image: linear-gradient(to right, transparent var(--fade-a, -400px), #000 var(--fade-b, -316px));
+  mask-image: linear-gradient(to right, transparent var(--fade-a, -400px), #000 var(--fade-b, -316px));
+}
+
+/* The commander atmosphere. data-atmosphere on the root element says how far it reaches: header, accents (header plus tinted edges) or page. */
+.atm-header, .atm-page { display: none; }
+html[data-atmosphere="header"] .atm-header,
+html[data-atmosphere="accents"] .atm-header,
+html[data-atmosphere="page"] .atm-header { display: block; }
+html[data-atmosphere="page"] .atm-page { display: block; }
+html[data-atmosphere="accents"] .atm-accent,
+html[data-atmosphere="page"] .atm-accent {
+  border-color: color-mix(in srgb, var(--atm, var(--line)) 55%, var(--line));
+}
+html[data-atmosphere="accents"] .atm-accent-glow,
+html[data-atmosphere="page"] .atm-accent-glow {
+  box-shadow: 0 0 40px -12px var(--atm, transparent);
+}
+
 /* The backdrop art is cut where the header and panel end, and fades out over the last stretch so it never hard-stops. */
 .art-clip {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 160px), transparent 100%);

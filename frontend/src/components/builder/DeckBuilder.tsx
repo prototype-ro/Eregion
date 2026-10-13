@@ -27,6 +27,7 @@ import { CardPreview } from "./CardPreview";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { CardSearch } from "./CardSearch";
 import { CommandDock } from "./CommandDock";
+import { atmosphereAccent, HeaderAtmosphere, PageAtmosphere } from "./Atmosphere";
 import { SideBoards, type SideBoard } from "./SideBoards";
 import { CardGallery, CardStacks } from "./CardViews";
 import { ImportDialog, type ImportedCard } from "./ImportDialog";
@@ -58,7 +59,7 @@ const SORT_KEY = "eregion-deck-sort";
 const SORT_DIR_KEY = "eregion-deck-sort-direction";
 const SIZE_MIN = 120;
 const SIZE_MAX = 360;
-const SIZE_DEFAULT = 210;
+const SIZE_DEFAULT = 190;
 const TIMELINE_KEY = "eregion-timeline-open";
 const COLLECTION_KEY = "eregion-collection-check";
 
@@ -247,7 +248,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   useEffect(() => {
     const element = mainboardRef.current;
     if (!element || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(([entry]) => setDockShown(entry.isIntersecting || entry.boundingClientRect.top < 0), { rootMargin: "0px 0px -90px 0px" });
+    const observer = new IntersectionObserver(([entry]) => setDockShown(entry.isIntersecting || entry.boundingClientRect.top < 0), { rootMargin: "0px 0px -50% 0px" });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -810,9 +811,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     );
   }
 
+  const identity = lines.find((line) => line.board === "commander")?.colorIdentity ?? "";
   return (
-    <div className="relative pb-28">
+    <div className="relative pb-28" style={{ ["--atm" as string]: atmosphereAccent(identity) }}>
+      <PageAtmosphere identity={identity} />
       <div className="relative">
+        <HeaderAtmosphere identity={identity} />
         {/* Backdrop art. Placeholder until the art library exists. It keeps one size whatever the panel does, and is cut and faded where the header and panel end. */}
         <div aria-hidden="true" className="art-clip pointer-events-none absolute inset-0 z-0 hidden overflow-hidden md:block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -944,7 +948,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       )}
 
       {/* Version timeline, collapsible */}
-      <section aria-labelledby="timeline-heading" className="relative z-10 mb-10 rounded-card border border-line bg-surface/60 px-4 py-4 sm:px-6">
+      <section aria-labelledby="timeline-heading" className="atm-accent atm-accent-glow relative z-10 mb-10 rounded-card border border-line bg-surface/60 px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
           <h2 id="timeline-heading" title="Press [ and ] to step through versions" className="text-lg font-medium">
             Versions
@@ -1004,7 +1008,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       {/* The mainboard heading. Search, view and display options live in the dock at the bottom of the screen. */}
-      <div ref={mainboardRef} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line">
+      <div ref={mainboardRef} className="atm-accent flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line">
         <h2 className="py-2.5 text-[15px] sm:text-base">
           Mainboard <span className="text-sm text-muted">{mainCount}</span>
         </h2>
@@ -1078,7 +1082,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                   type="button"
                   aria-pressed={view === mode}
                   onClick={() => chooseView(mode)}
-                  className={`relative min-h-8 min-w-[68px] [@media(pointer:coarse)]:min-h-10 rounded-full px-3.5 text-sm transition-colors duration-200 ${view === mode ? "text-bg" : "text-muted hover:text-ink"}`}
+                  className={`relative min-h-7 min-w-[56px] [@media(pointer:coarse)]:min-h-10 rounded-full px-3 text-[13px] transition-colors duration-200 ${view === mode ? "text-bg" : "text-muted hover:text-ink"}`}
                 >
                   {label}
                 </button>
@@ -1154,7 +1158,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                       )}
           </>
         }
-        boards={sideBoards.map((entry) => ({ board: entry.board, title: entry.title, count: entry.count }))}
         save={
           showDraft ? (
             renderSaveButtons()
