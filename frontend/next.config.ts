@@ -30,6 +30,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Next blocks its development resources (hot reload, hydration) for any host but localhost, which leaves a page opened on 127.0.0.1
+  // a static shell with no developer tools. Development only: it has no effect on a production build.
+  allowedDevOrigins: ["127.0.0.1"],
   // A self-contained server for the Docker image.
   output: "standalone",
   images: {

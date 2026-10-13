@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * Records what happens in the tab, so a problem can be shown instead of described: a screen video plus a log of the
  * clicks, keys, scrolls, route changes, console errors and failed requests, each with its time in the video.
  * Typed text and request bodies are never logged. Alt+Shift+R starts and stops it (Cmd/Ctrl+Shift+R is the browser's own reload). Development on this machine only.
+ * Where the browser refuses screen capture (an embedded browser, a denied permission) it keeps the log alone and saves that as a .json file.
  */
 
 /** Marks the end of a recording file that carries its log after the video. */
@@ -53,6 +54,10 @@ export function SessionRecorder() {
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
   const cleanup = useRef<Array<() => void>>([]);
+  /** True from the moment a recording starts until it is saved, with or without video. */
+  const running = useRef(false);
+  /** True when the browser refused screen capture and only the log is being kept. */
+  const logOnly = useRef(false);
 
   const add = useCallback((type: string, data: Record<string, unknown> = {}) => {
     log.current.push({ t: Math.round(performance.now() - started.current), type, ...data });
@@ -132,12 +137,62 @@ export function SessionRecorder() {
     });
   }, [add]);
 
-  const stop = useCallback(() => {
-    const active = recorder.current;
-    if (active && active.state !== "inactive") active.stop();
+  /** Saves a session that has no video: the log alone, as a .json file the frame script reads. */
+  const finishLog = useCallback(() => {
+    cleanup.current.forEach((fn) => fn());
+    cleanup.current = [];
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const session = {
+      logOnly: true,
+      startedAt: new Date(Date.now() - (performance.now() - started.current)).toISOString(),
+      url: location.href,
+      viewport: { width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio },
+      video: null,
+      userAgent: navigator.userAgent,
+      events: log.current,
+    };
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(session)], { type: "application/json" }));
+    link.download = `eregion-session-${stamp}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+    running.current = false;
+    logOnly.current = false;
+    setRecording(false);
+    setStatus(`Saved eregion-session-${stamp}.json (the log, without video) to Downloads`);
   }, []);
 
+  /** Keeps the log without a video, for a browser that does not allow screen capture. */
+  const startLogOnly = useCallback(
+    (reason: string) => {
+      log.current = [];
+      started.current = performance.now();
+      logOnly.current = true;
+      running.current = true;
+      add("start", { url: location.pathname + location.search, scrollY: Math.round(window.scrollY) });
+      attach();
+      setSeconds(0);
+      setRecording(true);
+      setStatus(`This browser did not allow screen capture (${reason}), so only the log is being recorded. Press Stop to save it.`);
+    },
+    [add, attach],
+  );
+
+  const stop = useCallback(() => {
+    if (logOnly.current) {
+      finishLog();
+      return;
+    }
+    const active = recorder.current;
+    if (active && active.state !== "inactive") active.stop();
+  }, [finishLog]);
+
   const start = useCallback(async () => {
+    if (running.current) return;
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      startLogOnly("it has no screen capture");
+      return;
+    }
     try {
       const media = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
@@ -184,12 +239,14 @@ export function SessionRecorder() {
         const length = new DataView(new ArrayBuffer(8));
         length.setBigUint64(0, BigInt(logBytes.length), true);
         save(new Blob([...chunks.current, logBytes, length.buffer, new TextEncoder().encode(SESSION_MAGIC)], { type: rec.mimeType || "video/webm" }), `eregion-session-${stamp}.${extension}`);
+        running.current = false;
         setRecording(false);
         setStatus(`Saved eregion-session-${stamp}.${extension} (video and log in one file) to Downloads`);
       };
       // If the person stops sharing from the browser's own bar, finish the same way.
       media.getVideoTracks()[0]?.addEventListener("ended", () => stop());
       rec.onstart = () => {
+        running.current = true;
         started.current = performance.now();
         add("start", { url: location.pathname + location.search, scrollY: Math.round(window.scrollY) });
         attach();
@@ -198,12 +255,27 @@ export function SessionRecorder() {
       };
       rec.start(1000);
     } catch (err) {
-      setStatus(`Could not start recording: ${err instanceof Error ? err.message : "permission denied"}`);
+      // The browser refused, or the person closed the picker. Keep the log anyway, which is most of what a bug report needs.
+      const name = err instanceof Error ? err.name : "";
+      const safari = /^((?!chrome|chromium|android).)*safari/i.test(navigator.userAgent);
+      const why =
+        name === "NotAllowedError" && safari
+          ? "Safari remembers a refusal for each site. For video, open Safari > Settings > Websites > Screen Sharing and set localhost to Ask or Allow, share the Safari window, and allow Safari under System Settings > Privacy & Security > Screen & System Audio Recording"
+          : name === "NotAllowedError"
+          ? "refused or cancelled; to get video, choose this tab in the picker, or allow Screen Recording for the browser in System Settings > Privacy & Security"
+          : name === "NotReadableError"
+            ? "the screen could not be read"
+            : !window.isSecureContext
+              ? "capture needs localhost"
+              : err instanceof Error
+                ? err.message
+                : "unknown";
+      startLogOnly(why);
     }
-  }, [add, attach, stop]);
+  }, [add, attach, stop, startLogOnly]);
 
   const toggle = useCallback(() => {
-    if (recorder.current && recorder.current.state === "recording") stop();
+    if (running.current) stop();
     else void start();
   }, [start, stop]);
 
@@ -226,7 +298,7 @@ export function SessionRecorder() {
 
   useEffect(() => {
     if (!status) return;
-    const timer = setTimeout(() => setStatus(null), 6000);
+    const timer = setTimeout(() => setStatus(null), 9000);
     return () => clearTimeout(timer);
   }, [status]);
 

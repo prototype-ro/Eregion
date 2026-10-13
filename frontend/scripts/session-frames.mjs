@@ -59,7 +59,7 @@ if (bundled) {
   videoPath = join(out, `video${extname(videoArg)}`);
   writeFileSync(videoPath, bundled.video);
 }
-if (!existsSync(videoPath)) {
+if (!session.logOnly && !existsSync(videoPath)) {
   console.error(`The video ${videoPath} is missing next to the log.`);
   process.exit(1);
 }
@@ -127,6 +127,13 @@ const interesting = (event) =>
   (event.type === "console" && event.level === "error") ||
   (event.type === "request" && (event.failed || event.status >= 400)) ||
   (event.type === "key" && ["Escape", "Enter", "[", "]"].includes(event.key));
+if (session.logOnly) {
+  // The browser would not capture the screen, so there are no frames to cut: the timeline is the whole recording.
+  console.log(`Recording: ${basename(jsonPath)}   LOG ONLY, no video   viewport ${session.viewport?.width}x${session.viewport?.height}   page ${session.url}`);
+  console.log(`Timeline of ${events.length} events: ${join(out, "timeline.txt")}\n`);
+  events.filter(interesting).forEach((event) => console.log(`${clock(event.t)}  ${line(event)}`));
+  process.exit(0);
+}
 const moments = [];
 for (const event of events.filter(interesting)) {
   const last = moments.at(-1);
