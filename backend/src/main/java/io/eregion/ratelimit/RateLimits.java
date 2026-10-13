@@ -60,6 +60,11 @@ public class RateLimits {
 		check("advanced-search:" + user, properties.advancedSearchPerUserMinute(), MINUTE, "advanced searches");
 	}
 
+	/** A deck analysis may ask Commander Spellbook, so it is held to fewer a minute than a plain read. */
+	public void analysis(UUID user) {
+		check("analysis:" + user, properties.analysisPerUserMinute(), MINUTE, "deck analyses");
+	}
+
 	public void resolve(UUID user) {
 		check("resolve:" + user, properties.resolvePerUserMinute(), MINUTE, "list lookups");
 	}

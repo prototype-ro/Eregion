@@ -1,0 +1,170 @@
+{
+ "results": {
+  "identity": "UB",
+  "included": [
+   {
+    "id": "742-1295",
+    "uses": [
+     {
+      "card": {
+       "name": "Demonic Consultation"
+      }
+     },
+     {
+      "card": {
+       "name": "Thassa's Oracle"
+      }
+     }
+    ],
+    "status": "OK",
+    "requires": [],
+    "legalities": {
+     "commander": true
+    },
+    "produces": [
+     {
+      "feature": {
+       "name": "Exile your library"
+      }
+     },
+     {
+      "feature": {
+       "name": "Win the game"
+      }
+     }
+    ],
+    "popularity": 149099,
+    "bracketTag": "R",
+    "description": "Cast Demonic Consultation by paying {B}, naming Thassa's Oracle and thus exiling your library due to you not having a card named Thassa's Oracle in your library.\nCast Thassa's Oracle by paying {U}{U}.\nThassa's Oracle enters the battlefield, causing you to win the game.",
+    "manaNeeded": "{U}{U}{B}",
+    "manaValueNeeded": 3
+   }
+  ],
+  "almostIncluded": [
+   {
+    "id": "513-5034--46",
+    "uses": [
+     {
+      "card": {
+       "name": "Hullbreaker Horror"
+      }
+     },
+     {
+      "card": {
+       "name": "Sol Ring"
+      }
+     }
+    ],
+    "status": "OK",
+    "requires": [
+     {
+      "quantity": 1,
+      "template": {
+       "id": 46,
+       "name": "Permanent Castable for {C}",
+       "scryfallApi": "https://api.scryfall.com/cards/search?q=%28mv%3C%3D1+%28mana%3D%7B0%7D+or+mana%3D%7B1%7D+or+mana%3D%7BC%7D%29+is%3Apermanent%29+legal%3Acommander",
+       "scryfallQuery": "mv<=1 (mana={0} or mana={1} or mana={C}) is:permanent"
+      },
+      "zoneLocations": [
+       "H"
+      ],
+      "exileCardState": "",
+      "mustBeCommander": false,
+      "libraryCardState": "",
+      "graveyardCardState": "",
+      "battlefieldCardState": ""
+     }
+    ],
+    "legalities": {
+     "commander": true
+    },
+    "produces": [
+     {
+      "feature": {
+       "name": "Infinite colorless mana"
+      }
+     },
+     {
+      "feature": {
+       "name": "Infinite storm count"
+      }
+     }
+    ],
+    "popularity": 358602,
+    "bracketTag": "E",
+    "description": "Activate Sol Ring by tapping it, adding {C} {C}.\nCast the permanent that can be cast using {C} by paying its mana cost.\nHullbreaker Horror triggers, returning Sol Ring from the battlefield to your hand.\nCast Sol Ring by paying {1}. \nHullbreaker Horror triggers, returning the permanent cast in step 2 from the battlefield to your hand.\nRepeat.\nIf the permanent can be cast by paying {0}, this combo nets infinite colorless mana.",
+    "manaNeeded": "",
+    "manaValueNeeded": 0
+   },
+   {
+    "id": "1295-3093",
+    "uses": [
+     {
+      "card": {
+       "name": "Tainted Pact"
+      }
+     },
+     {
+      "card": {
+       "name": "Thassa's Oracle"
+      }
+     }
+    ],
+    "status": "OK",
+    "requires": [],
+    "legalities": {
+     "commander": true
+    },
+    "produces": [
+     {
+      "feature": {
+       "name": "Win the game"
+      }
+     }
+    ],
+    "popularity": 131399,
+    "bracketTag": "R",
+    "description": "Cast Tainted Pact by paying {1}{B}, exiling your library.\nCast Thassa's Oracle by paying {U}{U}.\nThassa's Oracle enters the battlefield, causing you to win the game.",
+    "manaNeeded": "{1}{U}{U}{B}",
+    "manaValueNeeded": 4
+   },
+   {
+    "id": "542-5034",
+    "uses": [
+     {
+      "card": {
+       "name": "Tidespout Tyrant"
+      }
+     },
+     {
+      "card": {
+       "name": "Sol Ring"
+      }
+     }
+    ],
+    "status": "OK",
+    "requires": [],
+    "legalities": {
+     "commander": true
+    },
+    "produces": [
+     {
+      "feature": {
+       "name": "Infinite colorless mana"
+      }
+     },
+     {
+      "feature": {
+       "name": "Infinite storm count"
+      }
+     }
+    ],
+    "popularity": 37458,
+    "bracketTag": "S",
+    "description": "Cast Sol Ring by paying its mana cost.\nTidespout Tyrant triggers, returning a nontoken permanent that can be cast using {C} from the battlefield to your hand.\nActivate Sol Ring by tapping it, adding {C}{C}.\nCast the nontoken permanent returned in step 2 by paying its mana cost.\nTidespout Tyrant triggers, returning Sol Ring from the battlefield to your hand.\nRepeat.",
+    "manaNeeded": "{1}",
+    "manaValueNeeded": 1
+   }
+  ]
+ }
+}

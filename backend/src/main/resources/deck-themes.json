@@ -1,0 +1,140 @@
+{
+  "_about": "What a deck is trying to do, read from its cards. Each theme scores every non-land card: the weights of its patterns that match the rules text (lower-cased), plus a weight for the card's main role and one for its card type, capped at 1 per card. A theme's score is the share of the deck's non-land cards that lean on it, in percent. These weights are reasoned guesses, not fitted to labelled decks. Edit, then restart.",
+  "themes": [
+    {
+      "name": "Tokens",
+      "description": "Makes many small creatures or other tokens, then wins by going wide.",
+      "patterns": [
+        { "pattern": "create (a|an|one|two|three|four|x|\\d+|that many)[^.]* tokens?", "weight": 1.0 },
+        { "pattern": "\\bpopulate\\b|\\bconvoke\\b", "weight": 0.6 },
+        { "pattern": "tokens? you control|each token", "weight": 0.5 }
+      ]
+    },
+    {
+      "name": "+1/+1 Counters",
+      "description": "Grows creatures with counters and rewards having them.",
+      "patterns": [
+        { "pattern": "\\+1/\\+1 counters?", "weight": 1.0 },
+        { "pattern": "\\bproliferate\\b", "weight": 1.0 },
+        { "pattern": "\\b(modular|evolve|undying|graft|adapt|outlast|reinforce)\\b", "weight": 0.6 }
+      ]
+    },
+    {
+      "name": "Spellslinger",
+      "description": "Casts many instants and sorceries and gets rewarded for each one.",
+      "patterns": [
+        { "pattern": "whenever you cast (an?|your first|your second) ([a-z]+ )?(instant|sorcery|noncreature)", "weight": 1.0 },
+        { "pattern": "\\b(magecraft|prowess|storm)\\b", "weight": 0.8 },
+        { "pattern": "copy (target|that|this) (instant|sorcery|spell)", "weight": 0.8 }
+      ],
+      "types": { "Instant": 0.2, "Sorcery": 0.2 }
+    },
+    {
+      "name": "Graveyard",
+      "description": "Fills its graveyard and uses it as a second hand.",
+      "patterns": [
+        { "pattern": "from your graveyard", "weight": 0.8 },
+        { "pattern": "\\b(mill|mills|dredge|flashback|escape|delve|unearth|disturb|jump-start|embalm|eternalize)\\b", "weight": 0.8 },
+        { "pattern": "return target (creature )?card from your graveyard to the battlefield", "weight": 1.0 },
+        { "pattern": "your graveyard", "weight": 0.3 }
+      ],
+      "roles": { "Recursion": 0.8 }
+    },
+    {
+      "name": "Aristocrats",
+      "description": "Sacrifices its own creatures for value and drains the table when they die.",
+      "patterns": [
+        { "pattern": "sacrifice (a|an|another|up to)", "weight": 0.8 },
+        { "pattern": "whenever (a|another)[^.]* (creature|permanent)[^.]* dies", "weight": 1.0 },
+        { "pattern": "\\bsacrifice\\b", "weight": 0.3 }
+      ]
+    },
+    {
+      "name": "Artifacts",
+      "description": "Plays many artifacts and uses them for value.",
+      "patterns": [
+        { "pattern": "whenever an artifact|artifacts you control|\\baffinity for artifacts\\b|\\b(improvise|metalcraft|fabricate)\\b", "weight": 1.0 },
+        { "pattern": "create (a|an|\\w+) (treasure|clue|food|powerstone)", "weight": 0.5 }
+      ],
+      "types": { "Artifact": 0.2 }
+    },
+    {
+      "name": "Enchantments",
+      "description": "Builds around enchantments and the abilities that trigger from them.",
+      "patterns": [
+        { "pattern": "whenever an enchantment|enchantments you control|\\bconstellation\\b", "weight": 1.0 }
+      ],
+      "types": { "Enchantment": 0.2 }
+    },
+    {
+      "name": "Lands",
+      "description": "Gets value from lands entering the battlefield and from playing extra ones.",
+      "patterns": [
+        { "pattern": "\\blandfall\\b|whenever a land enters the battlefield under your control", "weight": 1.0 },
+        { "pattern": "you may play an additional land", "weight": 1.0 },
+        { "pattern": "put (a|an|up to)[^.]* land cards?[^.]* onto the battlefield", "weight": 0.6 },
+        { "pattern": "search your library for [^.]*land card", "weight": 0.4 }
+      ]
+    },
+    {
+      "name": "Auras and Equipment",
+      "description": "Loads one creature with equipment and auras and attacks with it.",
+      "patterns": [
+        { "pattern": "\\bequip\\b|equipped creature", "weight": 0.9 },
+        { "pattern": "enchanted creature", "weight": 0.6 },
+        { "pattern": "\\battach\\b|\\breconfigure\\b", "weight": 0.5 }
+      ]
+    },
+    {
+      "name": "Lifegain",
+      "description": "Gains life and turns it into value.",
+      "patterns": [
+        { "pattern": "gains? (\\d+|x|that much) life|whenever you gain life|\\blifelink\\b", "weight": 0.8 }
+      ],
+      "roles": { "Lifegain": 0.8 }
+    },
+    {
+      "name": "Control",
+      "description": "Answers what opponents do, with counterspells, removal and board wipes.",
+      "patterns": [
+        { "pattern": "counter target", "weight": 0.4 }
+      ],
+      "roles": { "Counterspell": 0.8, "Removal": 0.3, "Board Wipe": 0.6 }
+    },
+    {
+      "name": "Combat",
+      "description": "Wins by attacking, often with extra combats or attack triggers.",
+      "patterns": [
+        { "pattern": "additional combat phase", "weight": 1.0 },
+        { "pattern": "whenever [^.]* attacks", "weight": 0.6 },
+        { "pattern": "\\b(haste|myriad|exalted|battle cry|menace|trample)\\b", "weight": 0.3 },
+        { "pattern": "creatures you control (get|have) [^.]*(\\+\\d/\\+\\d|haste|trample)", "weight": 0.5 }
+      ],
+      "roles": { "Extra Combat": 1.0 }
+    },
+    {
+      "name": "Blink",
+      "description": "Flickers creatures to use their enter-the-battlefield effects again.",
+      "patterns": [
+        { "pattern": "exile (up to one )?target (non[a-z]+ )?(creature|permanent) you control, then return", "weight": 1.0 },
+        { "pattern": "\\bflicker\\b", "weight": 1.0 },
+        { "pattern": "whenever (a|another)[^.]* enters the battlefield", "weight": 0.5 }
+      ],
+      "roles": { "Blink": 1.0 }
+    },
+    {
+      "name": "Stax",
+      "description": "Slows the table with taxes and restrictions it can play around.",
+      "patterns": [
+        { "pattern": "can't (cast|untap|attack)|doesn't untap|each opponent (sacrifices|discards)", "weight": 0.5 }
+      ],
+      "roles": { "Stax": 1.0 }
+    },
+    {
+      "name": "Ramp",
+      "description": "Builds a lot of mana early to cast large spells.",
+      "patterns": [],
+      "roles": { "Ramp": 0.3 }
+    }
+  ]
+}

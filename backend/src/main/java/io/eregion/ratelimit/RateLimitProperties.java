@@ -24,5 +24,6 @@ public record RateLimitProperties(
 		@DefaultValue("240") int publicReadPerIpMinute,
 		@DefaultValue("10") int reportPerUserHour,
 		@DefaultValue("30") int savePerUserMinute,
-		@DefaultValue("20") int advancedSearchPerUserMinute) {
+		@DefaultValue("20") int advancedSearchPerUserMinute,
+		@DefaultValue("30") int analysisPerUserMinute) {
 }

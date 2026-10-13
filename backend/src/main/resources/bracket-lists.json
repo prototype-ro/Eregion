@@ -1,0 +1,15 @@
+{
+  "_about": "Curated card lists for bracket signals that Scryfall does not tag cleanly. Names are matched ignoring case, accents and the back face. The Game Changers and extra turn flags are not here: the sync job reads them from Scryfall. mass_land_denial approximates the list in Wizards of the Coast's Commander bracket article, so check it against the current article and edit here when it changes. fast_mana is mana that is paid back at once or for free; common rocks such as Sol Ring and Arcane Signet are deliberately left out.",
+  "lists": {
+    "mass_land_denial": [
+      "Acid Rain", "Apocalypse", "Armageddon", "Boil", "Boiling Seas", "Boom // Bust", "Cataclysm", "Catastrophe",
+      "Death Cloud", "Decree of Annihilation", "Devastation", "Global Ruin", "Impending Disaster", "Jokulhaups",
+      "Obliterate", "Ravages of War", "Ruination", "Sunder", "Tsunami", "Wake of Destruction"
+    ],
+    "fast_mana": [
+      "Black Lotus", "Chrome Mox", "Elvish Spirit Guide", "Grim Monolith", "Jeweled Lotus", "Lion's Eye Diamond", "Lotus Petal",
+      "Mana Crypt", "Mana Vault", "Mox Amber", "Mox Diamond", "Mox Emerald", "Mox Jet", "Mox Opal", "Mox Pearl", "Mox Ruby",
+      "Mox Sapphire", "Simian Spirit Guide", "Ancient Tomb"
+    ]
+  }
+}

@@ -64,6 +64,17 @@ public class CardRepository {
 				.single();
 	}
 
+	/** The cards with these ids, in no particular order. Ids that are not in the catalog are simply absent. */
+	public List<Card> findByIds(java.util.Collection<UUID> ids) {
+		if (ids.isEmpty()) {
+			return List.of();
+		}
+		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE id IN (:ids)")
+				.param("ids", ids)
+				.query(CardRepository::map)
+				.list();
+	}
+
 	/** Which of these card ids are in the catalog. */
 	public java.util.Set<UUID> existingIds(java.util.Collection<UUID> ids) {
 		if (ids.isEmpty()) {
