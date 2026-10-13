@@ -9,6 +9,7 @@ import { ExportDialog } from "@/components/ExportDialog";
 import { ReportDialog } from "@/components/ReportDialog";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
+import { AnalysisSection } from "@/components/builder/AnalysisSection";
 import { StatsSection } from "@/components/builder/StatsSection";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
@@ -227,6 +228,12 @@ export default function PublicDeckPage() {
           <div className="mt-16">
             <StatsSection deckId={id} stats={detail.stats} saved={null} savedVersion={detail.deck.versionNumber} removed={[]} showCollection={false} readOnly />
           </div>
+
+          {me && (
+            <div className="mt-16">
+              <AnalysisSection lines={detail.cards} />
+            </div>
+          )}
         </main>
       )}
       {detail && <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} deckId={id} />}

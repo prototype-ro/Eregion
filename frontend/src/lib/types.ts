@@ -326,3 +326,181 @@ export interface BranchStatus {
   headVersion: number;
   mainVersion: number;
 }
+
+// ---- deck analysis (POST /api/analysis) ----
+
+export interface AnalysisComposition {
+  medianManaValue: number;
+  /** Coloured pips in the costs of the non-land cards, by colour W U B R G. */
+  pips: Record<string, number>;
+  /** Cards that can make each colour (W U B R G) or colourless (C). */
+  sources: Record<string, number>;
+}
+
+export interface AnalysisConsistency {
+  libraryCards: number;
+  lands: number;
+  cheapRamp: number;
+  expectedOpeningLands: number;
+  landDropTurn2: number;
+  landDropTurn3: number;
+  landDropTurn4: number;
+  rampByTurn2: number;
+  rampByTurn3: number;
+  twoRampByTurn3: number;
+  keepableOpener: number;
+  /** Null without a commander. */
+  commanderOnCurve: number | null;
+  /** Chance of at least one source of each colour of the identity by turn 3. */
+  colorAccessTurn3: Record<string, number>;
+}
+
+export interface AnalysisSignals {
+  gameChangers: number;
+  gameChangerCards: string[];
+  massLandDenial: number;
+  massLandDenialCards: string[];
+  extraTurns: number;
+  extraTurnCards: string[];
+  tutors: number;
+  unconditionalTutors: number;
+  fastMana: number;
+  fastManaCards: string[];
+  /** Null when combo data was unavailable. */
+  twoCardCombos: number | null;
+  earlyTwoCardCombos: number | null;
+  winCombos: number | null;
+}
+
+export interface AnalysisReason {
+  kind: string;
+  bracket: number;
+  text: string;
+  cards: string[];
+}
+
+export interface AnalysisBracket {
+  floor: number;
+  estimated: number;
+  bracket: number;
+  name: string;
+  basis: string;
+  score: number;
+  scoreParts: Record<string, number>;
+  signals: AnalysisSignals;
+  reasons: AnalysisReason[];
+  whatWouldChange: string[];
+  note: string | null;
+}
+
+export interface AnalysisCombo {
+  id: string;
+  cards: string[];
+  missing: string[];
+  produces: string[];
+  description: string;
+  manaNeeded: string;
+  manaValueNeeded: number | null;
+  bracketTag: string;
+  popularity: number;
+}
+
+export interface AnalysisCombos {
+  available: boolean;
+  included: AnalysisCombo[];
+  oneCardAway: AnalysisCombo[];
+}
+
+export interface AnalysisTheme {
+  name: string;
+  score: number;
+  cards: string[];
+}
+
+export interface AnalysisEngine {
+  primary: string;
+  description: string;
+  confidence: number;
+  runnerUp: string | null;
+  ambiguous: boolean;
+  themes: AnalysisTheme[];
+  tribe: string | null;
+  signatureCards: string[];
+}
+
+export interface AnalysisSpeed {
+  games: number;
+  /** Average mana left for spells on turns 1 to 8, after ramp has been played. */
+  manaByTurn: number[];
+  /** The turn the commander could first be cast in half the games, or null. */
+  commanderTurn: number | null;
+  /** Chance the commander can be cast by turns "3" to "6". */
+  commanderByTurn: Record<string, number>;
+  /** The turn a game-ending combo could first be executed in half the games, or null. */
+  comboTurn: number | null;
+  /** Chance a game-ending combo can be executed by turns "4", "6", "8" and "10". Empty without such a combo. */
+  comboByTurn: Record<string, number>;
+  assumptions: string[];
+}
+
+export interface AnalysisWinTurn {
+  turn: number;
+  /** "combo" when a game-ending combo is quicker than the signals suggest, otherwise "signals". */
+  basis: string;
+  /** The bracket whose turn range holds this turn, 1 to 5. */
+  bracket: number;
+}
+
+export interface AnalysisHealthSpoke {
+  key: string;
+  label: string;
+  observed: number;
+  min: number;
+  max: number;
+  score: number;
+  hint: string;
+  cards: string[];
+}
+
+export interface AnalysisHealthPillar {
+  key: string;
+  label: string;
+  score: number;
+  spokes: AnalysisHealthSpoke[];
+}
+
+export interface AnalysisHealth {
+  score: number;
+  pillars: AnalysisHealthPillar[];
+  note: string;
+}
+
+export interface AnalysisArchenemyPattern {
+  key: string;
+  label: string;
+  text: string;
+  points: number;
+  cards: string[];
+}
+
+export interface AnalysisArchenemy {
+  score: number;
+  /** Zero-based step on the scale. */
+  level: number;
+  name: string;
+  levels: string[];
+  patterns: AnalysisArchenemyPattern[];
+}
+
+/** Every block can be null: a block the server cannot work out is left out, never zeroed. */
+export interface DeckAnalysis {
+  composition: AnalysisComposition | null;
+  consistency: AnalysisConsistency | null;
+  bracket: AnalysisBracket | null;
+  combos: AnalysisCombos | null;
+  engine: AnalysisEngine | null;
+  speed: AnalysisSpeed | null;
+  winTurn: AnalysisWinTurn | null;
+  health: AnalysisHealth | null;
+  archenemy: AnalysisArchenemy | null;
+}
