@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretDown } from "@phosphor-icons/react";
+import { DotsThree } from "@phosphor-icons/react";
 import { lineKey, type LineGroup } from "@/lib/groups";
 import type { DeckCardLine } from "@/lib/types";
 
@@ -45,31 +45,12 @@ export function DotsButton({ line, onMenu, className = "" }: { line: DeckCardLin
   );
 }
 
-/** A round button with a chevron, always visible, so every row plainly has a menu. */
-function RowMenuButton({ line, onMenu }: { line: DeckCardLine; onMenu: ViewProps["onMenu"] }) {
-  return (
-    <button
-      type="button"
-      aria-label={`Options for ${line.name}`}
-      aria-haspopup="menu"
-      onClick={(event) => {
-        event.stopPropagation();
-        const box = event.currentTarget.getBoundingClientRect();
-        onMenu(line, box.right - 300 > 8 ? box.right - 300 : box.left, box.bottom + 4);
-      }}
-      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-ink hover:text-ink focus-visible:border-ink focus-visible:text-ink [@media(pointer:coarse)]:size-11"
-    >
-      <CaretDown size={12} weight="bold" aria-hidden />
-    </button>
-  );
-}
-
 function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSelect, onMenu }: { line: DeckCardLine; selected: boolean; isNew: boolean; checkCollection: boolean; readOnly: boolean; showRoles: boolean; onSelect: ViewProps["onSelect"]; onMenu: ViewProps["onMenu"] }) {
   const needs = checkCollection && line.owned < line.quantity;
   return (
     <li
       data-line-key={lineKey(line)}
-      className={`group/row flex items-center gap-1 border-b border-line pr-1 last:border-b-0 ${selected ? "bg-surface" : ""} hover:bg-surface focus-within:bg-surface`}
+      className={`group/row flex items-center gap-1 pr-1 ${selected ? "rounded-xl bg-surface" : ""} hover:bg-surface focus-within:bg-surface`}
       onMouseEnter={() => onSelect(line, "hover")}
       onContextMenu={(event) => {
         if (readOnly) return;
@@ -80,7 +61,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
       <button
         type="button"
         onClick={() => onSelect(line, "click")}
-        className="flex min-h-9 min-w-0 flex-1 items-center gap-2.5 px-2.5 py-1.5 text-left text-[14px] leading-snug [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:text-[15px]"
+        className="flex min-h-[34px] min-w-0 flex-1 items-center gap-2.5 px-2.5 py-1 text-left text-[14px] leading-snug [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:text-[15px]"
       >
         <span className={`w-5 shrink-0 text-right font-mono text-[12px] ${line.quantity > 1 ? "text-ink" : "text-muted"}`} aria-label={`${line.quantity} ${line.quantity === 1 ? "copy" : "copies"}`}>
           {line.quantity}
@@ -103,7 +84,21 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
         </span>
       </button>
       {/* Always there, dimmed, so it is clear that a card has a menu. It lights up under the pointer. */}
-      {!readOnly && <RowMenuButton line={line} onMenu={onMenu} />}
+      {!readOnly && (
+        <button
+          type="button"
+          aria-label={`Options for ${line.name}`}
+          aria-haspopup="menu"
+          onClick={(event) => {
+            event.stopPropagation();
+            const box = event.currentTarget.getBoundingClientRect();
+            onMenu(line, box.right - 300 > 8 ? box.right - 300 : box.left, box.bottom + 4);
+          }}
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:bg-surface-2 focus-visible:text-ink group-hover/row:text-ink [@media(pointer:coarse)]:size-11"
+        >
+          <DotsThree size={20} weight="bold" aria-hidden />
+        </button>
+      )}
     </li>
   );
 }
@@ -112,13 +107,21 @@ export function CardList({ groups, selectedKey, newKeys, checkCollection, readOn
   if (groups.length === 0) {
     return <p className="max-w-[420px] py-6 text-lg leading-normal text-muted">Nothing here yet. Search above to add cards.</p>;
   }
+  const counts = groups.map((group) => group.lines.reduce((sum, line) => sum + line.quantity, 0));
+  const total = counts.reduce((sum, count) => sum + count, 0);
   return (
     <div className="group-columns group-flow">
-      {groups.map((group) => (
-        <section key={group.title} aria-label={group.title} className="mb-6">
-          <header className="flex items-baseline gap-2.5 border-b border-line px-2.5 pb-2">
-            <h3 className="text-[16px] font-medium">{group.title}</h3>
-            <span className="font-mono text-[13px] text-muted">{group.lines.reduce((sum, line) => sum + line.quantity, 0)}</span>
+      {groups.map((group, index) => (
+        <section key={group.title} aria-label={group.title} className="mb-7">
+          <header className="px-2.5 pb-2">
+            <div className="flex items-baseline gap-2.5">
+              <h3 className="text-[17px] font-medium">{group.title}</h3>
+              <span className="font-mono text-[13px] text-muted">{counts[index]}</span>
+            </div>
+            {/* How much of the whole this group is, on the dot grid. */}
+            <div aria-hidden="true" className="dotted mt-2 h-2 rounded-full">
+              <div className="h-full rounded-full bg-accent-text/70" style={{ width: `${Math.max(4, (counts[index] / total) * 100)}%` }} />
+            </div>
           </header>
           <ul>
             {group.lines.map((line) => (

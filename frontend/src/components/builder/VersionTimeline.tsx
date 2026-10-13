@@ -223,6 +223,22 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
     return out;
   };
   const root = useRef<HTMLDivElement>(null);
+  // Strands and dots slide under the branch names while a long history scrolls, so they fade out just before the widest name. With the history at its start nothing fades.
+  const updateFade = () => {
+    const box = scroller.current;
+    if (!box || !root.current) return;
+    const origin = box.getBoundingClientRect().left;
+    let edge = 0;
+    box.querySelectorAll<HTMLElement>("[data-flip-id^='b-']").forEach((pill) => {
+      edge = Math.max(edge, pill.getBoundingClientRect().right - origin);
+    });
+    const sx = box.scrollLeft;
+    const start = sx + edge + 2 - (1 - Math.min(sx / 60, 1)) * 520;
+    root.current.style.setProperty("--fade-a", `${start}px`);
+    root.current.style.setProperty("--fade-b", `${start + 30}px`);
+  };
+  // The names can change width with the branches drawn, so it is measured again after every render.
+  useEffect(() => updateFade());
   // What the diagram looked like just before the branches were shown or hidden, for Flip to animate from.
   const before = useRef<{ state: Flip.FlipState; height: number; lanes: string } | null>(null);
   const { contextSafe } = useGSAP({ scope: root });
@@ -536,6 +552,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
       <div ref={scroller} onScroll={() => {
           hide();
           measureMore();
+          updateFade();
         }}
         className="relative overflow-auto pb-2"
         style={{
@@ -547,6 +564,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
         tabIndex={-1}
       >
         <div className="relative" style={{ width, height, minWidth: "100%" }}>
+          <div className="tl-fade absolute inset-0">
           {useGl && <StrandLayer strands={strands} width={width} height={height} color={strandColor} light={!dark} getClear={clearAroundNames} paused={tipBusy} onUnsupported={() => setGlOk(false)} />}
           <svg width={width} height={height} className="absolute inset-0" aria-hidden="true">
             <g className="tl-edges">
@@ -583,6 +601,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
             })}
             </g>
           </svg>
+          </div>
 
           {/* Branch names live in a gutter that stays put while a long history scrolls. */}
           <div className="pointer-events-none sticky left-0 z-10 h-full w-[148px]">
@@ -611,6 +630,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
             })}
           </div>
 
+          <div className="tl-fade pointer-events-none absolute inset-0 [&>*]:pointer-events-auto">
           {nodes.map((node) => {
             const number = node.version.versionNumber;
             const selected = number === current;
@@ -670,6 +690,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
               </button>
             );
           })}
+          </div>
         </div>
       </div>
       </div>

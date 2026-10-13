@@ -1,6 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { CaretDown } from "@phosphor-icons/react";
+import { useState, type ReactNode } from "react";
+import { Presence } from "@/components/motion/Presence";
 import type { LineGroup } from "@/lib/groups";
 import type { Board } from "@/lib/types";
 
@@ -23,28 +25,41 @@ interface Props {
 
 /**
  * The boards that sit beside the deck and are not part of its hundred cards: the maybeboard, the cards being considered, and the
- * tokens the deck makes. Each shows its cards the same way as the deck and has its own box to add to it.
+ * tokens the deck makes. Each folds away, starts open only when it holds cards, and has its own box to add to it.
  */
 export function SideBoards({ boards, renderCards, renderSearch }: Props) {
+  // Absent means "as it started": open when the board has cards. Once the person folds or opens one, that choice stands.
+  const [chosen, setChosen] = useState<Record<string, boolean>>({});
   return (
-    <section id="other-boards" aria-label="Other boards" className="mt-16 scroll-mt-6 border-t border-line pt-10">
-      <h2 className="font-display text-[clamp(40px,5vw,64px)] leading-none">Other boards</h2>
-      <p className="mt-3 max-w-[60ch] text-sm text-muted">Cards you are weighing, and tokens the deck makes. They do not count toward the hundred.</p>
-      <div className="mt-8 flex flex-col gap-10">
-        {boards.map((entry) => (
-          <section key={entry.board} aria-label={entry.title}>
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line pb-3">
-              <h3 className="flex items-baseline gap-2.5 text-[20px] font-medium">
-                {entry.title}
-                <span className="font-mono text-[13px] font-normal text-muted">{entry.count}</span>
+    <section id="other-boards" aria-label="Other boards" className="mt-12 scroll-mt-6 border-t border-line pt-6">
+      <div className="flex flex-col">
+        {boards.map((entry) => {
+          const open = chosen[entry.board] ?? entry.count > 0;
+          const bodyId = `board-${entry.board}`;
+          return (
+            <section key={entry.board} aria-label={entry.title} className="border-b border-line last:border-b-0">
+              <h3>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={bodyId}
+                  onClick={() => setChosen((current) => ({ ...current, [entry.board]: !open }))}
+                  className="flex min-h-11 w-full items-baseline gap-2.5 px-2.5 py-3 text-left hover:bg-surface/60"
+                >
+                  <span className="text-[17px] font-medium">{entry.title}</span>
+                  <span className="font-mono text-[13px] font-normal text-muted">{entry.count}</span>
+                  <CaretDown size={14} aria-hidden className={`ml-auto self-center text-muted transition-transform duration-300 motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
+                </button>
               </h3>
-              <div className="w-full sm:w-[320px]">{renderSearch(entry.board)}</div>
-            </div>
-            <div className="pt-5">
-              {entry.groups.length === 0 ? <p className="py-3 text-sm text-muted">{entry.hint}</p> : renderCards(entry.groups)}
-            </div>
-          </section>
-        ))}
+              <Presence show={open} collapse id={bodyId}>
+                <div className="px-2.5 pt-1 pb-6">
+                  <div className="mb-4 w-full sm:w-[320px]">{renderSearch(entry.board)}</div>
+                  {entry.groups.length === 0 ? <p className="text-sm text-muted">{entry.hint}</p> : renderCards(entry.groups)}
+                </div>
+              </Presence>
+            </section>
+          );
+        })}
       </div>
     </section>
   );
