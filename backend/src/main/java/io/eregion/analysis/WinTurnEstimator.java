@@ -18,6 +18,17 @@ public final class WinTurnEstimator {
 	static final double COMMANDER_LAG = 0.4;
 	/** At this share of games with a game-ending combo ready by turn 8, the deck no longer depends on its commander. */
 	static final double COMBO_INDEPENDENCE = 0.5;
+	/** This many reanimation effects make a deck a reanimator plan. The deck with the most among the reference decks that did not need one has 5. */
+	static final int REANIMATOR_PLAN = 8;
+	/**
+	 * The other site's turns bunch between 6 and 8.6 while the score map spreads wider. On nine decks with a known turn from it, ours and theirs
+	 * correlate at 0.96 but ours run from 5.0 to 9.8, and pulling ours toward 6.5 by this slope cut the mean gap from 0.81 to 0.28 (0.31 with
+	 * each deck left out in turn). Decks near 6.5, where the earlier reference decks sit, barely move. Below {@link #FULL_SLOPE_BELOW} there is
+	 * no data, so the turn keeps its own scale there, joined to the compressed one at that point.
+	 */
+	static final double PIVOT = 6.5;
+	static final double SLOPE = 0.6;
+	static final double FULL_SLOPE_BELOW = 5.0;
 	static final double SLOWEST = 12;
 	static final double FASTEST = 2.5;
 
@@ -34,8 +45,9 @@ public final class WinTurnEstimator {
 			basis = "combo";
 		}
 		// Without a fast combo a deck cannot win before its commander is out, however fast its mana: a six mana commander that is cast on turn
-		// six keeps the deck from closing earlier, whatever the score says.
-		if (speed != null && speed.commanderTurn() != null && speed.comboByTurn().getOrDefault("8", 0.0) < COMBO_INDEPENDENCE) {
+		// six keeps the deck from closing earlier, whatever the score says. A reanimator plan skips this, since it never has to cast it.
+		boolean needsCommander = bracket.signals().reanimation() == null || bracket.signals().reanimation() < REANIMATOR_PLAN;
+		if (needsCommander && speed != null && speed.commanderTurn() != null && speed.comboByTurn().getOrDefault("8", 0.0) < COMBO_INDEPENDENCE) {
 			double earliest = speed.commanderTurn() + COMMANDER_LAG;
 			if (earliest > turn) {
 				turn = earliest;
@@ -46,9 +58,17 @@ public final class WinTurnEstimator {
 		if (bracket.estimated() < 5) {
 			turn = Math.max(turn, 4.0);
 		}
-		turn = Math.max(FASTEST, Math.min(SLOWEST, turn));
+		turn = Math.max(FASTEST, Math.min(SLOWEST, calibrate(turn)));
 		double rounded = Math.round(turn * 10.0) / 10.0;
 		return new WinTurn(rounded, basis, bracketOf(rounded));
+	}
+
+	/** Pulls a turn toward the pivot, and leaves the fast end on its own scale because there is nothing to fit it to. */
+	static double calibrate(double turn) {
+		if (turn >= FULL_SLOPE_BELOW) {
+			return PIVOT + SLOPE * (turn - PIVOT);
+		}
+		return calibrate(FULL_SLOPE_BELOW) - (FULL_SLOPE_BELOW - turn);
 	}
 
 	static double fromScore(double score) {

@@ -95,7 +95,9 @@ public final class AnalysisDtos {
 			Integer endingTwoCardCombos,
 			Integer earlyEndingTwoCardCombos,
 			/** Tutors weighted by how freely they find a card: any card 1.0, a broad type 0.7, anything narrower 0.4. */
-			Double weightedTutors) {
+			Double weightedTutors,
+			/** Spells that put a creature into play from a graveyard, which is a way to skip casting it. */
+			Integer reanimation) {
 	}
 
 	/** A rule that sets a minimum bracket, with the cards that trip it. */

@@ -239,6 +239,31 @@ class BracketClassifierTest {
 		assertThat(bracket.signals().unconditionalTutors()).isEqualTo(1);
 	}
 
+	private static List<AnalysisCard> reanimators(int count) {
+		List<AnalysisCard> cards = new ArrayList<>();
+		for (int i = 0; i < count; i++) {
+			cards.add(new AnalysisCard("Reanimate " + i, "{1}{B}", 2, "Sorcery", "Sorcery",
+					"Put target creature card from a graveyard onto the battlefield under your control.", "", null, 1, "main", Set.of()));
+		}
+		return cards;
+	}
+
+	@Test
+	void reanimationAddsSpeedOnlyBeyondWhatManyDecksPlay() {
+		assertThat(BracketClassifier.classify(reanimators(5), List.of(), 3.0).scoreParts()).doesNotContainKey("Reanimation");
+		assertThat(BracketClassifier.classify(reanimators(6), List.of(), 3.0).scoreParts().get("Reanimation")).isEqualTo(0.15);
+		assertThat(BracketClassifier.classify(reanimators(12), List.of(), 3.0).scoreParts().get("Reanimation")).isEqualTo(1.05);
+		assertThat(BracketClassifier.classify(reanimators(40), List.of(), 3.0).scoreParts().get("Reanimation")).isEqualTo(1.5);
+	}
+
+	@Test
+	void reanimationIsReadFromTheRulesText() {
+		assertThat(BracketClassifier.isReanimation("Each player puts a creature card from their graveyard onto the battlefield.")).isTrue();
+		assertThat(BracketClassifier.isReanimation("Enchant creature card in a graveyard. When this enters, put enchanted card onto the battlefield.")).isTrue();
+		assertThat(BracketClassifier.isReanimation("Return target creature card from your graveyard to your hand.")).isFalse();
+		assertThat(BracketClassifier.isReanimation("Put a creature card from your hand onto the battlefield.")).isFalse();
+	}
+
 	@Test
 	void whatEndsAGameIsReadFromWhatTheComboProduces() {
 		assertThat(combo(List.of("A", "B"), 3, "Near-infinite damage").endsGame()).isTrue();

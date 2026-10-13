@@ -84,6 +84,17 @@ public final class BracketClassifier {
 	private static final Pattern TYPE_TUTOR = Pattern.compile(
 			"search your library for (a|an|up to [a-z]+) (legendary |nonland |noncreature |nonbasic )?(artifact|creature|instant|sorcery|enchantment|planeswalker|permanent)( or (artifact|creature|instant|sorcery|enchantment|planeswalker))? cards?\\b(?! (named|with))");
 
+	/** A spell that puts a card from a graveyard onto the battlefield, or an Aura that does, such as Animate Dead. */
+	private static final Pattern REANIMATION_BATTLEFIELD = Pattern.compile("(onto|to) the battlefield|enchant creature card in a graveyard");
+
+	/**
+	 * A few reanimation spells are in many decks. Beyond this many a deck is built to cheat creatures into play, which is fast, so each one
+	 * further adds a little to the speed score, up to a cap. The rate was set on one reanimator list whose reference turn is known.
+	 */
+	private static final int REANIMATION_COMMON = 5;
+	private static final double REANIMATION_POINTS = 0.15;
+	private static final double REANIMATION_CAP = 1.5;
+
 	private BracketClassifier() {
 	}
 
@@ -122,6 +133,7 @@ public final class BracketClassifier {
 		int tutors = 0;
 		int unconditional = 0;
 		double weighted = 0;
+		int reanimation = 0;
 		for (AnalysisCard card : cards) {
 			if (!card.counted()) {
 				continue;
@@ -143,6 +155,9 @@ public final class BracketClassifier {
 				fastMana.add(card.name());
 			}
 			// Scryfall's Tagger also calls a fetch land a tutor, but it only thins the deck. A tutor is a spell.
+			if (!card.isLand() && isReanimation(card.oracleText())) {
+				reanimation += card.quantity();
+			}
 			if (card.hasRole("Tutor") && !card.isLand()) {
 				tutors += card.quantity();
 				double weight = tutorWeight(card.oracleText());
@@ -167,7 +182,12 @@ public final class BracketClassifier {
 			earlyEndingTwo = (int) combos.stream().filter(c -> c.cards().size() == 2 && c.endsGame() && isEarly(c)).count();
 		}
 		return new Signals(gcCount, gameChangers, mldCount, landDenial, turnCount, extraTurns, tutors, unconditional, fastCount, fastMana,
-				twoCard, early, wins, ending, endingTwo, earlyEndingTwo, Math.round(weighted * 100.0) / 100.0);
+				twoCard, early, wins, ending, endingTwo, earlyEndingTwo, Math.round(weighted * 100.0) / 100.0, reanimation);
+	}
+
+	static boolean isReanimation(String oracleText) {
+		String text = oracleText.toLowerCase(Locale.ROOT);
+		return text.contains("graveyard") && REANIMATION_BATTLEFIELD.matcher(text).find();
 	}
 
 	/** How freely a tutor finds a card, from its rules text. */
@@ -257,6 +277,7 @@ public final class BracketClassifier {
 		parts.put("Fast mana", round(s.fastMana() * FAST_MANA_POINTS));
 		parts.put("Tutors", round(s.weightedTutors() * POINTS_PER_TUTOR_WEIGHT * credit(TUTOR_FLOOR, ready)));
 		parts.put("Extra turns", round(s.extraTurns() * EXTRA_TURN_POINTS));
+		parts.put("Reanimation", round(Math.min(REANIMATION_CAP, Math.max(0, s.reanimation() - REANIMATION_COMMON) * REANIMATION_POINTS)));
 		parts.put("Mass land denial", round(s.massLandDenial() * MASS_LAND_DENIAL_POINTS));
 		double combos = 0;
 		if (s.twoCardCombos() != null) {
