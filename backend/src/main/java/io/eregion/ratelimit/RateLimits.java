@@ -65,6 +65,11 @@ public class RateLimits {
 		check("analysis:" + user, properties.analysisPerUserMinute(), MINUTE, "deck analyses");
 	}
 
+	/** Each proxy generation is a paid call to a language model. */
+	public void proxy(UUID user) {
+		check("proxy:" + user, properties.proxyPerUserMinute(), MINUTE, "proxy generations");
+	}
+
 	public void resolve(UUID user) {
 		check("resolve:" + user, properties.resolvePerUserMinute(), MINUTE, "list lookups");
 	}
