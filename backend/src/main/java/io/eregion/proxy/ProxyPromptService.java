@@ -1,0 +1,142 @@
+package io.eregion.proxy;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import io.eregion.common.ApiException;
+import io.eregion.proxy.ProxyDtos.CardFacts;
+import io.eregion.proxy.ProxyDtos.Character;
+import io.eregion.proxy.ProxyDtos.Draft;
+import io.eregion.proxy.ProxyDtos.Mode;
+import io.eregion.proxy.ProxyDtos.Pick;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/** Turns a deck's lore and one card into a request for the model, and the model's JSON answer into a {@link Draft}. */
+@Service
+public class ProxyPromptService {
+
+	static final int MAX_PROMPT = 4000;
+	static final int MAX_NICKNAME = 80;
+	private static final JsonMapper JSON = JsonMapper.builder().build();
+
+	/** The reply was not the JSON we asked for. One retry, then the card fails. */
+	static class BadReply extends RuntimeException {
+		BadReply(String message) {
+			super(message);
+		}
+	}
+
+	private final LlmClient llm;
+	private final String rules;
+
+	public ProxyPromptService(LlmClient llm) {
+		this.llm = llm;
+		try (var in = ProxyPromptService.class.getResourceAsStream("/proxy-rules.md")) {
+			this.rules = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException(ex);
+		}
+	}
+
+	/**
+	 * @param previous the current result when refining, otherwise null
+	 * @param instruction what to change when refining, otherwise null
+	 */
+	public Draft generate(String lore, CardFacts card, Mode mode, List<Pick> others, Draft previous, String instruction) {
+		String user = userMessage(lore, card, mode, others, previous, instruction);
+		BadReply last = null;
+		for (int attempt = 0; attempt < 2; attempt++) {
+			String reply = llm.complete(rules, user);
+			try {
+				return parse(reply, mode);
+			}
+			catch (BadReply ex) {
+				last = ex;
+			}
+		}
+		throw ApiException.unavailable("The model's answer could not be read (" + last.getMessage() + "). Try again.");
+	}
+
+	static String userMessage(String lore, CardFacts card, Mode mode, List<Pick> others, Draft previous, String instruction) {
+		var out = new StringBuilder();
+		out.append("# Deck lore\n\n").append(lore == null || lore.isBlank() ? "(none given: keep the result generic)" : lore.strip()).append("\n\n");
+		out.append("# Mode\n\n").append(mode).append(mode == Mode.RESKIN ? " (keep the card's own name)" : " (invent a new name)").append("\n\n");
+		out.append("# Card\n\n");
+		out.append("Name: ").append(card.name()).append('\n');
+		out.append("Mana cost: ").append(nullToEmpty(card.manaCost())).append('\n');
+		out.append("Type: ").append(nullToEmpty(card.typeLine())).append('\n');
+		out.append("Colors: ").append(nullToEmpty(card.colors())).append('\n');
+		out.append("Rules text: ").append(nullToEmpty(card.oracleText())).append("\n\n");
+		if (!others.isEmpty()) {
+			out.append("# Already chosen for other cards in this deck (do not reuse these names)\n\n");
+			for (Pick pick : others) {
+				out.append("- ").append(pick.cardName()).append(": ");
+				out.append(pick.nickname() == null ? "(kept its name)" : pick.nickname());
+				out.append(", ").append(pick.tier() == null || pick.tier().isBlank() ? "no tier" : pick.tier()).append('\n');
+			}
+			out.append('\n');
+		}
+		if (previous != null && instruction != null && !instruction.isBlank()) {
+			out.append("# Previous result to refine\n\n");
+			if (previous.nickname() != null) {
+				out.append("Nickname: ").append(previous.nickname()).append('\n');
+			}
+			out.append("Prompt: ").append(previous.prompt()).append("\n\n");
+			out.append("# Change requested\n\n").append(instruction.strip()).append('\n');
+		}
+		return out.toString();
+	}
+
+	static Draft parse(String reply, Mode mode) {
+		JsonNode root;
+		try {
+			root = JSON.readTree(stripFence(reply));
+		}
+		catch (RuntimeException ex) {
+			throw new BadReply("not JSON");
+		}
+		JsonNode character = root.path("character");
+		String prompt = root.path("prompt").asString("").strip();
+		String who = character.path("who").asString("").strip();
+		if (prompt.isEmpty() || prompt.length() > MAX_PROMPT) {
+			throw new BadReply("no usable prompt");
+		}
+		if (who.isEmpty()) {
+			throw new BadReply("no character");
+		}
+		String nickname = null;
+		if (mode == Mode.NICKNAME) {
+			nickname = root.path("nickname").asString("").strip();
+			if (nickname.isEmpty() || nickname.length() > MAX_NICKNAME) {
+				throw new BadReply("no usable nickname");
+			}
+		}
+		return new Draft(nickname,
+				new Character(character.path("tier").asString("").strip(), who, character.path("race").asString("").strip(),
+						character.path("role").asString("").strip(), character.path("signature").asString("").strip()),
+				prompt);
+	}
+
+	/** Models sometimes wrap JSON in a code fence even when told not to. */
+	static String stripFence(String reply) {
+		String text = reply == null ? "" : reply.strip();
+		if (text.startsWith("```")) {
+			int firstBreak = text.indexOf('\n');
+			int close = text.lastIndexOf("```");
+			if (firstBreak > 0 && close > firstBreak) {
+				text = text.substring(firstBreak + 1, close).strip();
+			}
+		}
+		return text;
+	}
+
+	private static String nullToEmpty(String value) {
+		return value == null ? "" : value;
+	}
+}
