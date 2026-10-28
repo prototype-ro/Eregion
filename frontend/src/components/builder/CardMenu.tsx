@@ -23,6 +23,7 @@ interface Props {
   onSetBackground: (line: DeckCardLine) => void;
   onSetPartner: (line: DeckCardLine) => void;
   onHistory: (line: DeckCardLine) => void;
+  onProxy: (line: DeckCardLine) => void;
   onRemove: (line: DeckCardLine) => void;
   onNotify: (message: string) => void;
 }
@@ -39,7 +40,7 @@ const MOVES: Array<[Board, string]> = [
 ];
 
 /** The quick menu for a card, opened from its three dots or by right-clicking it. */
-export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onSetPartner, onHistory, onRemove, onNotify }: Props) {
+export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onSetPartner, onHistory, onProxy, onRemove, onNotify }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [amount, setAmount] = useState(1);
@@ -122,6 +123,9 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       </button>
       <button role="menuitem" className={item} onClick={act(() => onHistory(line))}>
         History in this deck
+      </button>
+      <button role="menuitem" className={item} onClick={act(() => onProxy(line))}>
+        Proxy art prompt
       </button>
       <button role="menuitem" className={item} onClick={copyName}>
         Copy card name

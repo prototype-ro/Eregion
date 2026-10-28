@@ -19,6 +19,9 @@ import { canApplyInPlace } from "@/lib/versions";
 import { btn, tag } from "@/lib/ui";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
+import { ProxyPanel } from "./ProxyPanel";
+import { ProxiesSection } from "./ProxiesSection";
+import { useProxies } from "@/lib/useProxies";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
@@ -185,6 +188,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [mergeBranch, setMergeBranch] = useState<Branch | null>(null);
   const [mergeInto, setMergeInto] = useState<Branch | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
+  const proxies = useProxies(deck.id);
+  const [proxyCardId, setProxyCardId] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
@@ -1067,6 +1072,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         />
       </div>
 
+      <ProxiesSection lines={withOwned} proxies={proxies} onOpen={setProxyCardId} />
+
       <div className="mt-16">
         <AnalysisSection lines={withOwned} />
       </div>
@@ -1289,6 +1296,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onSetBackground={makeBackground}
         onSetPartner={makePartner}
         onHistory={(line) => setHistoryKey(lineKey(line))}
+        onProxy={(line) => setProxyCardId(line.cardId)}
         onRemove={removeLine}
         onNotify={setToast}
       />
@@ -1303,6 +1311,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       />
       <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} onChooseCustom={chooseCustom} />
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
+      <ProxyPanel
+        open={proxyCardId !== null}
+        onClose={() => setProxyCardId(null)}
+        cardId={proxyCardId}
+        cardName={lines.find((l) => l.cardId === proxyCardId)?.name ?? ""}
+        proxies={proxies}
+        onNotify={setToast}
+      />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={(cards, replace) => importCards(cards, replace)} />
       <ImportDialog
         open={editListOpen}
