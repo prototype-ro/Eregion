@@ -38,9 +38,9 @@ export async function runBatch<T>(items: T[], worker: (item: T) => Promise<void>
   return { done, failed };
 }
 
-/** Cards that have no treatment yet, in the order given. An interrupted batch resumes with these. */
-export function pending(cardIds: string[], treatments: Array<{ cardId: string }>): string[] {
-  const have = new Set(treatments.map((t) => t.cardId));
+/** Cards that have no current result yet, in the order given. An interrupted batch resumes with these. */
+export function pending(cardIds: string[], treatments: Array<{ cardId: string; current?: unknown | null }>): string[] {
+  const have = new Set(treatments.filter((t) => t.current).map((t) => t.cardId));
   return cardIds.filter((id) => !have.has(id));
 }
 

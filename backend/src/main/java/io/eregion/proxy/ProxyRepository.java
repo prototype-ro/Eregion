@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import io.eregion.proxy.ProxyDtos.Character;
 import io.eregion.proxy.ProxyDtos.Draft;
@@ -73,6 +74,15 @@ public class ProxyRepository {
 				.param("deck", deckId).param("card", cardId)
 				.query(ProxyRepository::treatment)
 				.optional();
+	}
+
+	/** Stores a finished generation and makes it current, all or nothing. Returns the generation id. */
+	@Transactional
+	public UUID record(UUID deckId, UUID cardId, Mode mode, String instruction, Draft draft, String model) {
+		UUID treatmentId = upsertTreatment(deckId, cardId, mode);
+		UUID generationId = insertGeneration(treatmentId, instruction, draft, model);
+		setCurrent(treatmentId, generationId);
+		return generationId;
 	}
 
 	/** Creates the treatment for a card, or switches its mode. Returns its id. */

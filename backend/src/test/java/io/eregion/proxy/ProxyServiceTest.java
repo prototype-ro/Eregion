@@ -67,6 +67,14 @@ class ProxyServiceTest {
 		}
 
 		@Override
+		public UUID record(UUID deckId, UUID cardId, Mode m, String instruction, Draft draft, String model) {
+			UUID treatment = upsertTreatment(deckId, cardId, m);
+			UUID generation = insertGeneration(treatment, instruction, draft, model);
+			setCurrent(treatment, generation);
+			return generation;
+		}
+
+		@Override
 		public UUID upsertTreatment(UUID deckId, UUID cardId, Mode m) {
 			if (treatmentId == null) {
 				treatmentId = UUID.randomUUID();

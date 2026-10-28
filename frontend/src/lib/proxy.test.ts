@@ -56,8 +56,12 @@ test("progress is reported after each item", async () => {
   assert.deepEqual(marks, [1, 2, 3]);
 });
 
-test("pending lists the cards that have no treatment yet", () => {
-  assert.deepEqual(pending(["a", "b", "c"], [{ cardId: "b" }]), ["a", "c"]);
+test("pending lists the cards that have no result yet", () => {
+  assert.deepEqual(pending(["a", "b", "c"], [{ cardId: "b", current: { id: "g" } }]), ["a", "c"]);
+});
+
+test("a treatment without a current result is still pending", () => {
+  assert.deepEqual(pending(["a", "b"], [{ cardId: "a", current: null }, { cardId: "b" }]), ["a", "b"]);
 });
 
 test("the copied prompt carries the deck's parameters", () => {

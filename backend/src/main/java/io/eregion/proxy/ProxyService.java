@@ -63,9 +63,7 @@ public class ProxyService {
 
 		Draft draft = prompts.generate(lore.lore(), facts(card), mode, repository.picks(deckId, cardId), previous, instruction);
 
-		UUID treatmentId = repository.upsertTreatment(deckId, cardId, mode);
-		UUID generationId = repository.insertGeneration(treatmentId, instruction, draft, llm.modelName());
-		repository.setCurrent(treatmentId, generationId);
+		repository.record(deckId, cardId, mode, instruction, draft, llm.modelName());
 		return repository.treatment(deckId, cardId).orElseThrow();
 	}
 
