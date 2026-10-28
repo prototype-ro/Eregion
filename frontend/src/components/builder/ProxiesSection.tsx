@@ -34,9 +34,15 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
   const [failures, setFailures] = useState<Map<string, string>>(new Map());
   const abort = useRef<AbortController | null>(null);
 
+  const [saving, setSaving] = useState(false);
+  // The values the fields were last synced to. A field that differs from them holds unsaved edits and is left alone.
+  const synced = useRef({ lore: proxies.lore.lore ?? "", params: proxies.lore.mjParams ?? "" });
+
   useEffect(() => {
-    setLore(proxies.lore.lore ?? "");
-    setParams(proxies.lore.mjParams ?? "");
+    const incoming = { lore: proxies.lore.lore ?? "", params: proxies.lore.mjParams ?? "" };
+    setLore((current) => (current === synced.current.lore ? incoming.lore : current));
+    setParams((current) => (current === synced.current.params ? incoming.params : current));
+    synced.current = incoming;
   }, [proxies.lore.lore, proxies.lore.mjParams]);
 
   const byCard = new Map(proxies.treatments.map((t) => [t.cardId, t]));
@@ -44,11 +50,14 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
   const running = progress !== null;
 
   async function save() {
+    setSaving(true);
     try {
       await proxies.saveLore(lore, params);
       setSavedMessage("Saved");
     } catch (err) {
       setSavedMessage(err instanceof ApiError ? err.message : "Could not save");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -81,6 +90,15 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
     <section aria-label="Proxies" className="mt-16 flex flex-col gap-6">
       <h2 className="font-display text-[44px] leading-none">Proxies</h2>
 
+      {proxies.loadError && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
+          <span className="min-w-0 flex-1">{proxies.loadError}</span>
+          <button type="button" className={btn.secondary} onClick={() => void proxies.retry()}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         <label htmlFor="deck-lore" className="text-sm text-muted">
           Deck lore. The model reads all of it for every card.
@@ -102,7 +120,7 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
             placeholder="--ar 5:7 --style raw --v 7"
             className="min-h-9 w-full max-w-sm rounded-full border border-line bg-surface px-4 text-[13px] text-ink placeholder:text-muted focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11"
           />
-          <button type="button" className={btn.primary} disabled={!dirty} onClick={save}>
+          <button type="button" className={btn.primary} disabled={!proxies.loaded || !dirty || saving} onClick={save}>
             Save
           </button>
           {savedMessage && !dirty && <span className="text-sm text-muted">{savedMessage}</span>}
@@ -114,10 +132,10 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
           <option value="NICKNAME">New nickname</option>
           <option value="RESKIN">Keep the name, new art</option>
         </select>
-        <button type="button" className={btn.primary} disabled={running || selected.size === 0} onClick={() => generateSelected([...selected])}>
+        <button type="button" className={btn.primary} disabled={!proxies.loaded || running || selected.size === 0} onClick={() => generateSelected([...selected])}>
           Generate {selected.size > 0 ? selected.size : ""} selected
         </button>
-        <button type="button" className={btn.secondary} disabled={running} onClick={() => setSelected(new Set(pending(cards.map((c) => c.cardId), proxies.treatments)))}>
+        <button type="button" className={btn.secondary} disabled={!proxies.loaded || running} onClick={() => setSelected(new Set(pending(cards.map((c) => c.cardId), proxies.treatments)))}>
           Select cards without a proxy
         </button>
         {running && (

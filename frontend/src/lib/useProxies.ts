@@ -8,20 +8,28 @@ import type { DeckLore, ProxyGeneration, ProxyMode, ProxyTreatment } from "./typ
 export function useProxies(deckId: string) {
   const [treatments, setTreatments] = useState<ProxyTreatment[]>([]);
   const [lore, setLore] = useState<DeckLore>({ lore: null, mjParams: null });
+  /** True when the last load succeeded. Until then the lists may be stale or empty, so callers should not act on them. */
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const [list, text] = await Promise.all([
-      api<ProxyTreatment[]>(`/api/decks/${deckId}/proxies`),
-      api<DeckLore>(`/api/decks/${deckId}/lore`),
-    ]);
-    setTreatments(list);
-    setLore(text);
-    setLoaded(true);
+    try {
+      const [list, text] = await Promise.all([
+        api<ProxyTreatment[]>(`/api/decks/${deckId}/proxies`),
+        api<DeckLore>(`/api/decks/${deckId}/lore`),
+      ]);
+      setTreatments(list);
+      setLore(text);
+      setLoaded(true);
+      setLoadError(null);
+    } catch (err) {
+      setLoaded(false);
+      setLoadError(err instanceof Error && err.message ? err.message : "Could not load the proxies.");
+    }
   }, [deckId]);
 
   useEffect(() => {
-    reload().catch(() => setLoaded(true));
+    void reload();
   }, [reload]);
 
   const put = useCallback((next: ProxyTreatment) => {
@@ -56,5 +64,5 @@ export function useProxies(deckId: string) {
     [deckId],
   );
 
-  return { treatments, lore, loaded, generate, history, choose, saveLore };
+  return { treatments, lore, loaded, loadError, retry: reload, generate, history, choose, saveLore };
 }

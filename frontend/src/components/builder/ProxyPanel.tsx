@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ApiError } from "@/lib/api";
 import { fullPrompt } from "@/lib/proxy";
@@ -36,6 +36,12 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<ProxyGeneration[]>([]);
   const current = treatment?.current ?? null;
+  const touchedMode = useRef(false);
+
+  // The saved mode arrives after the first render when the proxies load late. Follow it until the player picks one.
+  useEffect(() => {
+    if (treatment && !touchedMode.current) setMode(treatment.mode);
+  }, [treatment?.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!treatment) return;
@@ -54,6 +60,19 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
       if (refine) setInstruction("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not generate. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function choose(generationId: string) {
+    setBusy(true);
+    try {
+      const next = await proxies.choose(cardId, generationId);
+      touchedMode.current = false;
+      setMode(next.mode);
+    } catch {
+      onNotify("Could not switch.");
     } finally {
       setBusy(false);
     }
@@ -80,7 +99,10 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
             key={m}
             type="button"
             aria-pressed={mode === m}
-            onClick={() => setMode(m)}
+            onClick={() => {
+              touchedMode.current = true;
+              setMode(m);
+            }}
             className={`min-h-9 rounded-full text-[13px] [@media(pointer:coarse)]:min-h-11 ${mode === m ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
           >
             {m === "NICKNAME" ? "New nickname" : "Keep the name, new art"}
@@ -143,7 +165,7 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
                 {g.id === treatment?.currentGenerationId ? (
                   <span className="shrink-0 font-mono text-xs text-muted">current</span>
                 ) : (
-                  <button type="button" className={btn.quiet} onClick={() => proxies.choose(cardId, g.id).catch(() => onNotify("Could not switch."))}>
+                  <button type="button" className={btn.quiet} disabled={busy} onClick={() => choose(g.id)}>
                     Use this
                   </button>
                 )}
