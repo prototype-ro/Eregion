@@ -97,7 +97,7 @@ class ProxyServiceTest {
 
 		@Override
 		public boolean generationBelongs(UUID treatment, UUID generationId) {
-			return generations.stream().anyMatch(g -> g.id().equals(generationId));
+			return treatment.equals(treatmentId) && generations.stream().anyMatch(g -> g.id().equals(generationId));
 		}
 
 		@Override
@@ -229,5 +229,38 @@ class ProxyServiceTest {
 		Treatment back = service.setCurrent(USER, DECK, CARD, a.current().id());
 
 		assertThat(back.mode()).isEqualTo(Mode.NICKNAME);
+	}
+
+	@Test
+	void aStrangerCannotReadOrChangeAnything() {
+		Treatment mine = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		int callsBefore = llm.calls;
+
+		assertThatThrownBy(() -> service.lore(STRANGER, DECK)).isInstanceOf(ApiException.class).hasMessageContaining("Deck not found");
+		assertThatThrownBy(() -> service.treatments(STRANGER, DECK)).isInstanceOf(ApiException.class).hasMessageContaining("Deck not found");
+		assertThatThrownBy(() -> service.history(STRANGER, DECK, CARD)).isInstanceOf(ApiException.class).hasMessageContaining("Deck not found");
+		assertThatThrownBy(() -> service.setCurrent(STRANGER, DECK, CARD, mine.current().id()))
+				.isInstanceOf(ApiException.class).hasMessageContaining("Deck not found");
+		assertThat(llm.calls).isEqualTo(callsBefore);
+	}
+
+	@Test
+	void aFailingModelLeavesNothingBehind() {
+		var failing = new LlmClient() {
+			@Override
+			public String complete(String system, String user) {
+				throw ApiException.unavailable("down");
+			}
+
+			@Override
+			public String modelName() {
+				return "fake";
+			}
+		};
+		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(failing), failing);
+
+		assertThatThrownBy(() -> svc.generate(USER, DECK, CARD, Mode.NICKNAME, null)).isInstanceOf(ApiException.class).hasMessageContaining("down");
+		assertThat(repo.treatmentId).isNull();
+		assertThat(repo.generations).isEmpty();
 	}
 }
