@@ -38,6 +38,8 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
   // The values the fields were last synced to. A field that differs from them holds unsaved edits and is left alone.
   const synced = useRef({ lore: proxies.lore.lore ?? "", params: proxies.lore.mjParams ?? "" });
 
+  useEffect(() => () => abort.current?.abort(), []);
+
   useEffect(() => {
     const incoming = { lore: proxies.lore.lore ?? "", params: proxies.lore.mjParams ?? "" };
     setLore((current) => (current === synced.current.lore ? incoming.lore : current));
