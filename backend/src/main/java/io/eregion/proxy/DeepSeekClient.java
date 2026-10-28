@@ -5,6 +5,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -19,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class DeepSeekClient implements LlmClient {
 
+	private static final Logger log = LoggerFactory.getLogger(DeepSeekClient.class);
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	private final RestClient http;
@@ -30,7 +33,8 @@ public class DeepSeekClient implements LlmClient {
 		this.apiKey = apiKey;
 		this.model = model;
 		var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
-		factory.setReadTimeout(Duration.ofSeconds(90));
+		// Two attempts (see ProxyPromptService) must fit under the 120s limit of the Next proxy in front of the API.
+		factory.setReadTimeout(Duration.ofSeconds(45));
 		this.http = RestClient.builder().baseUrl(url).requestFactory(factory).build();
 	}
 
@@ -64,6 +68,7 @@ public class DeepSeekClient implements LlmClient {
 			throw ApiException.unavailable("The model service answered " + status + ". Try again in a moment.");
 		}
 		catch (RuntimeException ex) {
+			log.warn("Model service call failed: {}", ex.toString());
 			throw ApiException.unavailable("The model service could not be reached. Try again in a moment.");
 		}
 	}
