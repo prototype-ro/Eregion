@@ -504,3 +504,36 @@ export interface DeckAnalysis {
   health: AnalysisHealth | null;
   archenemy: AnalysisArchenemy | null;
 }
+
+export type ProxyMode = "NICKNAME" | "RESKIN";
+
+export interface ProxyCharacter {
+  tier: string;
+  who: string;
+  race: string;
+  role: string;
+  signature: string;
+}
+
+export interface ProxyGeneration {
+  id: string;
+  createdAt: string;
+  instruction: string | null;
+  nickname: string | null;
+  character: ProxyCharacter;
+  prompt: string;
+  model: string;
+}
+
+export interface ProxyTreatment {
+  id: string;
+  cardId: string;
+  mode: ProxyMode;
+  currentGenerationId: string | null;
+  current: ProxyGeneration | null;
+}
+
+export interface DeckLore {
+  lore: string | null;
+  mjParams: string | null;
+}
