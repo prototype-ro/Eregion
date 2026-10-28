@@ -80,6 +80,9 @@ public class ProxyService {
 		if (!repository.generationBelongs(treatment.id(), generationId)) {
 			throw ApiException.notFound("Generation");
 		}
+		Generation picked = repository.history(treatment.id()).stream().filter(g -> g.id().equals(generationId)).findFirst()
+				.orElseThrow(() -> ApiException.notFound("Generation"));
+		repository.upsertTreatment(deckId, cardId, picked.nickname() != null ? Mode.NICKNAME : Mode.RESKIN);
 		repository.setCurrent(treatment.id(), generationId);
 		return repository.treatment(deckId, cardId).orElseThrow();
 	}

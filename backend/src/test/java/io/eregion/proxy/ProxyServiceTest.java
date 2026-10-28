@@ -212,4 +212,14 @@ class ProxyServiceTest {
 
 		assertThat(treatment.current().character()).isEqualTo(new Character("T", "w", "r", "o", "s"));
 	}
+
+	@Test
+	void pickingAnOlderResultBringsItsModeBack() {
+		Treatment a = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		service.generate(USER, DECK, CARD, Mode.RESKIN, null);
+
+		Treatment back = service.setCurrent(USER, DECK, CARD, a.current().id());
+
+		assertThat(back.mode()).isEqualTo(Mode.NICKNAME);
+	}
 }
