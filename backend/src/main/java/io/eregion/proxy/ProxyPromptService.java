@@ -22,6 +22,7 @@ public class ProxyPromptService {
 
 	static final int MAX_PROMPT = 4000;
 	static final int MAX_NICKNAME = 80;
+	static final int MAX_FIELD = 400;
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	/** The reply was not the JSON we asked for. One retry, then the card fails. */
@@ -117,10 +118,16 @@ public class ProxyPromptService {
 				throw new BadReply("no usable nickname");
 			}
 		}
-		return new Draft(nickname,
-				new Character(character.path("tier").asString("").strip(), who, character.path("race").asString("").strip(),
-						character.path("role").asString("").strip(), character.path("signature").asString("").strip()),
-				prompt);
+		String tier = character.path("tier").asString("").strip();
+		String race = character.path("race").asString("").strip();
+		String role = character.path("role").asString("").strip();
+		String signature = character.path("signature").asString("").strip();
+		for (String field : new String[] { tier, who, race, role, signature }) {
+			if (field.length() > MAX_FIELD) {
+				throw new BadReply("a field is too long");
+			}
+		}
+		return new Draft(nickname, new Character(tier, who, race, role, signature), prompt);
 	}
 
 	/** Models sometimes wrap JSON in a code fence even when told not to. */

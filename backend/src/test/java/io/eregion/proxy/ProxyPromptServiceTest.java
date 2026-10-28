@@ -120,4 +120,15 @@ class ProxyPromptServiceTest {
 
 		assertThatThrownBy(() -> service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null)).isInstanceOf(ApiException.class);
 	}
+
+	@Test
+	void anOverLongFieldIsRejectedAndTheRetrySucceeds() {
+		String tooLong = GOOD_NICKNAME.replace("a calm toll-keeper", "x".repeat(401));
+		var llm = new Scripted(tooLong, GOOD_NICKNAME);
+
+		Draft draft = service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null);
+
+		assertThat(draft.character().who()).isEqualTo("a calm toll-keeper");
+		assertThat(llm.users).hasSize(2);
+	}
 }
