@@ -46,8 +46,9 @@ export type Size = keyof typeof SIZES;
 
 export const std = (variant: Variant = "secondary", size: Size = "md") => `${base} ${VARIANTS[variant]} ${SIZES[size]}`;
 
-/** A square button for a single icon. */
-export const stdIcon = (size: Size = "md") => `${base} ${VARIANTS.quiet} ${size === "md" ? "size-9 [@media(pointer:coarse)]:size-11" : "size-11"}`;
+/** A square button for a single icon. Quiet by default, and glass for one that floats over art. */
+export const stdIcon = (size: Size = "md", variant: Variant = "quiet") =>
+  `${base} ${VARIANTS[variant]} ${size === "md" ? "size-9 [@media(pointer:coarse)]:size-11" : "size-11"}`;
 
 /** A read-only label, a status, and a count. Never clickable. */
 export const STD_TAG = {
@@ -56,6 +57,12 @@ export const STD_TAG = {
   add: "inline-flex items-center rounded-full border border-add-line px-3 py-1 text-[13px] text-add-text",
   danger: "inline-flex items-center rounded-full border border-danger-line px-3 py-1 text-[13px] text-danger",
   count: "inline-flex min-w-6 items-center justify-center rounded-full bg-surface px-2 py-0.5 font-mono text-xs text-ink",
+  /**
+   * A count that sits on card art. The fill is the page colour at 78%, so it reads the same over a dark or a white card frame, with the
+   * accent for the number. Not for "New": that stays the one solid accent badge.
+   */
+  overArt:
+    "inline-flex items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--text)_24%,transparent)] bg-[color-mix(in_srgb,var(--bg)_78%,transparent)] font-mono font-bold text-accent-text shadow-[inset_0_1px_0_var(--glass-hi),0_4px_14px_var(--glass-shadow)] backdrop-blur-[14px] backdrop-saturate-[1.7]",
 } as const;
 
 /** Text fields and selects: a pill, in the same two sizes as the buttons, so a form row lines up. */

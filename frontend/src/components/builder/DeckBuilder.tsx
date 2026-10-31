@@ -35,7 +35,6 @@ import { SideBoards, type SideBoard } from "./SideBoards";
 import { CardGallery, CardStacks } from "./CardViews";
 import { ImportDialog, type ImportedCard } from "./ImportDialog";
 import { PrintingPicker } from "./PrintingPicker";
-import { AnalysisSection } from "./AnalysisSection";
 import { StatsSection } from "./StatsSection";
 import { TagEditor } from "./TagEditor";
 import { BranchesDialog } from "./BranchesDialog";
@@ -1067,16 +1066,13 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           stats={stats}
           saved={savedStats}
           savedVersion={version?.versionNumber ?? 0}
+          lines={withOwned}
           removed={removed}
           showCollection={checkCollection}
         />
       </div>
 
       <ProxiesSection lines={withOwned} proxies={proxies} onOpen={setProxyCardId} />
-
-      <div className="mt-16">
-        <AnalysisSection lines={withOwned} />
-      </div>
 
       <CommandDock
         shown={dockShown}

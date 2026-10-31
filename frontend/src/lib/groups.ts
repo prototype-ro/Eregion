@@ -33,8 +33,8 @@ export interface LineGroup {
 }
 
 const TYPE_GROUPS: Array<[string, string]> = [
-  ["Creature", "Creatures"],
   ["Planeswalker", "Planeswalkers"],
+  ["Creature", "Creatures"],
   ["Instant", "Instants"],
   ["Sorcery", "Sorceries"],
   ["Artifact", "Artifacts"],

@@ -3,3 +3,8 @@
 .env.local
 .idea/
 .vscode/
+
+# Local agent tooling and reference material, too large or too personal to track.
+.superpowers/
+frontend/.viz-cand/
+frontend/public/dev/

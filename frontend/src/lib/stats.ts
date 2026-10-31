@@ -8,7 +8,7 @@ import type { DeckCardLine, DeckStats } from "./types";
 export const CURVE_BUCKETS = 7;
 
 const COUNTED = new Set(["commander", "main"]);
-const TYPE_ORDER = ["Creature", "Planeswalker", "Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Battle", "Other"];
+const TYPE_ORDER = ["Planeswalker", "Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Battle", "Other"];
 
 export function isCounted(board: string): boolean {
   return COUNTED.has(board);

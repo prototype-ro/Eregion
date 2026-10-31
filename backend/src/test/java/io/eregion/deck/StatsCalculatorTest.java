@@ -113,4 +113,13 @@ class StatsCalculatorTest {
 		assertThat(stats.roles()).containsExactly(
 				java.util.Map.entry("Removal", 1), java.util.Map.entry("Ramp", 3), java.util.Map.entry("Uncategorized", 1));
 	}
+
+	@Test
+	void planeswalkersAreListedBeforeCreatures() {
+		DeckStats stats = StatsCalculator.compute(List.of(
+				main("Bear", "Creature", 2, 1),
+				main("Jace", "Planeswalker", 3, 1),
+				main("Bolt", "Instant", 1, 1)));
+		assertThat(stats.types().keySet()).containsExactly("Planeswalker", "Creature", "Instant");
+	}
 }

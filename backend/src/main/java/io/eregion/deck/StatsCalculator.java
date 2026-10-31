@@ -18,7 +18,7 @@ public final class StatsCalculator {
 	/** Curve buckets run 0 to 6, with the last bucket meaning "6 or more". */
 	public static final int CURVE_BUCKETS = 7;
 
-	private static final List<String> TYPE_ORDER = List.of("Creature", "Planeswalker", "Instant", "Sorcery",
+	private static final List<String> TYPE_ORDER = List.of("Planeswalker", "Creature", "Instant", "Sorcery",
 			"Artifact", "Enchantment", "Land", "Battle", "Other");
 
 	public static final String UNCATEGORIZED = "Uncategorized";

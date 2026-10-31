@@ -34,6 +34,40 @@ export function dominantHue(data: ArrayLike<number>): { hue: number; strength: n
 
 export const strandColorOf = (hue: number) => `hsl(${Math.round(hue)} 95% 60%)`;
 
+/** A colour as OKLCH lightness, chroma and hue, so a strand colour can drive lightness ramps. */
+export interface Oklch {
+  l: number;
+  c: number;
+  h: number;
+}
+
+/** A strand colour ("#rrggbb" or the "hsl(h s% l%)" of strandColorOf) in OKLCH. Anything else reads as the default strand. */
+export function toOklch(color: string): Oklch {
+  let rgb: number[];
+  const hsl = /^hsl\((\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%\)$/.exec(color);
+  if (hsl) {
+    const [h, sat, light] = [Number(hsl[1]), Number(hsl[2]) / 100, Number(hsl[3]) / 100];
+    const a = sat * Math.min(light, 1 - light);
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      return light - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    };
+    rgb = [f(0), f(8), f(4)];
+  } else {
+    const hex = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_STRAND;
+    const n = parseInt(hex.slice(1), 16);
+    rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
+  }
+  const [r, g, b] = rgb.map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const q = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q;
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * q;
+  const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * q;
+  return { l: L, c: Math.hypot(A, B), h: ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360 };
+}
+
 const KEY = "eregion-art-hue:v1:";
 const memory = new Map<string, Promise<number | null>>();
 

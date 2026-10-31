@@ -3,7 +3,7 @@
 import { Check, GitBranch } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { artHue, DEFAULT_STRAND, strandColorOf } from "@/lib/artColor";
+import { STRAND_CHOICES, useStrandColor } from "@/lib/useStrandColor";
 import { Flip, gsap, MOTION, REDUCED, useGSAP, whenMotionAllowed } from "@/lib/motion";
 import type { Timeline, VersionSummary } from "@/lib/types";
 import { NodeTip } from "./NodeTip";
@@ -79,9 +79,6 @@ function branchesToDraw(timeline: Timeline, current: number | null, published: n
   return wanted;
 }
 
-/** The colours a person can pick for the strands, besides the one taken from the commander's art. */
-const STRAND_CHOICES: Array<[string, string]> = [["#38d6ff", "Cyan"], ["#9b6bff", "Violet"], ["#ff4fd8", "Magenta"], ["#3dff8a", "Green"], ["#ffb02e", "Amber"]];
-const STRAND_KEY = "eregion-strand-color";
 
 /** Whether the page is showing its dark theme. On a light one the strands are drawn as ink instead of light. */
 function useDarkTheme() {
@@ -170,33 +167,11 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
   const dark = useDarkTheme();
   const [glOk, setGlOk] = useState(true);
   const useGl = glOk;
-  const [choice, setChoice] = useState<string>("auto");
-  const [autoHue, setAutoHue] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STRAND_KEY);
-      if (saved && (saved === "auto" || STRAND_CHOICES.some(([hex]) => hex === saved))) setChoice(saved);
-    } catch {
-      // Keep the default.
-    }
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    void artHue(artUrl).then((hue) => !cancelled && setAutoHue(hue));
-    return () => {
-      cancelled = true;
-    };
-  }, [artUrl]);
-  const strandColor = choice !== "auto" ? choice : autoHue !== null ? strandColorOf(autoHue) : DEFAULT_STRAND;
+  const { choice, color: strandColor, autoColor, pick: pickStrand } = useStrandColor(artUrl);
   function pick(next: string) {
-    setChoice(next);
+    pickStrand(next);
     setPickerOpen(false);
-    try {
-      localStorage.setItem(STRAND_KEY, next);
-    } catch {
-      // Not remembered.
-    }
   }
   const pickerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -488,7 +463,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
             {pickerOpen && (
               <div role="menu" className="absolute top-full right-0 z-40 mt-2 w-60 rounded-2xl border border-line bg-bg p-2 shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
                 <button type="button" role="menuitemradio" aria-checked={choice === "auto"} onClick={() => pick("auto")} className="flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-ink transition-colors hover:bg-surface">
-                  <span aria-hidden="true" className="size-5 rounded-full" style={{ background: autoHue !== null ? strandColorOf(autoHue) : DEFAULT_STRAND }} />
+                  <span aria-hidden="true" className="size-5 rounded-full" style={{ background: autoColor }} />
                   <span className="flex-1">From the commander</span>
                   {choice === "auto" && <Check size={16} aria-hidden />}
                 </button>

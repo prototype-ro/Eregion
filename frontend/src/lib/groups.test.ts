@@ -23,6 +23,21 @@ test("subtypes come from after the dash, for every face", () => {
   assert.deepEqual(subtypes("Artifact — Equipment"), ["Equipment"]);
 });
 
+test("type groups put planeswalkers before creatures, then the rest in their usual order", () => {
+  const groups = groupLines(
+    [
+      card({ name: "Bear", primaryType: "Creature", typeLine: "Creature — Bear" }),
+      card({ name: "Jace", primaryType: "Planeswalker", typeLine: "Legendary Planeswalker — Jace" }),
+      card({ name: "Bolt", primaryType: "Instant", typeLine: "Instant" }),
+      card({ name: "Forest", primaryType: "Land", typeLine: "Basic Land — Forest" }),
+      card({ name: "Ring", primaryType: "Artifact", typeLine: "Artifact" }),
+    ],
+    "type",
+  );
+
+  assert.deepEqual(titles(groups), ["Planeswalkers", "Creatures", "Instants", "Artifacts", "Lands"]);
+});
+
 test("subtype groups list a card under each subtype and put cards without one last", () => {
   const groups = groupLines(
     [card({ name: "A", primaryType: "Creature", typeLine: "Creature — Human Wizard" }), card({ name: "B", typeLine: "Instant" }), card({ name: "C", primaryType: "Creature", typeLine: "Creature — Human" })],

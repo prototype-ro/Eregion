@@ -1,16 +1,14 @@
 import { healthWord, stepStrength, turnLabel, turnPosition } from "@/lib/analysis";
-import { std, STD_TAG } from "@/lib/ui";
 import type { AnalysisArchenemy, AnalysisHealth, AnalysisWinTurn } from "@/lib/types";
-import { Meter, Segment } from "./Meter";
+import { COPPER_HOT, INK, MeterRow, Panel } from "./stats/screen";
 
-/** Brand card: a hairline border and the 28px radius, the same as the other panels in the app. */
-const CARD = "min-w-0 rounded-[28px] border border-line p-6 sm:p-8";
-/** A disclosure toggle, in the quiet pill style so it reads as a control. */
-const SUMMARY = `${std("quiet")} -ml-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden`;
+/** A disclosure toggle in the screens' mono pill style, so it reads as a control. */
+const SUMMARY =
+  "inline-flex min-h-9 cursor-pointer list-none items-center rounded-full border border-white/15 px-4 font-mono text-[11px] tracking-[0.12em] text-muted uppercase transition-colors hover:text-ink [&::-webkit-details-marker]:hidden [@media(pointer:coarse)]:min-h-11";
 
 /**
- * The five brackets as the win turn bar draws them, slow on the left. They are told apart by how strongly they take the accent, the
- * one colour of the brand, and by their labels, so nothing depends on hue.
+ * The five brackets as the win turn bar draws them, slow on the left. Each is a halftone screen whose dots grow with the bracket's
+ * speed, and the deck's own bracket is lit, so nothing depends on hue.
  */
 const BRACKETS = [
   { n: 1, label: "B1", range: "10+" },
@@ -22,29 +20,48 @@ const BRACKETS = [
 
 const AXIS_TURNS = [10, 8, 6, 4];
 
+/** A CSS halftone: a grid of dots of one size, as a background. */
+const halftone = (color: string, radius: number, pitch = 6) => ({
+  backgroundImage: `radial-gradient(circle, ${color} ${radius}px, transparent ${radius + 0.6}px)`,
+  backgroundSize: `${pitch}px ${pitch}px`,
+});
+
 /** Where in its bracket's range the deck's estimated turn falls, in words a player would say. */
 export function WinTurnBlock({ winTurn, rulesBracket }: { winTurn: AnalysisWinTurn; rulesBracket: number }) {
   const position = turnPosition(winTurn.turn);
-  // Near either end the label hangs inward from the pin, so it never leaves the card.
+  // Near either end the label hangs inward from the pin, so it never leaves the panel.
   const labelShift = position < 12 ? "0%" : position > 88 ? "-100%" : "-50%";
   return (
-    // The pin layer is as wide as the bar and moves by transform, so its box can reach past the card. It is clipped there, which also
-    // stops it from widening the page.
-    <div className={`${CARD} overflow-x-clip`}>
-      <div className="flex items-baseline justify-between gap-4">
-        <p className="text-[15px] text-muted">Estimated win turn</p>
-        <p className="text-[clamp(48px,5vw,80px)] leading-none font-medium tracking-[-0.05em]">{turnLabel(winTurn.turn)}</p>
-      </div>
-
-      <div className="relative mt-12 mb-10" role="img" aria-label={`Estimated win turn ${turnLabel(winTurn.turn)}, in the range of bracket ${winTurn.bracket}`}>
+    <Panel
+      title="Estimated win turn"
+      clip={false}
+      right={<p className="text-[clamp(40px,4.4vw,64px)] leading-none font-medium tracking-[-0.05em]">{turnLabel(winTurn.turn)}</p>}
+      foot={
+        <>
+          The brackets are turn ranges, and the pin is where this deck lands.{" "}
+          {winTurn.basis === "combo" ? "A combo in the deck can be run sooner than the rest of its signals suggest. " : ""}
+          {rulesBracket > winTurn.bracket ? `The bracket rules still put it in bracket ${rulesBracket}. ` : ""}
+          It is an estimate from the cards and simulated games of the deck, not a model trained on played games.
+        </>
+      }
+    >
+      <div className="relative mt-10 mb-9" role="img" aria-label={`Estimated win turn ${turnLabel(winTurn.turn)}, in the range of bracket ${winTurn.bracket}`}>
         <div className="flex h-11 gap-1 overflow-hidden rounded-full">
           {BRACKETS.map((bracket) => {
             const current = bracket.n === winTurn.bracket;
+            const strength = stepStrength(bracket.n - 1, 5);
             return (
               <div
                 key={bracket.n}
-                className={`flex flex-1 items-center justify-center gap-1.5 px-1 text-[13px] whitespace-nowrap ${current ? "text-on-accent" : "text-ink"}`}
-                style={{ background: `color-mix(in srgb, var(--accent-text) ${current ? 100 : Math.round(stepStrength(bracket.n - 1, 5) * 28)}%, var(--bg))` }}
+                className={`relative flex flex-1 items-center justify-center gap-1.5 px-1 text-[13px] whitespace-nowrap ${current ? "text-bg" : "text-ink"}`}
+                style={
+                  current
+                    ? { background: INK }
+                    : {
+                        ...halftone(`rgba(241,243,255,${0.1 + strength * 0.22})`, 0.8 + strength * 1.4),
+                        boxShadow: "inset 0 0 0 1px rgba(241,243,255,0.1)",
+                      }
+                }
               >
                 <span className="font-semibold">{bracket.label}</span>
                 <span className={`hidden font-mono text-xs sm:inline ${current ? "" : "text-muted"}`}>{bracket.range}</span>
@@ -58,8 +75,22 @@ export function WinTurnBlock({ winTurn, rulesBracket }: { winTurn: AnalysisWinTu
           style={{ transform: `translateX(${position}%)` }}
           aria-hidden="true"
         >
-          <span className="absolute inset-y-0 left-0 w-0.5 -translate-x-1/2 rounded-full bg-ink" />
-          <span className={`${STD_TAG.plain} absolute -top-8 left-0 border-ink bg-bg font-mono whitespace-nowrap text-ink`} style={{ transform: `translateX(${labelShift})` }}>
+          <span
+            className="absolute inset-y-0 left-0 w-0.5 -translate-x-1/2 rounded-full"
+            style={{
+              background: COPPER_HOT,
+              boxShadow: `0 0 8px ${COPPER_HOT}`,
+            }}
+          />
+          <span
+            className="absolute -top-8 left-0 inline-flex items-center rounded-full border px-3 py-1 font-mono text-[12px] whitespace-nowrap"
+            style={{
+              transform: `translateX(${labelShift})`,
+              borderColor: COPPER_HOT,
+              color: COPPER_HOT,
+              background: "var(--bg)",
+            }}
+          >
             This deck {turnLabel(winTurn.turn)}
           </span>
         </div>
@@ -72,122 +103,116 @@ export function WinTurnBlock({ winTurn, rulesBracket }: { winTurn: AnalysisWinTu
           ))}
         </div>
       </div>
+    </Panel>
+  );
+}
 
-      <p className="max-w-[820px] text-sm text-muted">
-        The brackets are turn ranges, and the pin is where this deck lands.{" "}
-        {winTurn.basis === "combo" ? "A combo in the deck can be run sooner than the rest of its signals suggest. " : ""}
-        {rulesBracket > winTurn.bracket ? `The bracket rules still put it in bracket ${rulesBracket}. ` : ""}
-        It is an estimate from the cards and simulated games of the deck, not a model trained on played games.
-      </p>
-    </div>
+const RING_DOTS = 48;
+
+/** The health score as a ring of dots: solid up to the score, hollow after it. */
+function HealthRing({ score }: { score: number }) {
+  const lit = Math.round((score / 100) * RING_DOTS);
+  return (
+    <svg viewBox="0 0 100 100" className="size-full">
+      {Array.from({ length: RING_DOTS }, (_, i) => {
+        const a = (i / RING_DOTS) * Math.PI * 2 - Math.PI / 2;
+        const x = 50 + 42 * Math.cos(a);
+        const y = 50 + 42 * Math.sin(a);
+        return i < lit ? (
+          <circle key={i} cx={x} cy={y} r={2.4} fill={INK} />
+        ) : (
+          <circle key={i} cx={x} cy={y} r={1.6} fill="none" stroke="rgba(241,243,255,0.22)" strokeWidth="0.7" />
+        );
+      })}
+    </svg>
   );
 }
 
 export function HealthBlock({ health }: { health: AnalysisHealth }) {
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
   return (
-    <div className={CARD}>
-      <p className="text-[15px] text-muted">Deck health</p>
-      <div className="mt-6 flex items-center gap-8">
-        <div className="shrink-0 text-center">
-          <div className="relative size-[116px]" role="img" aria-label={`Deck health ${health.score} out of 100, ${healthWord(health.score)}`}>
-            <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-              <circle cx="50" cy="50" r={radius} fill="none" stroke="var(--line)" strokeWidth="7" />
-              <circle
-                cx="50"
-                cy="50"
-                r={radius}
-                fill="none"
-                stroke="var(--accent-text)"
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeDasharray={`${(circumference * health.score) / 100} ${circumference}`}
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[38px] leading-none font-medium tracking-[-0.05em]">{health.score}</span>
-          </div>
-          <p className="mt-2 text-sm text-muted">{healthWord(health.score)}</p>
+    <Panel title="Deck health" right={<p className="font-mono text-[11px] tracking-[0.12em] text-muted uppercase">{healthWord(health.score)}</p>}>
+      <div className="flex items-center gap-7">
+        <div className="relative size-[116px] shrink-0" role="img" aria-label={`Deck health ${health.score} out of 100, ${healthWord(health.score)}`}>
+          <HealthRing score={health.score} />
+          <span className="absolute inset-0 flex items-center justify-center text-[38px] leading-none font-medium tracking-[-0.05em]">{health.score}</span>
         </div>
         <ul className="min-w-0 flex-1">
           {health.pillars.map((pillar) => (
-            <li key={pillar.key} className="py-2">
-              <div className="flex justify-between text-[15px]">
-                <span>{pillar.label}</span>
-                <span className="font-mono text-[13px] text-muted">{pillar.score}</span>
-              </div>
-              <div className="mt-1.5">
-                <Meter value={pillar.score / 100} />
-              </div>
-            </li>
+            <MeterRow key={pillar.key} label={pillar.label} value={pillar.score / 100} shown={String(pillar.score)} />
           ))}
         </ul>
       </div>
 
       <details className="mt-5">
         <summary className={SUMMARY}>Details</summary>
-        <div className="mt-3 flex flex-col gap-6 text-sm">
+        <div className="mt-4 flex flex-col gap-6">
           {health.pillars.map((pillar) => (
             <div key={pillar.key}>
-              <p className="border-b border-line pb-2 text-[15px] text-muted">{pillar.label}</p>
+              <p className="border-b border-line pb-2 font-mono text-[11px] tracking-[0.12em] text-muted uppercase">{pillar.label}</p>
               <ul>
                 {pillar.spokes.map((spoke) => (
-                  <li key={spoke.key} className="py-2.5">
-                    <div className="flex justify-between gap-4 text-[15px]">
-                      <span>{spoke.label}</span>
-                      <span className="font-mono text-[13px] text-muted">
-                        {spoke.observed}, usual {spoke.min} to {spoke.max}
-                      </span>
-                    </div>
-                    <div className="mt-1.5">
-                      <Meter value={spoke.score / 100} className="h-1" />
-                    </div>
-                    <p className="mt-1.5 text-muted">
-                      {spoke.hint}
-                      {spoke.cards.length > 0 && `. ${spoke.cards.join(", ")}`}
-                    </p>
-                  </li>
+                  <MeterRow
+                    key={spoke.key}
+                    label={spoke.label}
+                    value={spoke.score / 100}
+                    shown={`${spoke.observed}, usual ${spoke.min} to ${spoke.max}`}
+                    hint={`${spoke.hint}${spoke.cards.length > 0 ? `. ${spoke.cards.join(", ")}` : ""}`}
+                  />
                 ))}
               </ul>
             </div>
           ))}
-          <p className="text-muted">{health.note}</p>
+          <p className="text-[13px] text-muted">{health.note}</p>
         </div>
       </details>
-    </div>
+    </Panel>
   );
 }
 
 export function ArchenemyBlock({ archenemy }: { archenemy: AnalysisArchenemy }) {
   const steps = archenemy.levels.length;
   return (
-    <div className={CARD}>
-      <div className="flex items-baseline justify-between gap-4">
-        <p className="text-[15px] text-muted">Archenemy level</p>
-        <p className="font-mono text-[13px] text-muted">
+    <Panel
+      title="Archenemy level"
+      right={
+        <p className="font-mono text-[11px] tracking-[0.12em] text-muted uppercase">
           {archenemy.level + 1} of {steps}
         </p>
-      </div>
-      <p className="mt-4 text-[clamp(40px,4vw,64px)] leading-none font-medium tracking-[-0.05em]">{archenemy.name}</p>
-      <div className="mt-6 flex gap-1.5" role="img" aria-label={`Archenemy level ${archenemy.level + 1} of ${steps}, ${archenemy.name}`}>
-        {archenemy.levels.map((name, step) => (
-          <Segment key={name} filled={step <= archenemy.level} strength={stepStrength(step, steps)} />
-        ))}
-      </div>
-      <div className="mt-2 flex justify-between text-sm text-muted">
+      }
+      foot="A starting point for the talk before a game, not a verdict."
+    >
+      <p className="text-[clamp(36px,3.6vw,56px)] leading-none font-medium tracking-[-0.05em]">{archenemy.name}</p>
+      <svg
+        viewBox={`0 0 ${steps * 24} 24`}
+        className="mt-5 block h-6 w-full max-w-[360px]"
+        preserveAspectRatio="xMinYMid meet"
+        role="img"
+        aria-label={`Archenemy level ${archenemy.level + 1} of ${steps}, ${archenemy.name}`}
+      >
+        {archenemy.levels.map((name, step) => {
+          const on = step <= archenemy.level;
+          const r = 4 + 6 * stepStrength(step, steps);
+          return on ? (
+            <circle key={name} cx={step * 24 + 12} cy={12} r={r} fill={step === archenemy.level ? COPPER_HOT : INK} />
+          ) : (
+            <circle key={name} cx={step * 24 + 12} cy={12} r={r - 0.6} fill="none" stroke="rgba(241,243,255,0.25)" strokeWidth="1" />
+          );
+        })}
+      </svg>
+      <div className="mt-2 flex max-w-[360px] justify-between font-mono text-[11px] text-muted">
         <span>{archenemy.levels[0]}</span>
         <span>{archenemy.levels[steps - 1]}</span>
       </div>
 
       {archenemy.patterns.length === 0 ? (
-        <p className="mt-6 text-[15px] text-muted">Nothing in this deck is known for annoying a table.</p>
+        <p className="mt-6 text-[14px] text-muted">Nothing in this deck is known for annoying a table.</p>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3 text-[15px]">
+        <ul className="mt-6 flex flex-col gap-3 text-[14px]">
           {archenemy.patterns.map((pattern) => (
             <li key={pattern.key}>
               <span className="font-semibold">{pattern.label}.</span> <span className="text-muted">{pattern.text}</span>
               {pattern.cards.length > 0 && (
-                <details className="mt-0.5 text-sm">
+                <details className="mt-0.5 text-[13px]">
                   <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-accent-text underline underline-offset-4 [&::-webkit-details-marker]:hidden [@media(pointer:coarse)]:min-h-11">
                     {pattern.cards.length === 1 ? "1 card" : `${pattern.cards.length} cards`}
                   </summary>
@@ -198,7 +223,6 @@ export function ArchenemyBlock({ archenemy }: { archenemy: AnalysisArchenemy }) 
           ))}
         </ul>
       )}
-      <p className="mt-5 text-sm text-muted">A starting point for the talk before a game, not a verdict.</p>
-    </div>
+    </Panel>
   );
 }

@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { copiesLabel, copiesSpoken, pileEdges } from "@/lib/copies";
 import { lineKey, type LineGroup } from "@/lib/groups";
 import type { DeckCardLine } from "@/lib/types";
+import { STD_TAG } from "@/lib/ui";
 import { DotsButton, type ViewProps } from "./CardList";
 
 const CARD_RATIO = "aspect-[488/680]";
@@ -28,10 +30,20 @@ function art(line: DeckCardLine, checkCollection: boolean) {
   return checkCollection && line.owned < line.quantity ? "grayscale opacity-60" : "";
 }
 
+/** The count of a repeated card, in the accent so it reads at once. */
+function CopiesPill({ quantity, compact = false }: { quantity: number; compact?: boolean }) {
+  if (quantity <= 1) return null;
+  return (
+    <span aria-hidden="true" className={`${STD_TAG.overArt} ${compact ? "px-1.5 py-px text-[11px]" : "px-2.5 py-0.5 text-[13px]"}`}>
+      {copiesLabel(quantity)}
+    </span>
+  );
+}
+
 function Badges({ line, isNew }: { line: DeckCardLine; isNew: boolean }) {
   return (
     <>
-      {line.quantity > 1 && <span className="rounded-full bg-bg px-2 py-0.5 font-mono text-xs text-ink">{line.quantity}x</span>}
+      <CopiesPill quantity={line.quantity} compact />
       {isNew && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent">New</span>}
     </>
   );
@@ -61,6 +73,9 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
   const [raised, setRaised] = useState<string | null>(null);
   if (groups.length === 0) return <Empty />;
   const strip = Math.round(cardSize * STRIP_RATIO);
+  // The card menu button has to fit in the strip, or the next card in the pile cuts it off: the standard 36px where there is room,
+  // smaller on a short strip, and always a little air above and below.
+  const menuSize = Math.min(36, Math.max(16, strip - 6));
   const total = groups.reduce((sum, group) => sum + group.lines.reduce((n, line) => n + line.quantity, 0), 0);
 
   return (
@@ -94,7 +109,7 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                         setRaised(front ? null : `${group.title}|${key}`);
                       }}
                       onMouseEnter={() => onSelect(line, "hover")}
-                      aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}`}
+                      aria-label={`${line.name}${line.quantity > 1 ? `, ${copiesSpoken(line.quantity)}` : ""}`}
                       aria-pressed={front}
                       className={`block w-full rounded-[10px] text-left ${
                         front ? "shadow-[0_18px_40px_rgba(0,0,0,0.55)]" : "shadow-[0_-2px_6px_rgba(0,0,0,0.25)]"
@@ -106,11 +121,11 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                         {selectedKey === key && <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[10px] ring-[3px] ring-accent-text ring-inset" />}
                       </div>
                     </button>
-                    <span className="pointer-events-none absolute top-1 right-1 flex items-center gap-1">
+                    <span className="pointer-events-none absolute top-0 right-1.5 flex items-center gap-1" style={{ height: strip }}>
                       <Badges line={line} isNew={newKeys.has(key)} />
                       {!readOnly && (
                         <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100">
-                          <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! [@media(pointer:coarse)]:h-11! [@media(pointer:coarse)]:w-11! bg-bg/90 text-ink" />
+                          <DotsButton line={line} onMenu={onMenu} size={menuSize} />
                         </span>
                       )}
                     </span>
@@ -150,22 +165,29 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                     onMenu(line, event.clientX, event.clientY);
                   }}
                 >
+                  {/* Repeated cards sit on a small pile: the edges of one or two more cards peek out behind, so a repeat is seen without reading anything. */}
+                  {pileEdges(line.quantity) === 2 && <span aria-hidden="true" className="absolute inset-0 translate-x-3 translate-y-3 rounded-[14px] border border-line bg-surface" />}
+                  {pileEdges(line.quantity) >= 1 && <span aria-hidden="true" className="absolute inset-0 translate-x-1.5 translate-y-1.5 rounded-[14px] border border-line bg-surface-2" />}
                   <button
                     type="button"
                     onClick={() => onSelect(line, "click")}
-                    aria-label={`${line.name}${line.quantity > 1 ? `, ${line.quantity} copies` : ""}${needs ? ", not owned" : ""}`}
+                    aria-label={`${line.name}${line.quantity > 1 ? `, ${copiesSpoken(line.quantity)}` : ""}${needs ? ", not owned" : ""}`}
                     className={`relative block w-full rounded-[14px] ${selectedKey === key ? "outline-2 outline-offset-2 outline-accent-text" : ""}`}
                   >
                     <div className={`relative w-full overflow-hidden rounded-[14px] bg-surface ${CARD_RATIO}`}>
                       {line.imageNormal && <Image src={line.imageNormal} alt="" fill sizes="400px" className={`object-cover ${art(line, checkCollection)}`} />}
                     </div>
                   </button>
+                  {/* On the bottom edge, over the artist line and not the name or the cost, and over the pile's edges so the two read together. */}
+                  <span className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2">
+                    <CopiesPill quantity={line.quantity} />
+                  </span>
                   <span className="pointer-events-none absolute top-2 right-2 flex items-center gap-1">
-                    <Badges line={line} isNew={newKeys.has(key)} />
+                    {newKeys.has(key) && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent">New</span>}
                     {needs && <span className="rounded-full border border-add-line bg-bg px-2 py-0.5 text-xs text-add-text">Need</span>}
                     {!readOnly && (
                       <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100">
-                        <DotsButton line={line} onMenu={onMenu} className="h-8! w-8! [@media(pointer:coarse)]:h-11! [@media(pointer:coarse)]:w-11! bg-bg/90 text-ink" />
+                        <DotsButton line={line} onMenu={onMenu} />
                       </span>
                     )}
                   </span>

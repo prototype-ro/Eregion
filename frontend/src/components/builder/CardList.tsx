@@ -1,6 +1,8 @@
 "use client";
 
 import { DotsThree } from "@phosphor-icons/react";
+import { copiesLabel, copiesSpoken } from "@/lib/copies";
+import { stdIcon } from "@/lib/ui";
 import { lineKey, type LineGroup } from "@/lib/groups";
 import type { DeckCardLine } from "@/lib/types";
 
@@ -23,11 +25,25 @@ export interface ViewProps {
   showRoles?: boolean;
 }
 
-export const dotsClass =
-  "flex size-9 [@media(pointer:coarse)]:size-11 shrink-0 items-center justify-center rounded-full text-xl leading-none text-muted hover:bg-surface-2 hover:text-ink focus-visible:bg-surface-2 focus-visible:text-ink";
-
-/** The three dots button that opens a card's menu. */
-export function DotsButton({ line, onMenu, className = "" }: { line: DeckCardLine; onMenu: ViewProps["onMenu"]; className?: string }) {
+/**
+ * The three dots button that opens a card's menu, in the standard icon button. Over card art it is the glass style, which is what the
+ * standard keeps for a control that floats over art; in the list it is the quiet one. The dots are an icon, so they sit in the exact
+ * middle of the circle.
+ */
+export function DotsButton({
+  line,
+  onMenu,
+  variant = "glass",
+  size,
+  className = "",
+}: {
+  line: DeckCardLine;
+  onMenu: ViewProps["onMenu"];
+  variant?: "glass" | "quiet";
+  /** A square size in pixels, for a place too short for the standard 36px, such as a title strip in the stacks. */
+  size?: number;
+  className?: string;
+}) {
   return (
     <button
       type="button"
@@ -38,9 +54,10 @@ export function DotsButton({ line, onMenu, className = "" }: { line: DeckCardLin
         const box = event.currentTarget.getBoundingClientRect();
         onMenu(line, box.right - 300 > 8 ? box.right - 300 : box.left, box.bottom + 4);
       }}
-      className={`${dotsClass} ${className}`}
+      className={`${stdIcon("md", variant)} shrink-0 ${variant === "glass" ? "text-ink" : ""} ${className}`}
+      style={size ? { width: size, height: size } : undefined}
     >
-      <span aria-hidden="true">...</span>
+      <DotsThree size={size ? Math.max(10, Math.round(size * 0.55)) : 20} weight="bold" aria-hidden />
     </button>
   );
 }
@@ -63,8 +80,12 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
         onClick={() => onSelect(line, "click")}
         className="flex min-h-[34px] min-w-0 flex-1 items-center gap-2.5 px-2.5 py-1 text-left text-[14px] leading-snug [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:text-[15px]"
       >
-        <span className={`w-5 shrink-0 text-right font-mono text-[12px] ${line.quantity > 1 ? "text-ink" : "text-muted"}`} aria-label={`${line.quantity} ${line.quantity === 1 ? "copy" : "copies"}`}>
-          {line.quantity}
+        {/* A repeat is the accent colour and heavier, so a glance down the column finds every card that is in the deck more than once. */}
+        <span
+          className={`w-9 shrink-0 text-right font-mono tabular-nums ${line.quantity > 1 ? "text-[13px] font-bold text-accent-text" : "text-[12px] text-muted/70"}`}
+          aria-label={copiesSpoken(line.quantity)}
+        >
+          {copiesLabel(line.quantity)}
         </span>
         <span className="flex min-w-0 flex-col gap-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -83,22 +104,8 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
           )}
         </span>
       </button>
-      {/* Always there, dimmed, so it is clear that a card has a menu. It lights up under the pointer. */}
-      {!readOnly && (
-        <button
-          type="button"
-          aria-label={`Options for ${line.name}`}
-          aria-haspopup="menu"
-          onClick={(event) => {
-            event.stopPropagation();
-            const box = event.currentTarget.getBoundingClientRect();
-            onMenu(line, box.right - 300 > 8 ? box.right - 300 : box.left, box.bottom + 4);
-          }}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:bg-surface-2 focus-visible:text-ink group-hover/row:text-ink [@media(pointer:coarse)]:size-11"
-        >
-          <DotsThree size={20} weight="bold" aria-hidden />
-        </button>
-      )}
+      {/* Always there, dimmed, so it is clear that a card has a menu. It lights up under the pointer. The row is 34px, so the 36px button takes 1px off each side. */}
+      {!readOnly && <DotsButton line={line} onMenu={onMenu} variant="quiet" className="-my-px group-hover/row:text-ink" />}
     </li>
   );
 }
