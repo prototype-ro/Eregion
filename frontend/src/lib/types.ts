@@ -540,21 +540,16 @@ export interface DeckLore {
   mjParams: string | null;
 }
 
-/** ADDITION mutates the subject but keeps its personhood; ERASURE subtracts until it keeps only a title or function. */
-export type LoreMechanism = "ADDITION" | "ERASURE";
-
 export interface LoreCosmology {
-  maker: string;
-  spirits: string[];
-  corruptor: string;
+  overview: string;
+  forces: string[];
 }
 
-export interface LoreTier {
+export interface LoreGroup {
   id: string;
   name: string;
-  definition: string;
-  mechanism: LoreMechanism;
-  vocabulary: string;
+  description: string;
+  traits: string;
 }
 
 export interface LoreColor {
@@ -567,20 +562,23 @@ export interface LoreColor {
 export interface LoreCharacter {
   id: string;
   name: string;
-  tier: string;
+  group: string;
   race: string;
   role: string;
   signature: string;
 }
 
-/** The structured setting: cosmology, the corruption spectrum, signature colours, characters, naming and open gaps. */
+/** The structured setting: cosmology, races/tribes/factions, tales, signature colours, characters, naming and open gaps. */
 export interface LoreDoc {
   cosmology: LoreCosmology;
-  tiers: LoreTier[];
+  groups: LoreGroup[];
+  tales: string[];
   colors: LoreColor[];
   characters: LoreCharacter[];
   naming: string;
   gaps: string[];
+  /** The real franchise this lore draws on (e.g. "Marvel Comics"), or null when the setting was invented from scratch. */
+  canonSource: string | null;
 }
 
 export interface LoreProblem {
@@ -591,4 +589,14 @@ export interface LoreProblem {
 export interface LoreVerdict {
   fits: boolean;
   problems: LoreProblem[];
+}
+
+export interface LoreTurnMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface LoreTurnReply {
+  reply: string;
+  doc: LoreDoc;
 }
