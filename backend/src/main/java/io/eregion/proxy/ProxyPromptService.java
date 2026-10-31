@@ -127,7 +127,14 @@ public class ProxyPromptService {
 				throw new BadReply("a field is too long");
 			}
 		}
-		return new Draft(nickname, new Character(tier, who, race, role, signature), prompt);
+		return new Draft(nickname, new Character(tier, who, race, role, signature), withAspect(prompt));
+	}
+
+	/** Every card is printed 5:7, so a reply that forgot the ratio gets it here instead of depending on the model. */
+	static String withAspect(String prompt) {
+		// A comma or semicolon left in front of a parameter is the model's habit, and Midjourney reads it as part of the text.
+		String tidy = prompt.replaceAll("[,;]\\s*(?=--)", " ").replaceAll("\\s{2,}", " ");
+		return tidy.contains("--ar ") ? tidy : tidy + " --ar 5:7";
 	}
 
 	/** Models sometimes wrap JSON in a code fence even when told not to. */

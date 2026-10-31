@@ -169,8 +169,8 @@ class ProxyServiceTest {
 		Treatment refined = service.generate(USER, DECK, CARD, Mode.NICKNAME, "make the armor darker");
 
 		assertThat(llm.lastUser).contains("prompt 1").contains("make the armor darker");
-		assertThat(refined.current().prompt()).isEqualTo("prompt 2");
-		assertThat(service.history(USER, DECK, CARD)).extracting(Generation::prompt).containsExactly("prompt 2", "prompt 1");
+		assertThat(refined.current().prompt()).isEqualTo("prompt 2 --ar 5:7");
+		assertThat(service.history(USER, DECK, CARD)).extracting(Generation::prompt).containsExactly("prompt 2 --ar 5:7", "prompt 1 --ar 5:7");
 	}
 
 	@Test
@@ -188,7 +188,7 @@ class ProxyServiceTest {
 
 		Treatment back = service.setCurrent(USER, DECK, CARD, first.current().id());
 
-		assertThat(back.current().prompt()).isEqualTo("prompt 1");
+		assertThat(back.current().prompt()).isEqualTo("prompt 1 --ar 5:7");
 	}
 
 	@Test

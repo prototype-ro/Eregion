@@ -119,7 +119,7 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
             onChange={(event) => setParams(event.target.value)}
             maxLength={200}
             aria-label="Midjourney parameters"
-            placeholder="--ar 5:7 --style raw --v 7"
+            placeholder="--style raw --v 7"
             className="min-h-9 w-full max-w-sm rounded-full border border-line bg-surface px-4 text-[13px] text-ink placeholder:text-muted focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11"
           />
           <button type="button" className={btn.primary} disabled={!proxies.loaded || !dirty || saving} onClick={save}>

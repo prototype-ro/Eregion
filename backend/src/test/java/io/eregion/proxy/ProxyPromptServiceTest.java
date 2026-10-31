@@ -64,6 +64,25 @@ class ProxyPromptServiceTest {
 	}
 
 	@Test
+	void aReplyWithoutAnAspectRatioGetsOne() {
+		Draft draft = service(new Scripted(GOOD_NICKNAME)).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null);
+
+		assertThat(draft.prompt()).endsWith("open palm --ar 5:7");
+	}
+
+	@Test
+	void aReplyThatAlreadyHasAnAspectRatioIsLeftAlone() {
+		assertThat(ProxyPromptService.withAspect("a lantern --ar 5:7 --no hands")).isEqualTo("a lantern --ar 5:7 --no hands");
+	}
+
+	@Test
+	void aCommaLeftBeforeAParameterIsRemoved() {
+		assertThat(ProxyPromptService.withAspect("a ravine, one tiny pilgrim for scale only, --ar 5:7 --no crowd, text"))
+				.isEqualTo("a ravine, one tiny pilgrim for scale only --ar 5:7 --no crowd, text");
+		assertThat(ProxyPromptService.withAspect("a ravine, for scale only,")).isEqualTo("a ravine, for scale only, --ar 5:7");
+	}
+
+	@Test
 	void reskinModeKeepsNoNickname() {
 		Draft draft = service(new Scripted(GOOD_RESKIN)).generate("LORE TEXT", SENTINEL, Mode.RESKIN, List.of(), null, null);
 

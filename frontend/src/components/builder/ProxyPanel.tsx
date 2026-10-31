@@ -116,7 +116,7 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
             {current.character.tier && <span className="mr-2 font-mono text-xs uppercase">{current.character.tier}</span>}
             {current.character.who}
           </p>
-          <p className="whitespace-pre-wrap rounded-3xl border border-line bg-surface px-5 py-4 text-[15px] leading-relaxed">{current.prompt}</p>
+          <p className="whitespace-pre-wrap rounded-3xl border border-line bg-surface px-5 py-4 text-[15px] leading-relaxed">{fullPrompt(current.prompt, proxies.lore.mjParams)}</p>
           <div className="flex gap-2.5">
             <button type="button" className={btn.primary} onClick={copy}>
               Copy prompt
