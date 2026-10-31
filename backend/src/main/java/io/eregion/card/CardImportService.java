@@ -79,6 +79,13 @@ public class CardImportService {
 				log.info("Scryfall rate limit hit on '{}', waiting {} ms", name, wait);
 				sleep(wait);
 			}
+			catch (ScryfallClient.BusyException ex) {
+				if (attempt >= MAX_RETRIES) {
+					throw ex;
+				}
+				log.info("Scryfall still rate limiting before '{}', waiting {} ms", name, ex.waitMs());
+				sleep(ex.waitMs());
+			}
 		}
 	}
 

@@ -44,7 +44,7 @@ interface Props {
 const CHUNK = 200;
 const MAX_FILE_BYTES = 512 * 1024;
 
-type Step = { kind: "edit" } | { kind: "working"; count: number } | { kind: "review"; found: ImportedCard[]; notFound: string[]; ignored: string[]; source?: ImportSource };
+type Step = { kind: "edit" } | { kind: "working"; count: number } | { kind: "review"; found: ImportedCard[]; notFound: string[]; unchecked: string[]; ignored: string[]; source?: ImportSource };
 
 /** Import a decklist by pasting it or loading a text or CSV file. Names are matched on Scryfall. */
 export function ImportDialog({
@@ -130,6 +130,7 @@ export function ImportDialog({
     try {
       const matches = new Map<string, Card>();
       const notFound: string[] = [];
+      const unchecked: string[] = [];
       for (let start = 0; start < names.length; start += CHUNK) {
         const result = await api<ResolveResult>("/api/cards/resolve", {
           method: "POST",
@@ -137,6 +138,7 @@ export function ImportDialog({
         });
         result.matches.forEach((match) => matches.set(match.requested.toLowerCase(), match.card));
         notFound.push(...result.notFound);
+        unchecked.push(...(result.unchecked ?? []));
       }
 
       // Merge repeated lines for the same card and board into one entry.
@@ -151,11 +153,11 @@ export function ImportDialog({
       }
 
       const found = [...merged.values()];
-      if (notFound.length === 0 && parsed.ignored.length === 0) {
+      if (notFound.length === 0 && unchecked.length === 0 && parsed.ignored.length === 0) {
         onImport(found, replace, source);
         close();
       } else {
-        setStep({ kind: "review", found, notFound, ignored: parsed.ignored, source });
+        setStep({ kind: "review", found, notFound, unchecked, ignored: parsed.ignored, source });
       }
     } catch (err) {
       setStep({ kind: "edit" });
@@ -251,8 +253,23 @@ export function ImportDialog({
               </>
             )}
             Found <span className="font-medium">{cardCount}</span> cards.{" "}
-            {step.notFound.length + step.ignored.length > 0 && "Some lines could not be matched."}
+            {step.notFound.length + step.unchecked.length + step.ignored.length > 0 && "Some lines could not be matched."}
           </p>
+
+          {step.unchecked.length > 0 && (
+            <div>
+              <p className="mb-2.5 text-sm text-muted">
+                Scryfall is busy, so these were not checked yet ({step.unchecked.length}). Go back and try again in a minute.
+              </p>
+              <ul className="flex max-h-48 flex-col overflow-auto rounded-2xl border border-line px-4 py-2 text-sm">
+                {step.unchecked.map((name) => (
+                  <li key={name} className="py-1.5">
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {step.notFound.length > 0 && (
             <div>

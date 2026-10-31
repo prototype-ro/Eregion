@@ -57,6 +57,8 @@ export interface Printing {
 export interface ResolveResult {
   matches: Array<{ requested: string; card: Card }>;
   notFound: string[];
+  /** Names Scryfall was too busy to check. They may exist, so trying again later can find them. */
+  unchecked: string[];
 }
 
 /** A deck as listed on the decks page. The numbers describe its latest version, the one the deck opens on. */

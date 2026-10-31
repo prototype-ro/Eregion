@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { artProblem, ART_TYPES, uploadArt } from "@/components/CustomArtSection";
 import { api, ApiError } from "@/lib/api";
-import type { Card } from "@/lib/types";
+import type { Card, ResolveResult } from "@/lib/types";
 import { btn } from "@/lib/ui";
 
 interface Props {
@@ -20,6 +20,8 @@ interface Summary {
   imported: number;
   added: number;
   problems: string[];
+  /** Names Scryfall was too busy to look up, so their art was not imported yet. */
+  unchecked: string[];
 }
 
 interface Parsed {
@@ -68,12 +70,14 @@ function Body({ onClose, owned, onDone }: Props) {
 
       const names = [...new Set(usable.map((item) => item.name))];
       const found = new Map<string, Card>();
+      const unchecked = new Set<string>();
       if (names.length > 0) {
-        const resolved = await api<{ matches: Array<{ requested: string; card: Card }>; notFound: string[] }>("/api/cards/resolve", {
+        const resolved = await api<ResolveResult>("/api/cards/resolve", {
           method: "POST",
           body: { names },
         });
         resolved.matches.forEach((match) => found.set(match.requested.toLowerCase(), match.card));
+        (resolved.unchecked ?? []).forEach((name) => unchecked.add(name.toLowerCase()));
       }
 
       let imported = 0;
@@ -81,6 +85,8 @@ function Body({ onClose, owned, onDone }: Props) {
       for (const item of usable) {
         const card = found.get(item.name.toLowerCase());
         if (!card) {
+          // A name Scryfall was too busy to check is not missing; it is reported once in the summary below.
+          if (unchecked.has(item.name.toLowerCase())) continue;
           problems.push(`No card named "${item.name}" (${item.file.name}).`);
           continue;
         }
@@ -101,7 +107,7 @@ function Body({ onClose, owned, onDone }: Props) {
           added = missing.length;
         }
       }
-      setSummary({ imported, added, problems });
+      setSummary({ imported, added, problems, unchecked: [...unchecked] });
       if (imported > 0) onDone();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "The import stopped early. Try again.");
@@ -118,6 +124,11 @@ function Body({ onClose, owned, onDone }: Props) {
           {summary.imported} {summary.imported === 1 ? "art" : "arts"} imported
           {summary.added > 0 ? `, and ${summary.added} ${summary.added === 1 ? "card" : "cards"} added to your collection` : ""}.
         </p>
+        {summary.unchecked.length > 0 && (
+          <p role="status" className="rounded-2xl border border-line px-4 py-3 text-sm text-ink">
+            Scryfall is busy, so {summary.unchecked.length} {summary.unchecked.length === 1 ? "card was" : "cards were"} not looked up. Wait a minute and import again.
+          </p>
+        )}
         {summary.problems.length > 0 && (
           <div>
             <p className="text-sm text-muted">Skipped</p>

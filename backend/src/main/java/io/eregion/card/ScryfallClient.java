@@ -11,11 +11,33 @@ import org.springframework.web.client.RestClient;
 @Component
 public class ScryfallClient {
 
-	/** Scryfall asks for 50 to 100 ms between requests. Every call through this client keeps that gap. */
-	private static final long MIN_GAP_MS = 110;
+	/**
+	 * Scryfall allows 2 requests a second on /cards/search, /cards/named and /cards/collection, which is every endpoint this client
+	 * uses. Every call keeps that gap.
+	 */
+	private static final long MIN_GAP_MS = 500;
+	/** How long Scryfall shuts us out after a 429 when it does not say. */
+	private static final long DEFAULT_COOL_DOWN_MS = 30_000;
+
+	/** Thrown instead of calling Scryfall while it is still shutting us out after a 429. Calling anyway risks a ban. */
+	public static class BusyException extends RuntimeException {
+
+		private final long waitMs;
+
+		BusyException(long waitMs) {
+			super("Scryfall is rate limiting us for another " + waitMs + " ms");
+			this.waitMs = waitMs;
+		}
+
+		public long waitMs() {
+			return waitMs;
+		}
+	}
 
 	private final RestClient http;
 	private long lastCallAt;
+	/** When Scryfall answers 429 we stay away until this time. */
+	private volatile long coolUntil;
 	/** The gap the background tag sync keeps between its requests: wider than a user's, so a person searching is never stuck behind it. */
 	private final long syncGapMs;
 
@@ -26,6 +48,13 @@ public class ScryfallClient {
 				.baseUrl("https://api.scryfall.com")
 				.defaultHeader("User-Agent", userAgent)
 				.defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
+				.requestInterceptor((request, body, execution) -> {
+					var response = execution.execute(request, body);
+					if (response.getStatusCode().value() == 429) {
+						coolUntil = System.currentTimeMillis() + retryAfterMs(response.getHeaders().getFirst("Retry-After"));
+					}
+					return response;
+				})
 				.build();
 	}
 
@@ -101,18 +130,17 @@ public class ScryfallClient {
 	/** Runs a request through the throttle. When Scryfall answers 429 it waits as long as it asks, then tries again a few times. */
 	private <T> T backingOff(java.util.function.Supplier<T> request) {
 		for (int attempt = 1;; attempt++) {
-			throttle(syncGapMs);
 			try {
+				throttle(syncGapMs);
 				return request.get();
 			}
-			catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests ex) {
+			catch (BusyException | org.springframework.web.client.HttpClientErrorException.TooManyRequests ex) {
+				long wait = coolUntil - System.currentTimeMillis();
 				if (attempt >= 4) {
 					throw ex;
 				}
-				String after = ex.getResponseHeaders() == null ? null : ex.getResponseHeaders().getFirst("Retry-After");
-				long seconds = after != null && after.matches("\\d+") ? Long.parseLong(after) : 30L * attempt;
 				try {
-					Thread.sleep(Math.min(seconds, 120) * 1000);
+					Thread.sleep(Math.min(Math.max(wait, 1_000), 120_000));
 				}
 				catch (InterruptedException interrupted) {
 					Thread.currentThread().interrupt();
@@ -203,7 +231,19 @@ public class ScryfallClient {
 		throttle(MIN_GAP_MS);
 	}
 
+	/** Milliseconds to stay away after a 429, from Scryfall's Retry-After seconds when it sends them. */
+	static long retryAfterMs(String header) {
+		if (header != null && header.trim().matches("\\d+")) {
+			return Math.min(Long.parseLong(header.trim()), 120) * 1000;
+		}
+		return DEFAULT_COOL_DOWN_MS;
+	}
+
 	private synchronized void throttle(long gapMs) {
+		long cooling = coolUntil - System.currentTimeMillis();
+		if (cooling > 0) {
+			throw new BusyException(cooling);
+		}
 		long wait = lastCallAt + gapMs - System.currentTimeMillis();
 		if (wait > 0) {
 			try {

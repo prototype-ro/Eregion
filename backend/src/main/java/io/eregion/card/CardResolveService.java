@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 
 /**
  * Turns a list of card names, typically pasted from another site, into catalog cards. Names we
@@ -23,7 +24,8 @@ public class CardResolveService {
 	public record Match(String requested, Card card) {
 	}
 
-	public record Result(List<Match> matches, List<String> notFound) {
+	/** {@code unchecked} holds names we could not ask Scryfall about because it was rate limiting us; they may well exist. */
+	public record Result(List<Match> matches, List<String> notFound, List<String> unchecked) {
 	}
 
 	private static final Logger log = LoggerFactory.getLogger(CardResolveService.class);
@@ -58,12 +60,17 @@ public class CardResolveService {
 				.toList();
 
 		List<String> stillMissing = new ArrayList<>();
+		Set<String> unchecked = new java.util.HashSet<>();
 		for (int start = 0; start < missing.size(); start += BATCH) {
 			List<String> batch = missing.subList(start, Math.min(start + BATCH, missing.size()));
 			try {
 				ScryfallClient.CollectionResult found = scryfall.collection(batch);
 				found.data().forEach(card -> cards.upsert(ScryfallMapper.toCard(card)));
 				found.not_found().forEach(id -> stillMissing.add(id.name()));
+			}
+			catch (ScryfallClient.BusyException | HttpClientErrorException.TooManyRequests ex) {
+				log.warn("Scryfall is rate limiting, {} names left unchecked", batch.size());
+				batch.forEach(name -> unchecked.add(NameNormalizer.normalize(name)));
 			}
 			catch (RuntimeException ex) {
 				log.warn("Scryfall batch lookup failed for {} names", batch.size(), ex);
@@ -81,6 +88,11 @@ public class CardResolveService {
 			try {
 				scryfall.fuzzy(name).ifPresent(card -> fuzzy.put(NameNormalizer.normalize(name), cards.upsert(ScryfallMapper.toCard(card))));
 			}
+			catch (ScryfallClient.BusyException | HttpClientErrorException.TooManyRequests ex) {
+				// Asking again while Scryfall shuts us out risks a ban, so the rest wait for the next try.
+				stillMissing.subList(tries - 1, stillMissing.size()).forEach(rest -> unchecked.add(NameNormalizer.normalize(rest)));
+				break;
+			}
 			catch (RuntimeException ex) {
 				log.warn("Fuzzy lookup failed for '{}'", name, ex);
 			}
@@ -93,17 +105,21 @@ public class CardResolveService {
 
 		List<Match> matches = new ArrayList<>();
 		List<String> notFound = new ArrayList<>();
+		List<String> notChecked = new ArrayList<>();
 		for (String spelling : spellings.values()) {
 			String key = NameNormalizer.normalize(spelling);
 			Card card = catalog.getOrDefault(key, fuzzy.get(key));
-			if (card == null) {
+			if (card == null && unchecked.contains(key)) {
+				notChecked.add(spelling);
+			}
+			else if (card == null) {
 				notFound.add(spelling);
 			}
 			else {
 				matches.add(new Match(spelling, card));
 			}
 		}
-		return new Result(List.copyOf(matches), List.copyOf(notFound));
+		return new Result(List.copyOf(matches), List.copyOf(notFound), List.copyOf(notChecked));
 	}
 
 	private Set<String> knownKeys(java.util.Collection<String> keys) {
