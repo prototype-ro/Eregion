@@ -8,9 +8,10 @@ import org.springframework.stereotype.Service;
 import io.eregion.card.Card;
 import io.eregion.card.CardRepository;
 import io.eregion.common.ApiException;
+import io.eregion.proxy.LoreDtos.Group;
 import io.eregion.proxy.LoreDtos.LoreDoc;
-import io.eregion.proxy.LoreDtos.Mechanism;
-import io.eregion.proxy.LoreDtos.Tier;
+import io.eregion.proxy.LoreDtos.TurnMessage;
+import io.eregion.proxy.LoreDtos.TurnReply;
 import io.eregion.proxy.LoreDtos.Verdict;
 import io.eregion.proxy.ProxyDtos.CardFacts;
 import io.eregion.proxy.ProxyDtos.Draft;
@@ -59,6 +60,24 @@ public class LoreService {
 		return prompts.draft(renderDigest(repository.loreDoc(deckId)), instruction);
 	}
 
+	/** Refines one part of the working document, which the client sends with its unsaved edits. */
+	public LoreDoc refine(UUID userId, UUID deckId, LoreDoc doc, String target, String instruction) {
+		owned(deckId, userId);
+		return prompts.refine(renderDigest(doc), target, instruction);
+	}
+
+	/**
+	 * One turn of the conversation. {@code doc} is the client's working document (unsaved edits included); the
+	 * digest sent to the model is rendered from it, never from the saved row. History is bounded to the last 20
+	 * messages so the prompt stays small.
+	 */
+	public TurnReply turn(UUID userId, UUID deckId, LoreDoc doc, List<TurnMessage> history, String message) {
+		owned(deckId, userId);
+		List<TurnMessage> bounded = history == null ? List.of()
+				: history.size() > 20 ? history.subList(history.size() - 20, history.size()) : history;
+		return prompts.turn(renderDigest(doc), bounded, message);
+	}
+
 	public Verdict check(UUID userId, UUID deckId, UUID cardId) {
 		owned(deckId, userId);
 		Card card = cards.findById(cardId).orElseThrow(() -> ApiException.notFound("Card"));
@@ -71,37 +90,46 @@ public class LoreService {
 		var out = new StringBuilder();
 
 		if (doc.cosmology() != null) {
-			String maker = blank(doc.cosmology().maker());
-			List<String> spirits = doc.cosmology().spirits() == null ? List.of() : doc.cosmology().spirits();
-			String corruptor = blank(doc.cosmology().corruptor());
-			if (!maker.isEmpty() || !spirits.isEmpty() || !corruptor.isEmpty()) {
+			String overview = blank(doc.cosmology().overview());
+			List<String> forces = doc.cosmology().forces() == null ? List.of() : doc.cosmology().forces();
+			String canonSource = blank(doc.canonSource());
+			if (!overview.isEmpty() || !forces.isEmpty() || !canonSource.isEmpty()) {
 				out.append("# Cosmology\n");
-				if (!maker.isEmpty()) {
-					out.append("Maker: ").append(maker).append('\n');
+				if (!canonSource.isEmpty()) {
+					out.append("Canon source: ").append(canonSource).append('\n');
 				}
-				if (!spirits.isEmpty()) {
-					out.append("Spirits: ").append(String.join(", ", spirits)).append('\n');
+				if (!overview.isEmpty()) {
+					out.append(overview).append('\n');
 				}
-				if (!corruptor.isEmpty()) {
-					out.append("Corruptor: ").append(corruptor).append('\n');
+				if (!forces.isEmpty()) {
+					out.append("Forces: ").append(String.join(", ", forces)).append('\n');
 				}
 				out.append('\n');
 			}
 		}
 
-		if (doc.tiers() != null && !doc.tiers().isEmpty()) {
-			out.append("# Spectrum (ordered, un-fallen to most-lost)\n");
+		if (doc.groups() != null && !doc.groups().isEmpty()) {
+			out.append("# Groups\n");
 			int i = 1;
-			for (Tier tier : doc.tiers()) {
-				out.append(i++).append(". ").append(blank(tier.name())).append(" (")
-						.append(tier.mechanism() == Mechanism.ERASURE ? "erasure" : "addition").append(')');
-				if (!blank(tier.definition()).isEmpty()) {
-					out.append(" — ").append(blank(tier.definition()));
+			for (Group group : doc.groups()) {
+				out.append(i++).append(". ").append(blank(group.name()));
+				if (!blank(group.description()).isEmpty()) {
+					out.append(" — ").append(blank(group.description()));
 				}
-				if (!blank(tier.vocabulary()).isEmpty()) {
-					out.append(" Visual: ").append(blank(tier.vocabulary()));
+				if (!blank(group.traits()).isEmpty()) {
+					out.append(" Traits: ").append(blank(group.traits()));
 				}
 				out.append('\n');
+			}
+			out.append('\n');
+		}
+
+		if (doc.tales() != null && !doc.tales().isEmpty()) {
+			out.append("# Tales\n");
+			for (String tale : doc.tales()) {
+				if (!blank(tale).isEmpty()) {
+					out.append("- ").append(blank(tale)).append('\n');
+				}
 			}
 			out.append('\n');
 		}
@@ -125,7 +153,7 @@ public class LoreService {
 			out.append("# Named characters\n");
 			for (var character : doc.characters()) {
 				out.append("- ").append(blank(character.name()));
-				appendField(out, character.tier());
+				appendField(out, character.group());
 				appendField(out, character.race());
 				appendField(out, character.role());
 				appendField(out, character.signature());

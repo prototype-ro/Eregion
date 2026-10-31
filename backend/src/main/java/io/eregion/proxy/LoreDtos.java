@@ -6,41 +6,38 @@ import java.util.UUID;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-/** The structured lore document of a deck: the setting's cosmology, spectrum, colours, characters, naming and gaps. */
+/** The structured lore document of a deck: its cosmology, groups, tales, colours, characters, naming and gaps. */
 public final class LoreDtos {
 
 	private LoreDtos() {
 	}
 
-	/**
-	 * How a spectrum tier is corrupted. ADDITION mutates the subject but keeps its personhood and agency; ERASURE
-	 * subtracts until the subject loses its name and face and keeps only a title or function.
-	 */
-	public enum Mechanism {
-		ADDITION, ERASURE
+	/** How this world or universe began and operates, plus any foundational powers or notable cosmic entities. */
+	public record Cosmology(String overview, List<String> forces) {
 	}
 
-	public record Cosmology(String maker, List<String> spirits, String corruptor) {
+	/** One race, tribe, faction or stage in the setting, in narrative order. {@code id} is opaque and kept so the editor can reorder stably. */
+	public record Group(String id, @NotBlank String name, String description, String traits) {
 	}
 
-	/** One tier of the corruption/alignment spectrum, in order. {@code id} is opaque and kept so the editor can reorder stably. */
-	public record Tier(String id, @NotBlank String name, String definition, Mechanism mechanism, String vocabulary) {
-	}
-
-	/** A colour locked to one faction or tier, so that colour stays a marker of that faction's touch. */
+	/** A colour locked to one faction or group, so that colour stays a marker of that faction's touch. */
 	public record SignatureColor(String id, String faction, String color, String meaning) {
 	}
 
-	/** A named individual. Only tiers that keep personhood may have these; the most-lost tier keeps titles, never names. */
-	public record NamedCharacter(String id, String name, String tier, String race, String role, String signature) {
+	/** A named individual. {@code group} is the race, tribe, faction or stage they belong to. */
+	public record NamedCharacter(String id, String name, String group, String race, String role, String signature) {
 	}
 
-	public record LoreDoc(Cosmology cosmology, List<Tier> tiers, List<SignatureColor> colors, List<NamedCharacter> characters,
-			String naming, List<String> gaps) {
+	/**
+	 * The setting. {@code canonSource} names the real franchise this lore draws on (e.g. "Marvel Comics"), or is
+	 * null when the setting was invented from scratch.
+	 */
+	public record LoreDoc(Cosmology cosmology, List<Group> groups, List<String> tales, List<SignatureColor> colors,
+			List<NamedCharacter> characters, String naming, List<String> gaps, String canonSource) {
 
 		/** The doc the editor starts from when the deck has no lore yet. */
 		public static LoreDoc empty() {
-			return new LoreDoc(new Cosmology("", List.of(), ""), List.of(), List.of(), List.of(), "", List.of());
+			return new LoreDoc(new Cosmology("", List.of()), List.of(), List.of(), List.of(), List.of(), "", List.of(), null);
 		}
 	}
 
@@ -48,8 +45,30 @@ public final class LoreDtos {
 	public record DraftRequest(@NotNull @NotBlank String instruction) {
 	}
 
+	/**
+	 * A targeted edit to one part of the working lore. {@code doc} is the current document (including unsaved edits);
+	 * {@code target} names the part to change; {@code instruction} is the requested change.
+	 */
+	public record RefineRequest(@NotNull LoreDoc doc, @NotNull @NotBlank String target, @NotNull @NotBlank String instruction) {
+	}
+
 	/** Which card to check against the locked lore. The card and its current treatment are read server side. */
 	public record CheckRequest(@NotNull UUID cardId) {
+	}
+
+	/** One message in the conversation so far, oldest first. */
+	public record TurnMessage(String role, String text) {
+	}
+
+	/**
+	 * A conversational turn. {@code doc} is the client's working document (unsaved edits included) — the server
+	 * never reads the saved row to answer a turn. {@code history} is the last ~20 messages, newest last.
+	 */
+	public record TurnRequest(@NotNull LoreDoc doc, List<TurnMessage> history, @NotNull @NotBlank String message) {
+	}
+
+	/** The model's one- or two-sentence summary of what it changed, plus the whole updated document. */
+	public record TurnReply(String reply, LoreDoc doc) {
 	}
 
 	public record Problem(String rule, String message) {

@@ -9,7 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import io.eregion.common.ApiException;
-import io.eregion.proxy.LoreDtos.Mechanism;
+import io.eregion.proxy.LoreDtos.TurnMessage;
 import io.eregion.proxy.LoreDtos.Verdict;
 import io.eregion.proxy.ProxyDtos.CardFacts;
 import io.eregion.proxy.ProxyDtos.Character;
@@ -40,12 +40,13 @@ class LorePromptServiceTest {
 	}
 
 	static final String GOOD_DOC = """
-			{"cosmology":{"maker":"Aelar","spirits":["Thin","Veil"],"corruptor":"Maelgrith"},"tiers":[
-			{"name":"Unfallen","definition":"still whole","mechanism":"ADDITION","vocabulary":"polished stone"},
-			{"name":"Void-claimed","definition":"lost name and face","mechanism":"ERASURE","vocabulary":"fraying smoke, no face"}],
+			{"cosmology":{"overview":"Aelar wove the first threads of being; Maelgrith frays them.","forces":["Thin","Veil"]},"groups":[
+			{"name":"Unfallen","description":"still whole","traits":"polished stone"},
+			{"name":"Void-claimed","description":"lost name and face","traits":"fraying smoke, no face"}],
+			"tales":["The first weaving, before anything had a name"],
 			"colors":[{"faction":"the corruptor","color":"violet","meaning":"void touch"}],
-			"characters":[{"name":"Sildarion","tier":"Unfallen","race":"spirit","role":"sentinel","signature":"gold coin"}],
-			"naming":"-ion suffix","gaps":["an untested tier"]}
+			"characters":[{"name":"Sildarion","group":"Unfallen","race":"spirit","role":"sentinel","signature":"gold coin"}],
+			"naming":"-ion suffix","gaps":["an untested group"],"canonSource":null}
 			""";
 
 	LorePromptService service(LlmClient llm) {
@@ -56,33 +57,33 @@ class LorePromptServiceTest {
 	void parseDocReadsEverySectionAndAssignsIds() {
 		var doc = LorePromptService.parseDoc(GOOD_DOC);
 
-		assertThat(doc.cosmology().maker()).isEqualTo("Aelar");
-		assertThat(doc.cosmology().spirits()).containsExactly("Thin", "Veil");
-		assertThat(doc.cosmology().corruptor()).isEqualTo("Maelgrith");
+		assertThat(doc.cosmology().overview()).contains("Aelar");
+		assertThat(doc.cosmology().forces()).containsExactly("Thin", "Veil");
+		assertThat(doc.canonSource()).isNull();
 
-		assertThat(doc.tiers()).hasSize(2);
-		assertThat(doc.tiers().get(0).mechanism()).isEqualTo(Mechanism.ADDITION);
-		assertThat(doc.tiers().get(1).mechanism()).isEqualTo(Mechanism.ERASURE);
-		assertThat(doc.tiers()).extracting(t -> t.id()).doesNotContainNull().doesNotHaveDuplicates();
+		assertThat(doc.groups()).hasSize(2);
+		assertThat(doc.groups()).extracting(g -> g.id()).doesNotContainNull().doesNotHaveDuplicates();
 
+		assertThat(doc.tales()).containsExactly("The first weaving, before anything had a name");
 		assertThat(doc.colors()).hasSize(1);
 		assertThat(doc.colors().get(0).color()).isEqualTo("violet");
 		assertThat(doc.characters()).hasSize(1);
 		assertThat(doc.characters().get(0).name()).isEqualTo("Sildarion");
+		assertThat(doc.characters().get(0).group()).isEqualTo("Unfallen");
 		assertThat(doc.naming()).isEqualTo("-ion suffix");
-		assertThat(doc.gaps()).containsExactly("an untested tier");
+		assertThat(doc.gaps()).containsExactly("an untested group");
 	}
 
 	@Test
-	void parseDocDropsBlankTiersCharactersAndColors() {
+	void parseDocDropsBlankGroupsCharactersAndColors() {
 		String json = """
-				{"cosmology":{},"tiers":[{"name":"","definition":"x","mechanism":"ADDITION","vocabulary":"y"},{"name":"Real","definition":"d","mechanism":"ADDITION","vocabulary":"v"}],
-				"colors":[{"faction":"","color":"","meaning":""}],"characters":[{"name":"","tier":"t"}],"naming":"","gaps":["","real gap"]}
+				{"cosmology":{},"groups":[{"name":"","description":"x","traits":"y"},{"name":"Real","description":"d","traits":"v"}],
+				"colors":[{"faction":"","color":"","meaning":""}],"characters":[{"name":"","group":"t"}],"naming":"","gaps":["","real gap"]}
 				""";
 
 		var doc = LorePromptService.parseDoc(json);
 
-		assertThat(doc.tiers()).extracting(t -> t.name()).containsExactly("Real");
+		assertThat(doc.groups()).extracting(g -> g.name()).containsExactly("Real");
 		assertThat(doc.colors()).isEmpty();
 		assertThat(doc.characters()).isEmpty();
 		assertThat(doc.gaps()).containsExactly("real gap");
@@ -90,7 +91,7 @@ class LorePromptServiceTest {
 
 	@Test
 	void parseDocReadsACodeFence() {
-		assertThat(LorePromptService.parseDoc("```json\n" + GOOD_DOC + "\n```").cosmology().maker()).isEqualTo("Aelar");
+		assertThat(LorePromptService.parseDoc("```json\n" + GOOD_DOC + "\n```").cosmology().overview()).contains("Aelar");
 	}
 
 	@Test
@@ -110,11 +111,24 @@ class LorePromptServiceTest {
 	void draftCarriesTheLoreAndInstructionAndReturnsTheDoc() {
 		var llm = new Scripted(GOOD_DOC);
 
-		var doc = service(llm).draft("THE LORE", "invent a five-tier spectrum");
+		var doc = service(llm).draft("THE LORE", "invent a new faction");
 
-		assertThat(doc.tiers()).hasSize(2);
-		assertThat(llm.users.get(0)).contains("THE LORE").contains("invent a five-tier spectrum");
+		assertThat(doc.groups()).hasSize(2);
+		assertThat(llm.users.get(0)).contains("THE LORE").contains("invent a new faction");
 		assertThat(llm.systems.get(0)).isNotBlank();
+	}
+
+	@Test
+	void draftCanReturnACanonSource() {
+		var llm = new Scripted(GOOD_DOC.replace("\"canonSource\":null", "\"canonSource\":\"Marvel Comics\""));
+
+		var doc = service(llm).draft("(none yet)",
+				"Draft the opening setting for the commander Thor. If this is a recognizable character from an existing "
+						+ "franchise, write canon-accurate lore about them and set canonSource to that franchise's name. "
+						+ "Otherwise invent the whole setting from scratch and leave canonSource null.");
+
+		assertThat(doc.canonSource()).isEqualTo("Marvel Comics");
+		assertThat(llm.users.get(0)).contains("Thor").contains("canonSource");
 	}
 
 	@Test
@@ -131,12 +145,68 @@ class LorePromptServiceTest {
 	}
 
 	@Test
+	void refineCarriesTheLoreTargetAndInstructionAndReturnsTheDoc() {
+		var llm = new Scripted(GOOD_DOC);
+
+		var doc = service(llm).refine("THE LORE", "the corruptor", "make it a serpent of cold ash");
+
+		assertThat(doc.cosmology().overview()).contains("Aelar");
+		String user = llm.users.get(0);
+		assertThat(user).contains("THE LORE").contains("the corruptor").contains("make it a serpent of cold ash");
+		assertThat(user).contains("changing only the requested part");
+		assertThat(llm.systems.get(0)).isNotBlank();
+	}
+
+	@Test
+	void turnCarriesTheLoreHistoryAndMessageAndReturnsTheReplyAndDoc() {
+		var llm = new Scripted("{\"reply\":\"I added a serpent corruptor.\",\"doc\":" + GOOD_DOC.strip() + "}");
+		var history = List.of(new TurnMessage("user", "invent a new faction"),
+				new TurnMessage("assistant", "Done — I sketched two groups."));
+
+		var turn = service(llm).turn("THE LORE", history, "make the corruptor a serpent of cold ash");
+
+		assertThat(turn.reply()).isEqualTo("I added a serpent corruptor.");
+		assertThat(turn.doc().cosmology().overview()).contains("Aelar");
+		String user = llm.users.get(0);
+		assertThat(user).contains("THE LORE").contains("invent a new faction").contains("Done — I sketched two groups.")
+				.contains("make the corruptor a serpent of cold ash");
+	}
+
+	@Test
+	void turnWithNoHistorySkipsTheConversationSection() {
+		var llm = new Scripted("{\"reply\":\"Drafted.\",\"doc\":" + GOOD_DOC.strip() + "}");
+
+		service(llm).turn("(none yet)", List.of(), "invent a Tolkien-shaped world");
+
+		assertThat(llm.users.get(0)).doesNotContain("# Conversation so far");
+	}
+
+	@Test
+	void aMalformedTurnReplyIsRetriedOnce() {
+		var llm = new Scripted("not json at all", "{\"reply\":\"Drafted.\",\"doc\":" + GOOD_DOC.strip() + "}");
+
+		var turn = service(llm).turn("L", List.of(), "x");
+
+		assertThat(turn.reply()).isEqualTo("Drafted.");
+		assertThat(llm.users).hasSize(2);
+	}
+
+	@Test
+	void aTurnReplyMissingTheDocFieldIsTreatedAsMalformed() {
+		var llm = new Scripted("{\"reply\":\"ok\"}", "{\"reply\":\"ok\",\"doc\":" + GOOD_DOC.strip() + "}");
+
+		var turn = service(llm).turn("L", List.of(), "x");
+
+		assertThat(turn.doc().cosmology().overview()).contains("Aelar");
+	}
+
+	@Test
 	void aMalformedReplyIsRetriedOnce() {
 		var llm = new Scripted("not json at all", GOOD_DOC);
 
 		var doc = service(llm).draft("L", "x");
 
-		assertThat(doc.cosmology().maker()).isEqualTo("Aelar");
+		assertThat(doc.cosmology().overview()).contains("Aelar");
 		assertThat(llm.users).hasSize(2);
 	}
 

@@ -11,12 +11,13 @@ import org.springframework.stereotype.Service;
 
 import io.eregion.common.ApiException;
 import io.eregion.proxy.LoreDtos.Cosmology;
+import io.eregion.proxy.LoreDtos.Group;
 import io.eregion.proxy.LoreDtos.LoreDoc;
-import io.eregion.proxy.LoreDtos.Mechanism;
 import io.eregion.proxy.LoreDtos.NamedCharacter;
 import io.eregion.proxy.LoreDtos.Problem;
 import io.eregion.proxy.LoreDtos.SignatureColor;
-import io.eregion.proxy.LoreDtos.Tier;
+import io.eregion.proxy.LoreDtos.TurnMessage;
+import io.eregion.proxy.LoreDtos.TurnReply;
 import io.eregion.proxy.LoreDtos.Verdict;
 import io.eregion.proxy.ProxyDtos.CardFacts;
 import io.eregion.proxy.ProxyDtos.Draft;
@@ -56,6 +57,15 @@ public class LorePromptService {
 		return retry(() -> parseDoc(llm.complete(rules, user)));
 	}
 
+	/** Refines one part of the working lore in place, keeping the rest exactly as given. */
+	public LoreDoc refine(String loreDigest, String target, String instruction) {
+		String user = "# Current lore\n\n" + digest(loreDigest) + "\n\n"
+				+ "# Part to refine\n\n" + target.strip() + "\n\n"
+				+ "# Instruction\n\n" + instruction.strip()
+				+ "\n\nReturn the whole document as one JSON object in the documented shape, changing only the requested part and keeping everything else exactly as written.";
+		return retry(() -> parseDoc(llm.complete(rules, user)));
+	}
+
 	/** Checks one card (and its current treatment, when it has one) against the locked lore. */
 	public Verdict check(String loreDigest, CardFacts card, Draft current) {
 		var user = new StringBuilder();
@@ -80,6 +90,28 @@ public class LorePromptService {
 		return retry(() -> parseVerdict(llm.complete(rules, user.toString())));
 	}
 
+	/**
+	 * One turn of the conversation: the current lore, the bounded history and the player's new message. The model
+	 * may draft the whole thing (when the document is still empty) or change just what was asked; either way it
+	 * returns the whole document plus a one- or two-sentence summary of what it did.
+	 */
+	public TurnReply turn(String loreDigest, List<TurnMessage> history, String message) {
+		var user = new StringBuilder();
+		user.append("# Current lore\n\n").append(digest(loreDigest)).append("\n\n");
+		if (history != null && !history.isEmpty()) {
+			user.append("# Conversation so far\n\n");
+			for (TurnMessage m : history) {
+				user.append("assistant".equalsIgnoreCase(m.role()) ? "AI: " : "Player: ").append(orEmpty(m.text()).strip()).append('\n');
+			}
+			user.append('\n');
+		}
+		user.append("# New message\n\n").append(message.strip()).append("\n\n")
+				.append("Make only the change this message asks for — if the current lore is \"(none yet)\", draft a whole setting per the message instead — ")
+				.append("keep everything else exactly as written, and reply with one JSON object: ")
+				.append("{\"reply\": a one or two sentence summary of what you changed, \"doc\": the whole document in the documented shape}.");
+		return retry(() -> parseTurn(llm.complete(rules, user.toString())));
+	}
+
 	private <T> T retry(java.util.function.Supplier<T> attempt) {
 		BadReply last = null;
 		for (int i = 0; i < 2; i++) {
@@ -94,20 +126,32 @@ public class LorePromptService {
 	}
 
 	static LoreDoc parseDoc(String reply) {
-		JsonNode root = read(reply);
-		JsonNode cos = root.path("cosmology");
-		String maker = text(cos.path("maker"));
-		List<String> spirits = strings(cos.path("spirits"));
-		String corruptor = text(cos.path("corruptor"));
+		return docFrom(read(reply));
+	}
 
-		List<Tier> tiers = new ArrayList<>();
-		for (JsonNode t : root.path("tiers")) {
-			String name = text(t.path("name"));
+	static TurnReply parseTurn(String reply) {
+		JsonNode root = read(reply);
+		if (!root.has("doc")) {
+			throw new BadReply("missing doc");
+		}
+		return new TurnReply(text(root.path("reply")), docFrom(root.path("doc")));
+	}
+
+	private static LoreDoc docFrom(JsonNode root) {
+		JsonNode cos = root.path("cosmology");
+		String overview = text(cos.path("overview"));
+		List<String> forces = strings(cos.path("forces"));
+
+		List<Group> groups = new ArrayList<>();
+		for (JsonNode g : root.path("groups")) {
+			String name = text(g.path("name"));
 			if (name.isEmpty()) {
 				continue;
 			}
-			tiers.add(new Tier(UUID.randomUUID().toString(), name, text(t.path("definition")), mechanism(t.path("mechanism")), text(t.path("vocabulary"))));
+			groups.add(new Group(UUID.randomUUID().toString(), name, text(g.path("description")), text(g.path("traits"))));
 		}
+
+		List<String> tales = strings(root.path("tales"));
 
 		List<SignatureColor> colors = new ArrayList<>();
 		for (JsonNode c : root.path("colors")) {
@@ -125,10 +169,13 @@ public class LorePromptService {
 			if (name.isEmpty()) {
 				continue;
 			}
-			characters.add(new NamedCharacter(UUID.randomUUID().toString(), name, text(ch.path("tier")), text(ch.path("race")), text(ch.path("role")), text(ch.path("signature"))));
+			characters.add(new NamedCharacter(UUID.randomUUID().toString(), name, text(ch.path("group")), text(ch.path("race")),
+					text(ch.path("role")), text(ch.path("signature"))));
 		}
 
-		return new LoreDoc(new Cosmology(maker, spirits, corruptor), tiers, colors, characters, text(root.path("naming")), strings(root.path("gaps")));
+		String canonSource = text(root.path("canonSource"));
+		return new LoreDoc(new Cosmology(overview, forces), groups, tales, colors, characters, text(root.path("naming")),
+				strings(root.path("gaps")), canonSource.isEmpty() ? null : canonSource);
 	}
 
 	static Verdict parseVerdict(String reply) {
@@ -158,10 +205,6 @@ public class LorePromptService {
 			}
 			throw new BadReply("not JSON");
 		}
-	}
-
-	private static Mechanism mechanism(JsonNode node) {
-		return "ERASURE".equalsIgnoreCase(node.asString("")) ? Mechanism.ERASURE : Mechanism.ADDITION;
 	}
 
 	private static List<String> strings(JsonNode node) {
