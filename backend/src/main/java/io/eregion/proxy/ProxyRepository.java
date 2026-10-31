@@ -50,6 +50,12 @@ public class ProxyRepository {
 				.param("lore", blankToNull(lore)).param("params", blankToNull(mjParams)).param("deck", deckId).update();
 	}
 
+	/** Only the Midjourney parameters, so the Proxies section never overwrites the digest the Lore section writes. */
+	public void saveMjParams(UUID deckId, String mjParams) {
+		jdbc.sql("UPDATE decks SET mj_params = :params WHERE id = :deck")
+				.param("params", blankToNull(mjParams)).param("deck", deckId).update();
+	}
+
 	/** Every treatment of the deck with its current generation. */
 	public List<Treatment> treatments(UUID deckId) {
 		return jdbc.sql("""

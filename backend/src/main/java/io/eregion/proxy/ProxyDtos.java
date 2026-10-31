@@ -47,6 +47,9 @@ public final class ProxyDtos {
 	public record LoreRequest(@Size(max = 60000) String lore, @Size(max = 200) String mjParams) {
 	}
 
+	public record MjParamsRequest(@Size(max = 200) String mjParams) {
+	}
+
 	public record Lore(String lore, String mjParams) {
 	}
 }

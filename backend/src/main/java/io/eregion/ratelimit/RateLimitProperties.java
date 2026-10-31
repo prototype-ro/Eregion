@@ -26,5 +26,6 @@ public record RateLimitProperties(
 		@DefaultValue("30") int savePerUserMinute,
 		@DefaultValue("20") int advancedSearchPerUserMinute,
 		@DefaultValue("30") int analysisPerUserMinute,
-		@DefaultValue("30") int proxyPerUserMinute) {
+		@DefaultValue("30") int proxyPerUserMinute,
+		@DefaultValue("30") int lorePerUserMinute) {
 }

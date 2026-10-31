@@ -19,6 +19,7 @@ import io.eregion.proxy.ProxyDtos.GenerateRequest;
 import io.eregion.proxy.ProxyDtos.Generation;
 import io.eregion.proxy.ProxyDtos.Lore;
 import io.eregion.proxy.ProxyDtos.LoreRequest;
+import io.eregion.proxy.ProxyDtos.MjParamsRequest;
 import io.eregion.proxy.ProxyDtos.Treatment;
 import io.eregion.ratelimit.RateLimits;
 import jakarta.validation.Valid;
@@ -44,6 +45,11 @@ public class ProxyController {
 	@PutMapping("/lore")
 	public Lore saveLore(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody LoreRequest request) {
 		return service.saveLore(CurrentUser.id(jwt), deckId, request.lore(), request.mjParams());
+	}
+
+	@PutMapping("/mj-params")
+	public Lore saveMjParams(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody MjParamsRequest request) {
+		return service.saveMjParams(CurrentUser.id(jwt), deckId, request.mjParams());
 	}
 
 	@GetMapping("/proxies")

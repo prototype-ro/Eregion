@@ -70,6 +70,11 @@ public class RateLimits {
 		check("proxy:" + user, properties.proxyPerUserMinute(), MINUTE, "proxy generations");
 	}
 
+	/** Each lore draft or card check is a paid call to a language model. */
+	public void lore(UUID user) {
+		check("lore:" + user, properties.lorePerUserMinute(), MINUTE, "lore drafts");
+	}
+
 	public void resolve(UUID user) {
 		check("resolve:" + user, properties.resolvePerUserMinute(), MINUTE, "list lookups");
 	}

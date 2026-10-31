@@ -42,6 +42,13 @@ public class ProxyService {
 		return repository.lore(deckId);
 	}
 
+	/** Saves only the Midjourney parameters; the deck lore itself is owned by the Lore section. */
+	public Lore saveMjParams(UUID userId, UUID deckId, String mjParams) {
+		owned(deckId, userId);
+		repository.saveMjParams(deckId, mjParams);
+		return repository.lore(deckId);
+	}
+
 	public List<Treatment> treatments(UUID userId, UUID deckId) {
 		owned(deckId, userId);
 		return repository.treatments(deckId);
