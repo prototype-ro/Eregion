@@ -128,17 +128,17 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       <button role="menuitem" className={item} onClick={act(() => onProxy(line))}>
         Proxy art prompt
       </button>
-      {isCommander && (
-        <button role="menuitem" className={item} onClick={act(() => onSetLore(line))}>
-          Set Lore
-        </button>
-      )}
       <button role="menuitem" className={item} onClick={copyName}>
         Copy card name
       </button>
 
       <div className="my-1.5 border-t border-line" />
 
+      {isCommander && (
+        <button role="menuitem" className={item} onClick={act(() => onSetLore(line))}>
+          Set Lore
+        </button>
+      )}
       {isBackground && !isCommander && (
         <button role="menuitem" className={item} onClick={act(() => onSetBackground(line))}>
           Set as background

@@ -71,8 +71,29 @@ function Body({ deckId, commanderName }: { deckId: string; commanderName: string
     const isEmpty = JSON.stringify(trimLoreDoc(lore.doc)) === JSON.stringify(emptyLoreDoc());
     if (!isEmpty) return;
     autoDrafted.current = true;
+    let cancelled = false;
     setAutoDrafting(true);
-    void sendText(autoDraftInstruction(commanderName)).finally(() => setAutoDrafting(false));
+    const before = sectionDigests(draft);
+    const instruction = autoDraftInstruction(commanderName);
+    void lore
+      .turn(draft, [], instruction)
+      .then(({ reply, doc }) => {
+        if (cancelled) return;
+        touched.current = true;
+        setDraft(doc);
+        setHistory((h) => [...h, { role: "user", text: instruction }, { role: "assistant", text: reply }]);
+        flash(changedSections(before, sectionDigests(doc)));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setChatError(err instanceof ApiError ? err.message : "Could not reach the AI");
+      })
+      .finally(() => {
+        if (!cancelled) setAutoDrafting(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lore.loaded, lore.doc, commanderName]);
 
@@ -158,7 +179,7 @@ function Body({ deckId, commanderName }: { deckId: string; commanderName: string
             <p className={LABEL}>Describe what to change. The document on the right fills in as you talk.</p>
           </div>
           <div className="flex max-h-[480px] flex-col gap-2 overflow-y-auto" aria-live="polite">
-            {history.length === 0 && !autoDrafting && (
+            {lore.loaded && history.length === 0 && !autoDrafting && (
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-muted">Try:</p>
                 <div className="flex flex-wrap gap-2">
