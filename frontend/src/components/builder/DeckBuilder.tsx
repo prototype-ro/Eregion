@@ -21,7 +21,7 @@ import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Pri
 import { CardList } from "./CardList";
 import { ProxyPanel } from "./ProxyPanel";
 import { ProxiesSection } from "./ProxiesSection";
-import { LoreSection } from "./LoreSection";
+import { LoreDialog } from "./LoreDialog";
 import { useProxies } from "@/lib/useProxies";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -190,6 +190,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [historyKey, setHistoryKey] = useState<string | null>(null);
   const proxies = useProxies(deck.id);
   const [proxyCardId, setProxyCardId] = useState<string | null>(null);
+  const [loreOpen, setLoreOpen] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
@@ -1073,8 +1074,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         />
       </div>
 
-      <LoreSection deckId={deck.id} />
-
       <ProxiesSection lines={withOwned} proxies={proxies} onOpen={setProxyCardId} />
 
       <CommandDock
@@ -1296,6 +1295,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onSetPartner={makePartner}
         onHistory={(line) => setHistoryKey(lineKey(line))}
         onProxy={(line) => setProxyCardId(line.cardId)}
+        onSetLore={() => setLoreOpen(true)}
         onRemove={removeLine}
         onNotify={setToast}
       />
@@ -1319,6 +1319,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         proxies={proxies}
         onNotify={setToast}
       />
+      <LoreDialog open={loreOpen} onClose={() => setLoreOpen(false)} deckId={deck.id} commanderName={lines.find((line) => line.board === "commander")?.name ?? null} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={(cards, replace) => importCards(cards, replace)} />
       <ImportDialog
         open={editListOpen}
