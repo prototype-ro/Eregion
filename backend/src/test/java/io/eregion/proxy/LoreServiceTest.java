@@ -85,6 +85,13 @@ class LoreServiceTest {
 	}
 
 	@Test
+	void renderDigestShowsTheCanonSourceEvenWithNoCosmology() {
+		var doc = new LoreDoc(null, List.of(), List.of(), List.of(), List.of(), "", List.of(), "Marvel Comics");
+
+		assertThat(LoreService.renderDigest(doc)).contains("Canon source: Marvel Comics");
+	}
+
+	@Test
 	void renderDigestIsEmptyForAnEmptyDoc() {
 		assertThat(LoreService.renderDigest(LoreDoc.empty())).isEmpty();
 	}

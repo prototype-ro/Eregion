@@ -89,23 +89,21 @@ public class LoreService {
 	static String renderDigest(LoreDoc doc) {
 		var out = new StringBuilder();
 
-		if (doc.cosmology() != null) {
-			String overview = blank(doc.cosmology().overview());
-			List<String> forces = doc.cosmology().forces() == null ? List.of() : doc.cosmology().forces();
-			String canonSource = blank(doc.canonSource());
-			if (!overview.isEmpty() || !forces.isEmpty() || !canonSource.isEmpty()) {
-				out.append("# Cosmology\n");
-				if (!canonSource.isEmpty()) {
-					out.append("Canon source: ").append(canonSource).append('\n');
-				}
-				if (!overview.isEmpty()) {
-					out.append(overview).append('\n');
-				}
-				if (!forces.isEmpty()) {
-					out.append("Forces: ").append(String.join(", ", forces)).append('\n');
-				}
-				out.append('\n');
+		String overview = doc.cosmology() == null ? "" : blank(doc.cosmology().overview());
+		List<String> forces = doc.cosmology() == null || doc.cosmology().forces() == null ? List.of() : doc.cosmology().forces();
+		String canonSource = blank(doc.canonSource());
+		if (!overview.isEmpty() || !forces.isEmpty() || !canonSource.isEmpty()) {
+			out.append("# Cosmology\n");
+			if (!canonSource.isEmpty()) {
+				out.append("Canon source: ").append(canonSource).append('\n');
 			}
+			if (!overview.isEmpty()) {
+				out.append(overview).append('\n');
+			}
+			if (!forces.isEmpty()) {
+				out.append("Forces: ").append(String.join(", ", forces)).append('\n');
+			}
+			out.append('\n');
 		}
 
 		if (doc.groups() != null && !doc.groups().isEmpty()) {
