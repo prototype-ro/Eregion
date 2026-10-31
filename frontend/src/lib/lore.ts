@@ -69,6 +69,7 @@ function withoutIds<T extends { id: string }>(items: T[]): Omit<T, "id">[] {
 /** A per-section fingerprint, ignoring regenerated ids, used to tell which parts of the document a turn changed. */
 export function sectionDigests(doc: LoreDoc): Record<LoreSectionKey, string> {
   return {
+    // canonSource has no section tile of its own; it renders inside the Cosmology card, so fold it in here too.
     cosmology: JSON.stringify({ ...doc.cosmology, canonSource: doc.canonSource }),
     groups: JSON.stringify(withoutIds(doc.groups)),
     tales: JSON.stringify(doc.tales),
