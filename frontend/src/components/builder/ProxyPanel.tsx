@@ -5,7 +5,8 @@ import { Dialog } from "@/components/Dialog";
 import { ApiError } from "@/lib/api";
 import { fullPrompt } from "@/lib/proxy";
 import type { useProxies } from "@/lib/useProxies";
-import type { ProxyGeneration, ProxyMode } from "@/lib/types";
+import type { LoreVerdict, ProxyGeneration, ProxyMode } from "@/lib/types";
+import { useLore } from "@/lib/useLore";
 import { btn } from "@/lib/ui";
 
 type Proxies = ReturnType<typeof useProxies>;
@@ -15,6 +16,7 @@ interface Props {
   onClose: () => void;
   cardId: string | null;
   cardName: string;
+  deckId: string;
   proxies: Proxies;
   onNotify: (message: string) => void;
 }
@@ -28,7 +30,7 @@ export function ProxyPanel(props: Props) {
   );
 }
 
-function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string }) {
+function Body({ cardId, cardName, deckId, proxies, onNotify }: Props & { cardId: string }) {
   const treatment = proxies.treatments.find((t) => t.cardId === cardId) ?? null;
   const [mode, setMode] = useState<ProxyMode>(treatment?.mode ?? "NICKNAME");
   const [instruction, setInstruction] = useState("");
@@ -37,6 +39,10 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
   const [history, setHistory] = useState<ProxyGeneration[]>([]);
   const current = treatment?.current ?? null;
   const touchedMode = useRef(false);
+  const lore = useLore(deckId);
+  const [verdict, setVerdict] = useState<LoreVerdict | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   // The saved mode arrives after the first render when the proxies load late. Follow it until the player picks one.
   useEffect(() => {
@@ -85,6 +91,19 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
       onNotify("Prompt copied");
     } catch {
       onNotify("Could not copy. Select the text and copy it by hand.");
+    }
+  }
+
+  async function check() {
+    setChecking(true);
+    setCheckError(null);
+    setVerdict(null);
+    try {
+      setVerdict(await lore.check(cardId));
+    } catch (err) {
+      setCheckError(err instanceof ApiError ? err.message : "Could not check.");
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -145,7 +164,28 @@ function Body({ cardId, cardName, proxies, onNotify }: Props & { cardId: string 
         </button>
       )}
 
-      {proxies.lore.lore === null && <p className="text-sm text-muted">This deck has no lore yet, so results will be generic. Add it under Proxies.</p>}
+      <div className="flex items-center gap-2.5">
+        <button type="button" className={btn.secondary} disabled={checking} onClick={() => void check()}>
+          {checking ? "Checking…" : "Check against lore"}
+        </button>
+        {checkError && <span className="text-sm text-danger">{checkError}</span>}
+      </div>
+      {verdict && (
+        <div
+          role="status"
+          className={`flex flex-col gap-2 rounded-3xl border px-5 py-4 text-sm ${verdict.fits ? "border-add-line bg-add-bg text-add-text" : "border-danger-line bg-danger/10 text-ink"}`}
+        >
+          <span className="font-medium">{verdict.fits ? "Fits the locked lore." : "Breaks the locked lore:"}</span>
+          {verdict.problems.map((problem, index) => (
+            <span key={index}>
+              {problem.rule && <span className="mr-2 font-mono text-xs uppercase">{problem.rule}</span>}
+              {problem.message}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {proxies.lore.lore === null && <p className="text-sm text-muted">This deck has no lore yet, so results will be generic. Add it under Lore.</p>}
       {error && (
         <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}

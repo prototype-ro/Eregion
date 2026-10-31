@@ -21,6 +21,7 @@ import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Pri
 import { CardList } from "./CardList";
 import { ProxyPanel } from "./ProxyPanel";
 import { ProxiesSection } from "./ProxiesSection";
+import { LoreSection } from "./LoreSection";
 import { useProxies } from "@/lib/useProxies";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -1072,6 +1073,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         />
       </div>
 
+      <LoreSection deckId={deck.id} />
+
       <ProxiesSection lines={withOwned} proxies={proxies} onOpen={setProxyCardId} />
 
       <CommandDock
@@ -1312,6 +1315,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setProxyCardId(null)}
         cardId={proxyCardId}
         cardName={lines.find((l) => l.cardId === proxyCardId)?.name ?? ""}
+        deckId={deck.id}
         proxies={proxies}
         onNotify={setToast}
       />

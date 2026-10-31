@@ -539,3 +539,56 @@ export interface DeckLore {
   lore: string | null;
   mjParams: string | null;
 }
+
+/** ADDITION mutates the subject but keeps its personhood; ERASURE subtracts until it keeps only a title or function. */
+export type LoreMechanism = "ADDITION" | "ERASURE";
+
+export interface LoreCosmology {
+  maker: string;
+  spirits: string[];
+  corruptor: string;
+}
+
+export interface LoreTier {
+  id: string;
+  name: string;
+  definition: string;
+  mechanism: LoreMechanism;
+  vocabulary: string;
+}
+
+export interface LoreColor {
+  id: string;
+  faction: string;
+  color: string;
+  meaning: string;
+}
+
+export interface LoreCharacter {
+  id: string;
+  name: string;
+  tier: string;
+  race: string;
+  role: string;
+  signature: string;
+}
+
+/** The structured setting: cosmology, the corruption spectrum, signature colours, characters, naming and open gaps. */
+export interface LoreDoc {
+  cosmology: LoreCosmology;
+  tiers: LoreTier[];
+  colors: LoreColor[];
+  characters: LoreCharacter[];
+  naming: string;
+  gaps: string[];
+}
+
+export interface LoreProblem {
+  rule: string;
+  message: string;
+}
+
+export interface LoreVerdict {
+  fits: boolean;
+  problems: LoreProblem[];
+}

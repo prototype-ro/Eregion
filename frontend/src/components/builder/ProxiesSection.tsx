@@ -25,7 +25,6 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
     return [...seen.values()];
   }, [lines]);
 
-  const [lore, setLore] = useState(proxies.lore.lore ?? "");
   const [params, setParams] = useState(proxies.lore.mjParams ?? "");
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -35,26 +34,26 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
   const abort = useRef<AbortController | null>(null);
 
   const [saving, setSaving] = useState(false);
-  // The values the fields were last synced to. A field that differs from them holds unsaved edits and is left alone.
-  const synced = useRef({ lore: proxies.lore.lore ?? "", params: proxies.lore.mjParams ?? "" });
+  // The value the field was last synced to. A field that differs from it holds unsaved edits and is left alone.
+  const synced = useRef({ params: proxies.lore.mjParams ?? "" });
 
   useEffect(() => () => abort.current?.abort(), []);
 
   useEffect(() => {
-    const incoming = { lore: proxies.lore.lore ?? "", params: proxies.lore.mjParams ?? "" };
-    setLore((current) => (current === synced.current.lore ? incoming.lore : current));
+    const incoming = { params: proxies.lore.mjParams ?? "" };
     setParams((current) => (current === synced.current.params ? incoming.params : current));
     synced.current = incoming;
-  }, [proxies.lore.lore, proxies.lore.mjParams]);
+  }, [proxies.lore.mjParams]);
 
   const byCard = new Map(proxies.treatments.map((t) => [t.cardId, t]));
-  const dirty = lore !== (proxies.lore.lore ?? "") || params !== (proxies.lore.mjParams ?? "");
+  const dirty = params !== (proxies.lore.mjParams ?? "");
   const running = progress !== null;
 
   async function save() {
     setSaving(true);
     try {
-      await proxies.saveLore(lore, params);
+      // The deck lore itself lives in the Lore section; here only the Midjourney parameters change.
+      await proxies.saveParams(params);
       setSavedMessage("Saved");
     } catch (err) {
       setSavedMessage(err instanceof ApiError ? err.message : "Could not save");
@@ -102,19 +101,12 @@ export function ProxiesSection({ lines, proxies, onOpen }: Props) {
       )}
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="deck-lore" className="text-sm text-muted">
-          Deck lore. The model reads all of it for every card.
+        <label htmlFor="deck-mj-params" className="text-sm text-muted">
+          Midjourney parameters, added after every prompt.
         </label>
-        <textarea
-          id="deck-lore"
-          value={lore}
-          onChange={(event) => setLore(event.target.value)}
-          maxLength={60000}
-          rows={8}
-          className="w-full resize-y rounded-3xl border border-line bg-surface px-5 py-4 text-[15px] leading-relaxed text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-        />
         <div className="flex items-center gap-2.5">
           <input
+            id="deck-mj-params"
             value={params}
             onChange={(event) => setParams(event.target.value)}
             maxLength={200}

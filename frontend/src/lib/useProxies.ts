@@ -56,13 +56,13 @@ export function useProxies(deckId: string) {
     [deckId, put],
   );
 
-  const saveLore = useCallback(
-    async (text: string, mjParams: string) => {
-      const saved = await api<DeckLore>(`/api/decks/${deckId}/lore`, { method: "PUT", body: { lore: text, mjParams } });
+  const saveParams = useCallback(
+    async (mjParams: string) => {
+      const saved = await api<DeckLore>(`/api/decks/${deckId}/mj-params`, { method: "PUT", body: { mjParams } });
       setLore(saved);
     },
     [deckId],
   );
 
-  return { treatments, lore, loaded, loadError, retry: reload, generate, history, choose, saveLore };
+  return { treatments, lore, loaded, loadError, retry: reload, generate, history, choose, saveParams };
 }
