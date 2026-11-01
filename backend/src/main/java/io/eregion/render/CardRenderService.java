@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class CardRenderService {
 
-	public void render(UUID cardId, byte[] artBytes) {
+	public void render(UUID deckId, UUID cardId, byte[] artBytes) {
 		// Replaced with real compositing logic in a later task.
 	}
 }

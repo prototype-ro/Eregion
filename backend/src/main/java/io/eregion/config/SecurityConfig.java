@@ -109,7 +109,7 @@ public class SecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/auth/**", "/api/health", "/error").permitAll()
 						// Public decks and the art in them can be read without an account.
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/explore", "/api/explore/*", "/api/custom-printings/*/image", "/api/cards/*/render/image").permitAll()
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/explore", "/api/explore/*", "/api/custom-printings/*/image", "/api/decks/*/cards/*/render/image").permitAll()
 						.anyRequest().authenticated())
 				.addFilterBefore(new SameOriginFilter(corsProperties.allowedOrigins()), BearerTokenAuthenticationFilter.class)
 				.oauth2ResourceServer(oauth -> oauth
