@@ -730,6 +730,8 @@ git commit -m "Add M15 frame assets and layout data from the local CardConjurer 
 
 **Corrected after discovery during execution:** no JPA. `cards.id` is `UUID` (confirmed in `CardRepository`/migrations), persistence is `JdbcClient` raw SQL, Postgres is the real dialect (confirmed via `now()`, `ILIKE` usage elsewhere) so `BYTEA` is correct for image bytes.
 
+**Further correction (found by code review after an initial implementation):** a `card_renders` table keyed only by `card_id` is a privacy and correctness bug. Rendered images carry per-deck private data (uploaded art, nicknames) — keying by `card_id` alone means (a) two different decks rendering the same base card stomp each other's row, and (b) a public, unauthenticated `GET` by card id would leak one user's private deck art/nickname to anyone who guesses a card's UUID. Fixed by keying `card_renders` by `(deck_id, card_id)` and adding the same owner-or-public-deck visibility check that `CustomPrintingRepository.imageFor` already uses for custom art (read that method first — in `backend/src/main/java/io/eregion/custom/CustomPrintingRepository.java`, `imageFor(UUID id, UUID viewerId)` — and mirror its exact `cp.user_id = :viewer OR EXISTS (SELECT 1 FROM decks d JOIN deck_version_cards dc ON dc.version_id = d.published_version_id WHERE d.visibility = 'public' AND ...)` shape, adapted to join through `decks` directly by `deck_id` since `card_renders` already carries that column — no need to join through `deck_version_cards`/`custom_printings` the way the art lookup does).
+
 **Files:**
 - Create: `backend/src/main/java/io/eregion/render/CardRenderRepository.java`
 - Create: `backend/src/main/java/io/eregion/render/CardRenderController.java`
@@ -738,64 +740,52 @@ git commit -m "Add M15 frame assets and layout data from the local CardConjurer 
 
 - [ ] **Step 1: Write the failing test**
 
+Follow the `PostgresTest`-base-class + hand-wired-real-objects convention established in Tasks 2/6 (no MockMvc exists anywhere in this codebase — confirmed repeatedly). The test needs: a real `decks` row (owned by a test user), a real `cards` row (for the FK), and an `@AuthenticationPrincipal Jwt`-equivalent viewer id to exercise both the owner-can-read and stranger-cannot-read-a-private-deck's-render paths:
+
 ```java
-package io.eregion.render;
+@Test
+void getImage_ownerCanReadPrivateDeckRender() {
+    // create a deck owned by userA, a card, insert a render row for (deck.id, card.id)
+    // call controller.getImage(jwtFor(userA), deck.id, card.id) -> 200, correct bytes
+}
 
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.web.servlet.MockMvc;
+@Test
+void getImage_strangerCannotReadPrivateDeckRender() {
+    // same setup, but call controller.getImage(jwtFor(userB)/* or null */, deck.id, card.id) -> 404
+}
 
-import java.util.UUID;
+@Test
+void getImage_anyoneCanReadPublicDeckRender() {
+    // deck.visibility = 'public' (and has a published_version_id, per the decks_public_needs_version
+    // constraint — check V5__public_decks.sql for exactly what that requires), render row present,
+    // call controller.getImage(null, deck.id, card.id) -> 200
+}
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-@SpringBootTest
-@AutoConfigureMockMvc
-class CardRenderControllerTest {
-
-    @Autowired MockMvc mockMvc;
-    @Autowired CardRenderRepository repository;
-
-    @Test
-    void getImage_returnsStoredPng() throws Exception {
-        UUID cardId = UUID.randomUUID();
-        byte[] fakePng = new byte[] { (byte) 0x89, 'P', 'N', 'G' };
-        repository.upsert(cardId, fakePng, "hash-123");
-
-        mockMvc.perform(get("/api/cards/" + cardId + "/render/image"))
-            .andExpect(status().isOk())
-            .andExpect(content().contentType("image/png"))
-            .andExpect(content().bytes(fakePng));
-    }
-
-    @Test
-    void getImage_missingRender_returns404() throws Exception {
-        mockMvc.perform(get("/api/cards/" + UUID.randomUUID() + "/render/image"))
-            .andExpect(status().isNotFound());
-    }
+@Test
+void getImage_missingRender_returns404() {
+    // no render row for (deck.id, card.id) -> 404, regardless of viewer
 }
 ```
-
-(This test seeds a `cards` row first if the migration's foreign key requires it — check whether `card_renders.card_id` needs an existing `cards` row via a test fixture/helper already used elsewhere, e.g. in `CardRepository` tests, and reuse that helper rather than inventing a new one.)
+(Treat these as the required behaviors, not literal copy-paste code — adapt to this codebase's actual test-fixture helpers for creating a deck/card/JWT, found by reading `DeckFrameSettingsControllerTest.java` and `CardRenderControllerTest`'s prior version if one already exists on this branch.)
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && ./mvnw test -Dtest=CardRenderControllerTest`
-Expected: FAIL — repository/controller don't exist.
 
 - [ ] **Step 3: Add the migration**
 
 ```sql
 CREATE TABLE card_renders (
-    card_id UUID PRIMARY KEY REFERENCES cards(id),
+    deck_id UUID NOT NULL REFERENCES decks(id),
+    card_id UUID NOT NULL REFERENCES cards(id),
     image_data BYTEA NOT NULL,
     inputs_hash VARCHAR(64) NOT NULL,
-    rendered_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    rendered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (deck_id, card_id)
 );
 ```
+
+(If a `card_renders` table already exists on this branch from a prior implementation attempt, this migration **alters** it rather than creating fresh — check first and adjust: `ALTER TABLE card_renders ADD COLUMN deck_id UUID REFERENCES decks(id)`, drop the old single-column PK, add the new composite PK, backfill or truncate existing rows as appropriate since any pre-existing data has no deck_id to backfill with.)
 
 - [ ] **Step 4: Create the repository**
 
@@ -811,7 +801,7 @@ import java.util.UUID;
 @Repository
 public class CardRenderRepository {
 
-    public record CardRenderRow(UUID cardId, byte[] imageData, String inputsHash) {}
+    public record CardRenderRow(UUID deckId, UUID cardId, byte[] imageData, String inputsHash) {}
 
     private final JdbcClient jdbc;
 
@@ -819,28 +809,38 @@ public class CardRenderRepository {
         this.jdbc = jdbc;
     }
 
-    public Optional<CardRenderRow> findByCardId(UUID cardId) {
-        return jdbc.sql("SELECT card_id, image_data, inputs_hash FROM card_renders WHERE card_id = :cardId")
-            .param("cardId", cardId)
+    /** The render, when the viewer owns the deck or the deck is public. Anything else looks like a missing render. */
+    public Optional<CardRenderRow> findVisibleTo(UUID deckId, UUID cardId, UUID viewerId) {
+        return jdbc.sql("""
+                SELECT cr.deck_id, cr.card_id, cr.image_data, cr.inputs_hash FROM card_renders cr
+                JOIN decks d ON d.id = cr.deck_id
+                WHERE cr.deck_id = :deckId AND cr.card_id = :cardId
+                  AND (d.owner_id = :viewer OR d.visibility = 'public')
+                """)
+            .param("deckId", deckId).param("cardId", cardId).param("viewer", viewerId)
             .query((rs, n) -> new CardRenderRow(
-                rs.getObject("card_id", UUID.class), rs.getBytes("image_data"), rs.getString("inputs_hash")))
+                rs.getObject("deck_id", UUID.class), rs.getObject("card_id", UUID.class),
+                rs.getBytes("image_data"), rs.getString("inputs_hash")))
             .optional();
     }
 
-    public void upsert(UUID cardId, byte[] imageData, String inputsHash) {
+    public void upsert(UUID deckId, UUID cardId, byte[] imageData, String inputsHash) {
         jdbc.sql("""
-                INSERT INTO card_renders (card_id, image_data, inputs_hash, rendered_at)
-                VALUES (:cardId, :imageData, :inputsHash, now())
-                ON CONFLICT (card_id) DO UPDATE SET
+                INSERT INTO card_renders (deck_id, card_id, image_data, inputs_hash, rendered_at)
+                VALUES (:deckId, :cardId, :imageData, :inputsHash, now())
+                ON CONFLICT (deck_id, card_id) DO UPDATE SET
                     image_data = EXCLUDED.image_data,
                     inputs_hash = EXCLUDED.inputs_hash,
                     rendered_at = now()
                 """)
-            .param("cardId", cardId).param("imageData", imageData).param("inputsHash", inputsHash)
+            .param("deckId", deckId).param("cardId", cardId)
+            .param("imageData", imageData).param("inputsHash", inputsHash)
             .update();
     }
 }
 ```
+
+(`viewerId` may be `null` for an anonymous caller — `d.owner_id = NULL` is simply false in Postgres, never throws, so an anonymous viewer falls through to the `visibility = 'public'` check only, same behavior as `CustomPrintingRepository.imageFor`.)
 
 - [ ] **Step 5: Create the controller**
 
@@ -850,12 +850,14 @@ package io.eregion.render;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/cards/{cardId}/render")
+@RequestMapping("/api/decks/{deckId}/cards/{cardId}/render")
 public class CardRenderController {
 
     private final CardRenderRepository repository;
@@ -867,8 +869,10 @@ public class CardRenderController {
     }
 
     @GetMapping("/image")
-    public ResponseEntity<byte[]> getImage(@PathVariable UUID cardId) {
-        return repository.findByCardId(cardId)
+    public ResponseEntity<byte[]> getImage(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID cardId
+    ) {
+        return repository.findVisibleTo(deckId, cardId, CurrentUser.idOrNull(jwt))
             .map(render -> ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(render.imageData()))
@@ -877,7 +881,9 @@ public class CardRenderController {
 }
 ```
 
-`CardRenderService` is implemented in Task 7 — create a minimal stub now so this compiles:
+(Use the real `CurrentUser.idOrNull` import — found in `io.eregion.auth.CurrentUser` per Task 2's research; it returns `null` when `jwt == null` instead of throwing, matching `CustomPrintingController`'s usage.) Since this endpoint takes an optional/nullable JWT and must work for anonymous callers viewing a public deck, add it to `SecurityConfig`'s `permitAll` GET list and `SessionTokenResolver.isOptional`, mirroring `/api/custom-printings/*/image`'s exact two-part treatment there (both files need the new path pattern, e.g. `/api/decks/*/cards/*/render/image`) — the DB-level `findVisibleTo` check is what actually enforces privacy; the HTTP-level permit is just "don't require a valid token to attempt the request."
+
+`CardRenderService` is implemented in Task 7 — create a minimal stub now so this compiles (note the signature now takes `deckId` too):
 
 ```java
 package io.eregion.render;
@@ -888,7 +894,7 @@ import java.util.UUID;
 
 @Service
 public class CardRenderService {
-    public void render(UUID cardId, byte[] artBytes) {
+    public void render(UUID deckId, UUID cardId, byte[] artBytes) {
         // Replaced with real compositing logic in Task 7.
     }
 }
@@ -899,22 +905,26 @@ public class CardRenderService {
 Run: `cd backend && ./mvnw test -Dtest=CardRenderControllerTest`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Run the full suite** to confirm no regressions: `cd backend && ./mvnw test`
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add backend/src/main/java/io/eregion/render/CardRenderRepository.java \
         backend/src/main/java/io/eregion/render/CardRenderController.java \
         backend/src/main/java/io/eregion/render/CardRenderService.java \
+        backend/src/main/java/io/eregion/config/SecurityConfig.java \
+        backend/src/main/java/io/eregion/config/SessionTokenResolver.java \
         backend/src/test/java/io/eregion/render/CardRenderControllerTest.java \
         backend/src/main/resources/db/migration
-git commit -m "Add CardRender repository and image endpoint"
+git commit -m "Scope CardRender storage/access by deck ownership and visibility"
 ```
 
 ---
 
 ### Task 7: Implement `CardRenderService` compositing
 
-**Corrected after discovery during execution:** `Card` is an immutable record, built via `CardRepository.upsert`/`findById` — there's no mutable builder. Build a test `Card` via `cardRepository.upsert(new Card(...))` with the full positional constructor (check its current field order — it changed in Task 1 to include `power`/`toughness`) rather than setters. `cardId` is `UUID`, matching the `render(UUID cardId, byte[] artBytes)` signature already stubbed in Task 6.
+**Corrected after discovery during execution:** `Card` is an immutable record, built via `CardRepository.upsert`/`findById` — there's no mutable builder. Build a test `Card` via `cardRepository.upsert(new Card(...))` with the full positional constructor (check its current field order — it changed in Task 1 to include `power`/`toughness`) rather than setters. `cardId`/`deckId` are both `UUID`, matching the `render(UUID deckId, UUID cardId, byte[] artBytes)` signature already stubbed in Task 6 (Task 6 was corrected to scope renders by deck, not just card, to avoid leaking private deck data — see Task 6's own correction note).
 
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/render/CardRenderService.java`
@@ -956,14 +966,17 @@ class CardRenderServiceTest {
         // typeLine="Creature — Bear", colors="G", power="2", toughness="2";
         // other fields can be empty strings / null / 0 as appropriate.
         Card card = cardRepository.upsert(/* ... */);
+        // Also create a real deck owned by the test user (follow Task 2's test
+        // fixture pattern) — deckId is needed for the new render() signature.
+        UUID deckId = /* ... */ null;
 
         BufferedImage tinyArt = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream artOut = new ByteArrayOutputStream();
         ImageIO.write(tinyArt, "png", artOut);
 
-        service.render(card.id(), artOut.toByteArray());
+        service.render(deckId, card.id(), artOut.toByteArray());
 
-        CardRenderRepository.CardRenderRow render = renderRepository.findByCardId(card.id()).orElseThrow();
+        CardRenderRepository.CardRenderRow render = renderRepository.findVisibleTo(deckId, card.id(), /* owner's user id */ null).orElseThrow();
         assertThat(render.imageData()).isNotEmpty();
 
         BufferedImage image = ImageIO.read(new ByteArrayInputStream(render.imageData()));
@@ -1093,7 +1106,7 @@ public class CardRenderService {
         this.layoutLoader = layoutLoader;
     }
 
-    public void render(UUID cardId, byte[] artBytes) {
+    public void render(UUID deckId, UUID cardId, byte[] artBytes) {
         Card card = cardRepository.findById(cardId)
             .orElseThrow(() -> new IllegalArgumentException("No card with id " + cardId));
 
@@ -1117,9 +1130,9 @@ public class CardRenderService {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ImageIO.write(canvas, "png", out);
 
-            renderRepository.upsert(cardId, out.toByteArray(), inputsHash(card, selection));
+            renderRepository.upsert(deckId, cardId, out.toByteArray(), inputsHash(card, selection));
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to render card " + cardId, e);
+            throw new IllegalStateException("Failed to render card " + cardId + " for deck " + deckId, e);
         }
     }
 
@@ -1197,7 +1210,7 @@ git commit -m "Implement card compositing: art, frame border, and basic text lay
 
 ### Task 8: Wire render triggers (art upload, nickname save, deck setting save)
 
-**Corrected after discovery during execution:** `CardRenderService.render(UUID cardId, byte[] artBytes)` already takes art bytes directly (fixed in Task 6/7 — no signature change needed here). Art is stored per `CustomPrinting` (table `custom_printings`), **not** 1:1 with a card — a card can have multiple custom printings. `CustomPrintingRepository` exposes `imageFor(id, viewerId)` keyed by *printing* id, not card id — this task needs a card-id-keyed lookup for "the" art to use when re-rendering, which doesn't exist yet. Read `CustomPrintingController.java` and `CustomPrintingRepository.java` in full before writing this task's code, and resolve this gap explicitly in Step 1 rather than assuming a method that isn't there. `DeckRenderTrigger.rerenderDeck` takes `UUID deckId` (already stubbed that way in Task 2). There is no `Deck.java`/`Card("name")` single-arg constructor — card-in-deck membership must be read from whatever table backs `DeckDtos`/deck card lists (check `DeckRepository`/`DeckService` for how deck contents are queried, e.g. a `deck_cards` join table) rather than guessed.
+**Corrected after discovery during execution:** `CardRenderService.render(UUID deckId, UUID cardId, byte[] artBytes)` already takes art bytes directly plus a `deckId` (fixed in Task 6/7 — the render is scoped per-deck now, to avoid leaking private deck data across decks that share the same base card; no further signature change needed here, but every call site below must pass a `deckId`, not just a `cardId`). Art is stored per `CustomPrinting` (table `custom_printings`), **not** 1:1 with a card — a card can have multiple custom printings. `CustomPrintingRepository` exposes `imageFor(id, viewerId)` keyed by *printing* id, not card id — this task needs a card-id-keyed lookup for "the" art to use when re-rendering, which doesn't exist yet. Read `CustomPrintingController.java` and `CustomPrintingRepository.java` in full before writing this task's code, and resolve this gap explicitly in Step 1 rather than assuming a method that isn't there. `DeckRenderTrigger.rerenderDeck` takes `UUID deckId` (already stubbed that way in Task 2) — that `deckId` is both "which deck to iterate cards for" and "which deck to pass into `render(...)`" for every card in it. There is no `Deck.java`/`Card("name")` single-arg constructor — card-in-deck membership must be read from whatever table backs `DeckDtos`/deck card lists (check `DeckRepository`/`DeckService` for how deck contents are queried — likely `deck_version_cards`, joined through the deck's current/published version) rather than guessed. The art-upload trigger (Step 3) also needs a `deckId` to pass to `render(...)` — check whether `CustomPrintingController`'s upload endpoint already receives a `deckId` (e.g. as a request param, since a custom printing isn't deck-scoped in its own table) or whether you need to resolve "which deck is this upload happening in the context of" some other way; this is a real design question to resolve by reading the actual upload request shape, not to guess.
 
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/custom/CustomPrintingController.java` (locate the existing art upload endpoint)
@@ -1244,11 +1257,11 @@ public class ArtLookup {
 
 - [ ] **Step 3: Trigger render on art upload**
 
-In `CustomPrintingController`'s upload endpoint (`upload(...)`, confirmed signature takes `cardId` and a `MultipartFile file`), after the upload is persisted successfully, call `cardRenderService.render(cardId, file.getBytes())` (inject `CardRenderService` into the controller's constructor). Use the just-uploaded bytes directly rather than re-fetching through `ArtLookup` — it's already in hand.
+In `CustomPrintingController`'s upload endpoint (`upload(...)`, confirmed signature takes `cardId` and a `MultipartFile file`), determine the `deckId` to use (per the note above — read the real request/route shape; if the upload endpoint has no deck context at all, this card-level upload may need to trigger a render for every deck that currently contains this card, similar to how `ArtLookup`/`DeckRenderTrigger` already has to enumerate deck→card relationships, rather than a single deckId). After the upload is persisted successfully, call `cardRenderService.render(deckId, cardId, file.getBytes())` for each relevant deck (inject `CardRenderService` into the controller's constructor). Use the just-uploaded bytes directly rather than re-fetching through `ArtLookup` — it's already in hand.
 
 - [ ] **Step 4: Trigger render on nickname save**
 
-In `ProxyService`, find the method that persists a nickname via `ProxyRepository` (from the `generate(...)`/`Draft` flow). After it's persisted, use `ArtLookup.findArtBytes(cardId)`; if non-null, call `cardRenderService.render(cardId, artBytes)`. If null (no art uploaded yet), skip — nothing to composite.
+In `ProxyService`, find the method that persists a nickname via `ProxyRepository` (from the `generate(...)`/`Draft` flow) — nicknames are already deck-scoped (per the Proxy feature's existing design), so this method should already have a `deckId` in scope. After the nickname is persisted, use `ArtLookup.findArtBytes(cardId)`; if non-null, call `cardRenderService.render(deckId, cardId, artBytes)`. If null (no art uploaded yet), skip — nothing to composite.
 
 - [ ] **Step 5: Write the failing test for deck-wide re-render**
 
@@ -1290,8 +1303,8 @@ class DeckRenderTriggerTest {
 
         trigger.rerenderDeck(deckId);
 
-        verify(cardRenderService, times(1)).render(eq(cardAId), any());
-        verify(cardRenderService, times(1)).render(eq(cardBId), any());
+        verify(cardRenderService, times(1)).render(eq(deckId), eq(cardAId), any());
+        verify(cardRenderService, times(1)).render(eq(deckId), eq(cardBId), any());
     }
 }
 ```
@@ -1329,7 +1342,7 @@ public class DeckRenderTrigger {
         for (UUID cardId : cardIds) {
             byte[] artBytes = artLookup.findArtBytes(cardId);
             if (artBytes != null) {
-                cardRenderService.render(cardId, artBytes);
+                cardRenderService.render(deckId, cardId, artBytes);
             }
         }
     }
@@ -1346,11 +1359,11 @@ Expected: PASS
 In `CardRenderService.render` (from Task 7), wrap the compositing body in a try/catch that logs on failure without deleting any existing render row:
 
 ```java
-public void render(UUID cardId, byte[] artBytes) {
+public void render(UUID deckId, UUID cardId, byte[] artBytes) {
     try {
         // existing body from Task 7 Step 5
     } catch (Exception e) {
-        LOGGER.error("Failed to render card {}; keeping previous render if any", cardId, e);
+        LOGGER.error("Failed to render card {} for deck {}; keeping previous render if any", cardId, deckId, e);
     }
 }
 ```
@@ -1374,6 +1387,8 @@ git commit -m "Trigger card renders on art upload, nickname save, and deck setti
 
 ### Task 9: Frontend displays composited render with fallback
 
+**Corrected after discovery during execution:** the render endpoint is deck-scoped (`GET /api/decks/{deckId}/cards/{cardId}/render/image`, not `/api/cards/{cardId}/render/image` — Task 6 was corrected to avoid leaking private deck data across decks sharing the same base card). `cardRenderUrl` needs both ids.
+
 **Files:**
 - Modify: `frontend/src/components/builder/DeckBuilder.tsx`
 - Modify: `frontend/src/components/builder/ProxyPanel.tsx`
@@ -1384,18 +1399,18 @@ git commit -m "Trigger card renders on art upload, nickname save, and deck setti
 In `frontend/src/lib/links.ts`, alongside the existing `customArtUrl` helper, add:
 
 ```typescript
-export function cardRenderUrl(cardId: string): string {
-  return `/api/cards/${cardId}/render/image`;
+export function cardRenderUrl(deckId: string, cardId: string): string {
+  return `/api/decks/${deckId}/cards/${cardId}/render/image`;
 }
 ```
 
 - [ ] **Step 2: Swap the displayed image with fallback**
 
-In both `DeckBuilder.tsx` (around the existing `customArtUrl`/`imageNormal` usage found during Task 1's spec research, near lines 84-86 and 596-599) and `ProxyPanel.tsx`, change the `<img>` `src` to try the render endpoint first, falling back to the existing art/Scryfall image on load error:
+In both `DeckBuilder.tsx` (around the existing `customArtUrl`/`imageNormal` usage found during Task 1's spec research, near lines 84-86 and 596-599) and `ProxyPanel.tsx`, change the `<img>` `src` to try the render endpoint first, falling back to the existing art/Scryfall image on load error. Both components already have the deck's id in scope (same `deck.id` passed to sibling sections like `FramePanel`/`LoreSection`) — thread it through:
 
 ```tsx
 <img
-  src={cardRenderUrl(card.id)}
+  src={cardRenderUrl(deck.id, card.id)}
   onError={(e) => {
     e.currentTarget.onerror = null;
     e.currentTarget.src = customArtUrl(card.id) ?? card.imageNormal;
@@ -1440,9 +1455,10 @@ void uploadArt_rendersOnlyThatCard() throws Exception {
     // whatever MockMvc setup the existing upload tests in this file already
     // use ...
 
-    verify(cardRenderService, times(1)).render(eq(cardId), any());
+    verify(cardRenderService, times(1)).render(any(), eq(cardId), any());
 }
 ```
+(`render(deckId, cardId, artBytes)` — match any `deckId` here since the upload-trigger's exact deck-resolution logic is Task 8's concern, not this test's; just confirm `cardId` and the call count.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
