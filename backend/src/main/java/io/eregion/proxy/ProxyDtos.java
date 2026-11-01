@@ -38,7 +38,8 @@ public final class ProxyDtos {
 	public record CardFacts(String name, String manaCost, String typeLine, String colors, String oracleText) {
 	}
 
-	public record GenerateRequest(@NotNull Mode mode, @Size(max = 1000) String instruction) {
+	/** {@code ignoreCreatureType} lets a creature's art break from its printed creature type when the lore says this subject is something else. */
+	public record GenerateRequest(@NotNull Mode mode, @Size(max = 1000) String instruction, boolean ignoreCreatureType) {
 	}
 
 	public record CurrentRequest(@NotNull UUID generationId) {

@@ -1315,11 +1315,20 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setProxyCardId(null)}
         cardId={proxyCardId}
         cardName={lines.find((l) => l.cardId === proxyCardId)?.name ?? ""}
+        cardTypeLine={lines.find((l) => l.cardId === proxyCardId)?.typeLine ?? ""}
         deckId={deck.id}
         proxies={proxies}
         onNotify={setToast}
       />
-      <LoreDialog open={loreOpen} onClose={() => setLoreOpen(false)} deckId={deck.id} commanderName={lines.find((line) => line.board === "commander")?.name ?? null} />
+      <LoreDialog
+        open={loreOpen}
+        onClose={() => {
+          setLoreOpen(false);
+          void proxies.retry();
+        }}
+        deckId={deck.id}
+        commanderName={lines.find((line) => line.board === "commander")?.name ?? null}
+      />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={(cards, replace) => importCards(cards, replace)} />
       <ImportDialog
         open={editListOpen}

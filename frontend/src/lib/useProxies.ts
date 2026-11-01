@@ -37,8 +37,11 @@ export function useProxies(deckId: string) {
   }, []);
 
   const generate = useCallback(
-    async (cardId: string, mode: ProxyMode, instruction?: string) => {
-      const next = await api<ProxyTreatment>(`/api/decks/${deckId}/proxies/${cardId}/generate`, { method: "POST", body: { mode, instruction: instruction || null } });
+    async (cardId: string, mode: ProxyMode, instruction?: string, ignoreCreatureType?: boolean) => {
+      const next = await api<ProxyTreatment>(`/api/decks/${deckId}/proxies/${cardId}/generate`, {
+        method: "POST",
+        body: { mode, instruction: instruction || null, ignoreCreatureType: ignoreCreatureType ?? false },
+      });
       put(next);
       return next;
     },

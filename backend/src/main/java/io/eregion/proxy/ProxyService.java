@@ -58,7 +58,7 @@ public class ProxyService {
 	 * Asks the model for a new generation and makes it the current one. With an instruction and an earlier result, the earlier result
 	 * is sent along so the model changes only what was asked. Nothing is written when the model fails.
 	 */
-	public Treatment generate(UUID userId, UUID deckId, UUID cardId, Mode mode, String instruction) {
+	public Treatment generate(UUID userId, UUID deckId, UUID cardId, Mode mode, String instruction, boolean ignoreCreatureType) {
 		owned(deckId, userId);
 		Card card = cards.findById(cardId).orElseThrow(() -> ApiException.notFound("Card"));
 		Lore lore = repository.lore(deckId);
@@ -68,7 +68,7 @@ public class ProxyService {
 				.map(g -> g == null ? null : new Draft(g.nickname(), g.character(), g.prompt()))
 				.orElse(null);
 
-		Draft draft = prompts.generate(lore.lore(), facts(card), mode, repository.picks(deckId, cardId), previous, instruction);
+		Draft draft = prompts.generate(lore.lore(), facts(card), mode, repository.picks(deckId, cardId), previous, instruction, ignoreCreatureType);
 
 		repository.record(deckId, cardId, mode, instruction, draft, llm.modelName());
 		return repository.treatment(deckId, cardId).orElseThrow();

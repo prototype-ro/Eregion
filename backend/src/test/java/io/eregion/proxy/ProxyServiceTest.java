@@ -154,7 +154,7 @@ class ProxyServiceTest {
 
 	@Test
 	void firstGenerationCreatesTheTreatmentAndMakesItCurrent() {
-		Treatment treatment = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		Treatment treatment = service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
 
 		assertThat(treatment.mode()).isEqualTo(Mode.NICKNAME);
 		assertThat(treatment.current().nickname()).isEqualTo("Name1");
@@ -164,9 +164,9 @@ class ProxyServiceTest {
 
 	@Test
 	void refiningSendsThePreviousResultAndKeepsBothInHistory() {
-		service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
 
-		Treatment refined = service.generate(USER, DECK, CARD, Mode.NICKNAME, "make the armor darker");
+		Treatment refined = service.generate(USER, DECK, CARD, Mode.NICKNAME, "make the armor darker", false);
 
 		assertThat(llm.lastUser).contains("prompt 1").contains("make the armor darker");
 		assertThat(refined.current().prompt()).isEqualTo("prompt 2 --ar 5:7");
@@ -175,7 +175,7 @@ class ProxyServiceTest {
 
 	@Test
 	void anInstructionWithNothingToRefineJustGeneratesFresh() {
-		Treatment treatment = service.generate(USER, DECK, CARD, Mode.RESKIN, "make the armor darker");
+		Treatment treatment = service.generate(USER, DECK, CARD, Mode.RESKIN, "make the armor darker", false);
 
 		assertThat(treatment.current().instruction()).isEqualTo("make the armor darker");
 		assertThat(llm.lastUser).doesNotContain("Previous result");
@@ -183,8 +183,8 @@ class ProxyServiceTest {
 
 	@Test
 	void anOlderGenerationCanBeMadeCurrent() {
-		Treatment first = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
-		service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		Treatment first = service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
+		service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
 
 		Treatment back = service.setCurrent(USER, DECK, CARD, first.current().id());
 
@@ -193,7 +193,7 @@ class ProxyServiceTest {
 
 	@Test
 	void anotherPlayersDeckLooksMissing() {
-		assertThatThrownBy(() -> service.generate(STRANGER, DECK, CARD, Mode.NICKNAME, null))
+		assertThatThrownBy(() -> service.generate(STRANGER, DECK, CARD, Mode.NICKNAME, null, false))
 				.isInstanceOf(ApiException.class).hasMessageContaining("Deck not found");
 		assertThatThrownBy(() -> service.saveLore(STRANGER, DECK, "x", null)).isInstanceOf(ApiException.class);
 		assertThat(llm.calls).isZero();
@@ -201,14 +201,14 @@ class ProxyServiceTest {
 
 	@Test
 	void anUnknownCardIsRefusedBeforeTheModelIsAsked() {
-		assertThatThrownBy(() -> service.generate(USER, DECK, UUID.randomUUID(), Mode.NICKNAME, null))
+		assertThatThrownBy(() -> service.generate(USER, DECK, UUID.randomUUID(), Mode.NICKNAME, null, false))
 				.isInstanceOf(ApiException.class).hasMessageContaining("Card not found");
 		assertThat(llm.calls).isZero();
 	}
 
 	@Test
 	void aGenerationThatBelongsToNoneOfThisCardsIsRefused() {
-		service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
 
 		assertThatThrownBy(() -> service.setCurrent(USER, DECK, CARD, UUID.randomUUID()))
 				.isInstanceOf(ApiException.class).hasMessageContaining("Generation not found");
@@ -216,15 +216,15 @@ class ProxyServiceTest {
 
 	@Test
 	void characterIsStoredWithTheGeneration() {
-		Treatment treatment = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		Treatment treatment = service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
 
 		assertThat(treatment.current().character()).isEqualTo(new Character("T", "w", "r", "o", "s"));
 	}
 
 	@Test
 	void pickingAnOlderResultBringsItsModeBack() {
-		Treatment a = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
-		service.generate(USER, DECK, CARD, Mode.RESKIN, null);
+		Treatment a = service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
+		service.generate(USER, DECK, CARD, Mode.RESKIN, null, false);
 
 		Treatment back = service.setCurrent(USER, DECK, CARD, a.current().id());
 
@@ -233,7 +233,7 @@ class ProxyServiceTest {
 
 	@Test
 	void aStrangerCannotReadOrChangeAnything() {
-		Treatment mine = service.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		Treatment mine = service.generate(USER, DECK, CARD, Mode.NICKNAME, null, false);
 		int callsBefore = llm.calls;
 
 		assertThatThrownBy(() -> service.lore(STRANGER, DECK)).isInstanceOf(ApiException.class).hasMessageContaining("Deck not found");
@@ -259,7 +259,7 @@ class ProxyServiceTest {
 		};
 		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(failing), failing);
 
-		assertThatThrownBy(() -> svc.generate(USER, DECK, CARD, Mode.NICKNAME, null)).isInstanceOf(ApiException.class).hasMessageContaining("down");
+		assertThatThrownBy(() -> svc.generate(USER, DECK, CARD, Mode.NICKNAME, null, false)).isInstanceOf(ApiException.class).hasMessageContaining("down");
 		assertThat(repo.treatmentId).isNull();
 		assertThat(repo.generations).isEmpty();
 	}

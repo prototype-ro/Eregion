@@ -62,7 +62,7 @@ public class ProxyController {
 			@Valid @RequestBody GenerateRequest request) {
 		UUID userId = CurrentUser.id(jwt);
 		limits.proxy(userId);
-		return service.generate(userId, deckId, cardId, request.mode(), request.instruction());
+		return service.generate(userId, deckId, cardId, request.mode(), request.instruction(), request.ignoreCreatureType());
 	}
 
 	@GetMapping("/proxies/{cardId}/history")
