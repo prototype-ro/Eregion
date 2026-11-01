@@ -926,6 +926,8 @@ git commit -m "Scope CardRender storage/access by deck ownership and visibility"
 
 **Corrected after discovery during execution:** `Card` is an immutable record, built via `CardRepository.upsert`/`findById` — there's no mutable builder. Build a test `Card` via `cardRepository.upsert(new Card(...))` with the full positional constructor (check its current field order — it changed in Task 1 to include `power`/`toughness`) rather than setters. `cardId`/`deckId` are both `UUID`, matching the `render(UUID deckId, UUID cardId, byte[] artBytes)` signature already stubbed in Task 6 (Task 6 was corrected to scope renders by deck, not just card, to avoid leaking private deck data — see Task 6's own correction note).
 
+**Second correction:** the draft below originally hardcoded `"m15"` as the frame family and never read the deck's actual `DeckFrameSettings` (frame family, artist name, collection code) from Task 2 — meaning those settings would go completely unused by compositing, contradicting the original ask (deck-chosen frame family + artist name + collection code baked into every render). Fixed: `CardRenderService` now injects `DeckFrameSettingsRepository` (from Task 2) and looks up the deck's settings at the top of `render(...)`, using its `frameFamily` instead of a literal, and threading `artistName`/`collectionCode` into `drawText` for the artist-credit/set-symbol line (even though that specific text rendering is still a documented placeholder per the "Known follow-ups" section — at least read the real values now instead of ignoring them, so finishing that follow-up later doesn't also require re-wiring this data access).
+
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/render/CardRenderService.java`
 - Create: `backend/src/main/java/io/eregion/render/FrameLayout.java`
@@ -1093,25 +1095,31 @@ public class CardRenderService {
     private final CardRenderRepository renderRepository;
     private final FrameSelector frameSelector;
     private final FrameLayoutLoader layoutLoader;
+    private final DeckFrameSettingsRepository frameSettingsRepository;
 
     public CardRenderService(
         CardRepository cardRepository,
         CardRenderRepository renderRepository,
         FrameSelector frameSelector,
-        FrameLayoutLoader layoutLoader
+        FrameLayoutLoader layoutLoader,
+        DeckFrameSettingsRepository frameSettingsRepository
     ) {
         this.cardRepository = cardRepository;
         this.renderRepository = renderRepository;
         this.frameSelector = frameSelector;
         this.layoutLoader = layoutLoader;
+        this.frameSettingsRepository = frameSettingsRepository;
     }
 
     public void render(UUID deckId, UUID cardId, byte[] artBytes) {
         Card card = cardRepository.findById(cardId)
             .orElseThrow(() -> new IllegalArgumentException("No card with id " + cardId));
 
+        DeckFrameSettingsRepository.FrameSettingsRow settings = frameSettingsRepository.findByDeckId(deckId)
+            .orElse(new DeckFrameSettingsRepository.FrameSettingsRow(deckId, null, null, FrameSelector.DEFAULT_FAMILY));
+
         FrameSelection selection = frameSelector.select(
-            card.typeLine(), card.colors(), "m15", card.name(), null);
+            card.typeLine(), card.colors(), settings.frameFamily(), card.name(), null);
 
         FrameLayout layout = layoutLoader.load(selection.frameFamily(), selection.templateSlot());
 
@@ -1123,7 +1131,7 @@ public class CardRenderService {
 
             drawArt(g, layout, artBytes);
             drawFrameBorder(g, selection);
-            drawText(g, layout, selection, card);
+            drawText(g, layout, selection, card, settings);
 
             g.dispose();
 
@@ -1153,7 +1161,10 @@ public class CardRenderService {
         }
     }
 
-    private void drawText(Graphics2D g, FrameLayout layout, FrameSelection selection, Card card) {
+    private void drawText(
+        Graphics2D g, FrameLayout layout, FrameSelection selection, Card card,
+        DeckFrameSettingsRepository.FrameSettingsRow settings
+    ) {
         g.setColor(Color.BLACK);
 
         Rectangle titleBox = layout.region("titleText");
