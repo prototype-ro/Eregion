@@ -81,6 +81,56 @@ export function DeleteDeckDialog({ deck, onClose, onDone }: Props) {
   );
 }
 
+interface BulkProps {
+  decks: DeckSummary[];
+  onClose: () => void;
+  /** Called after all deletes have been attempted. Failed decks stay selected so the caller can retry. */
+  onDone: (message: string, failed: DeckSummary[]) => void;
+}
+
+export function BulkDeleteDeckDialog({ decks, onClose, onDone }: BulkProps) {
+  return (
+    <Dialog open={decks.length > 0} onClose={onClose} label="Delete decks" size="sm">
+      {decks.length > 0 && <BulkDeleteForm key={decks.map((d) => d.id).join(",")} decks={decks} onClose={onClose} onDone={onDone} />}
+    </Dialog>
+  );
+}
+
+function BulkDeleteForm({ decks, onClose, onDone }: BulkProps) {
+  const [busy, setBusy] = useState(false);
+
+  async function remove() {
+    setBusy(true);
+    const results = await Promise.allSettled(decks.map((deck) => api(`/api/decks/${deck.id}`, { method: "DELETE" })));
+    const failed = decks.filter((_, i) => results[i].status === "rejected");
+    const succeeded = decks.length - failed.length;
+    const message =
+      failed.length === 0
+        ? `Deleted ${plural(succeeded, "deck")}`
+        : succeeded === 0
+          ? `Could not delete ${plural(failed.length, "deck")}`
+          : `Deleted ${succeeded} of ${decks.length} decks, ${failed.length} failed`;
+    onDone(message, failed);
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <h2 className="font-display text-[44px] leading-none">Delete decks</h2>
+      <p className="text-[15px] leading-snug">
+        Delete {plural(decks.length, "deck")}? Each one&apos;s versions and branches are removed for good, and any that are public disappear from Explore. This cannot be undone.
+      </p>
+      <div className="flex gap-2.5">
+        <button type="button" disabled={busy} onClick={() => void remove()} className={btn.large.dangerSolid}>
+          {busy ? "Deleting" : `Delete ${plural(decks.length, "deck")}`}
+        </button>
+        <button type="button" onClick={onClose} className={btn.large.secondary}>
+          Keep them
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DeleteForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -73,12 +73,35 @@ export function PinMark() {
   );
 }
 
+interface SelectionProps {
+  selecting?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (deck: DeckSummary) => void;
+}
+
+/** A checkbox for bulk-selecting a deck, shown only while selection mode is active. */
+function SelectCheckbox({ deck, selected, onToggleSelect, className }: { deck: DeckSummary; selected: boolean; onToggleSelect: (deck: DeckSummary) => void; className: string }) {
+  return (
+    <label
+      className={`${className} flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-line bg-bg shadow-sm`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <span className="sr-only">Select {deck.name}</span>
+      <input type="checkbox" checked={selected} onChange={() => onToggleSelect(deck)} className="h-4 w-4 accent-accent" />
+    </label>
+  );
+}
+
 /** One deck on the decks page: art, what it is, how it stands, and a menu of things to do with it. */
-export function DeckTile({ deck, actions }: { deck: DeckSummary; actions: DeckActions }) {
+export function DeckTile({ deck, actions, selecting, selected = false, onToggleSelect }: { deck: DeckSummary; actions: DeckActions } & SelectionProps) {
   return (
     <li className={`group relative flex flex-col ${deck.archived ? "opacity-70" : ""}`}>
       <Art deck={deck} />
-      <DeckMenu deck={deck} actions={actions} className="absolute top-3 right-3 z-10" />
+      {selecting && onToggleSelect ? (
+        <SelectCheckbox deck={deck} selected={selected} onToggleSelect={onToggleSelect} className="absolute top-3 right-3 z-10" />
+      ) : (
+        <DeckMenu deck={deck} actions={actions} className="absolute top-3 right-3 z-10" />
+      )}
 
       <div className="flex flex-1 flex-col px-1 pt-4">
         <h2 className="line-clamp-2 text-xl font-medium tracking-[-0.02em]" title={deck.name}>
@@ -104,11 +127,12 @@ export function DeckTile({ deck, actions }: { deck: DeckSummary; actions: DeckAc
 }
 
 /** A deck as one line, for a long list. */
-export function DeckRow({ deck, actions }: { deck: DeckSummary; actions: DeckActions }) {
+export function DeckRow({ deck, actions, selecting, selected = false, onToggleSelect }: { deck: DeckSummary; actions: DeckActions } & SelectionProps) {
   return (
     <li className={`group relative grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-line py-3 md:grid-cols-[64px_minmax(0,1.4fr)_minmax(0,1.6fr)_160px_auto] ${deck.archived ? "opacity-70" : ""}`}>
       <div className="relative h-12 w-16 overflow-hidden rounded-lg bg-surface" aria-hidden="true">
         {deck.artUrls[0] && <Image src={deck.artUrls[0]} alt="" fill sizes="64px" className="object-cover grayscale" />}
+        {selecting && onToggleSelect && <SelectCheckbox deck={deck} selected={selected} onToggleSelect={onToggleSelect} className="absolute top-1 left-1 z-10" />}
       </div>
       <div className="min-w-0">
         <h2 className="truncate text-[17px] font-medium" title={deck.name}>

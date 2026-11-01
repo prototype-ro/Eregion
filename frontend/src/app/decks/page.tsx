@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DeleteDeckDialog, RenameDeckDialog } from "@/components/decks/DeckDialogs";
+import { BulkDeleteDeckDialog, DeleteDeckDialog, RenameDeckDialog } from "@/components/decks/DeckDialogs";
+import { DeckSelectionBar } from "@/components/decks/DeckSelectionBar";
 import { NewDeckDialog, type NewDeckDraft } from "@/components/decks/NewDeckDialog";
 import { DeckRow, DeckTile } from "@/components/decks/DeckTile";
 import { ImportDialog, type ImportedCard, type ImportSource } from "@/components/builder/ImportDialog";
@@ -59,6 +60,9 @@ export default function DecksPage() {
   const [direction, setDirection] = useState<DeckDirection>("desc");
   const [renaming, setRenaming] = useState<DeckSummary | null>(null);
   const [deleting, setDeleting] = useState<DeckSummary | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState<DeckSummary[]>([]);
   // The saved view is applied first. Saving only starts after that, or the defaults would overwrite it.
   const [restored, setRestored] = useState(false);
 
@@ -226,6 +230,34 @@ export default function DecksPage() {
     void load();
   };
 
+  const visible = shown.slice(0, limit);
+  const allVisibleSelected = visible.length > 0 && visible.every((deck) => selectedIds.has(deck.id));
+
+  function toggleSelect(deck: DeckSummary) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(deck.id)) next.delete(deck.id);
+      else next.add(deck.id);
+      return next;
+    });
+  }
+
+  function selectAllVisible(checked: boolean) {
+    setSelectedIds(checked ? new Set(visible.map((deck) => deck.id)) : new Set());
+  }
+
+  function cancelSelecting() {
+    setSelecting(false);
+    setSelectedIds(new Set());
+  }
+
+  function bulkFinished(message: string, failed: DeckSummary[]) {
+    setBulkDeleting([]);
+    setSelectedIds(new Set(failed.map((deck) => deck.id)));
+    setToast(message);
+    void load();
+  }
+
   return (
     <div className="shell">
       <Nav active="decks" />
@@ -254,10 +286,26 @@ export default function DecksPage() {
           >
             Import a list
           </button>
+          {decks !== null && decks.length > 0 && !selecting && (
+            <button type="button" onClick={() => setSelecting(true)} className="pill min-h-14 rounded-full border border-ink px-7 text-base font-medium">
+              Select
+            </button>
+          )}
         </div>
 
         {decks !== null && decks.length > 0 && (
-          <DeckToolbar filters={filters} onFilters={setFilters} sort={sort} direction={direction} onSort={chooseSort} onFlip={() => setDirection((d) => (d === "asc" ? "desc" : "asc"))} shown={shown.length} total={decks.length} view={view} onView={setView} />
+          selecting ? (
+            <DeckSelectionBar
+              shownCount={visible.length}
+              selectedCount={selectedIds.size}
+              allSelected={allVisibleSelected}
+              onSelectAll={selectAllVisible}
+              onDelete={() => setBulkDeleting(visible.filter((deck) => selectedIds.has(deck.id)))}
+              onCancel={cancelSelecting}
+            />
+          ) : (
+            <DeckToolbar filters={filters} onFilters={setFilters} sort={sort} direction={direction} onSort={chooseSort} onFlip={() => setDirection((d) => (d === "asc" ? "desc" : "asc"))} shown={shown.length} total={decks.length} view={view} onView={setView} />
+          )
         )}
 
         {error && (
@@ -308,16 +356,16 @@ export default function DecksPage() {
 
         {shown.length > 0 && view === "grid" && (
           <StaggerList replayKey="grid" className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-10">
-            {shown.slice(0, limit).map((deck) => (
-              <DeckTile key={deck.id} deck={deck} actions={actions} />
+            {visible.map((deck) => (
+              <DeckTile key={deck.id} deck={deck} actions={actions} selecting={selecting} selected={selectedIds.has(deck.id)} onToggleSelect={toggleSelect} />
             ))}
           </StaggerList>
         )}
 
         {shown.length > 0 && view === "list" && (
           <StaggerList replayKey="list" className="border-t border-line">
-            {shown.slice(0, limit).map((deck) => (
-              <DeckRow key={deck.id} deck={deck} actions={actions} />
+            {visible.map((deck) => (
+              <DeckRow key={deck.id} deck={deck} actions={actions} selecting={selecting} selected={selectedIds.has(deck.id)} onToggleSelect={toggleSelect} />
             ))}
           </StaggerList>
         )}
@@ -357,6 +405,7 @@ export default function DecksPage() {
       />
       <RenameDeckDialog deck={renaming} onClose={() => setRenaming(null)} onDone={finished} />
       <DeleteDeckDialog deck={deleting} onClose={() => setDeleting(null)} onDone={finished} />
+      <BulkDeleteDeckDialog decks={bulkDeleting} onClose={() => setBulkDeleting([])} onDone={bulkFinished} />
 
       {toast && (
         <p role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl">
