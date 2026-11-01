@@ -1075,9 +1075,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         />
       </div>
 
-      <FramePanel deckId={deck.id} />
-
-      <ProxiesSection lines={withOwned} proxies={proxies} onOpen={setProxyCardId} />
+      {/* FramePanel and ProxiesSection are temporarily hidden, not removed. */}
 
       <CommandDock
         shown={dockShown}
