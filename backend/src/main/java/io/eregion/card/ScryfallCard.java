@@ -26,7 +26,9 @@ public record ScryfallCard(
 		Prices prices,
 		ImageUris image_uris,
 		List<Face> card_faces,
-		java.util.Map<String, String> legalities) {
+		java.util.Map<String, String> legalities,
+		String power,
+		String toughness) {
 
 	public record ImageUris(String small, String normal, String art_crop) {
 	}
@@ -41,6 +43,8 @@ public record ScryfallCard(
 			String type_line,
 			String oracle_text,
 			String artist,
-			ImageUris image_uris) {
+			ImageUris image_uris,
+			String power,
+			String toughness) {
 	}
 }

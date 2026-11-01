@@ -22,6 +22,8 @@ public final class ScryfallMapper {
 		String oracle = firstNonBlank(source.oracle_text(), front == null ? null : front.oracle_text(), "");
 		String artist = firstNonBlank(source.artist(), front == null ? null : front.artist(), "");
 		ImageUris images = source.image_uris() != null ? source.image_uris() : front == null ? null : front.image_uris();
+		String power = source.power() != null ? source.power() : front == null ? null : front.power();
+		String toughness = source.toughness() != null ? source.toughness() : front == null ? null : front.toughness();
 
 		return new Card(
 				null,
@@ -34,6 +36,8 @@ public final class ScryfallMapper {
 				colorString(source.colors()),
 				colorString(source.color_identity()),
 				oracle,
+				power,
+				toughness,
 				orEmpty(source.set()),
 				orEmpty(source.set_name()),
 				orEmpty(source.collector_number()),
@@ -43,7 +47,10 @@ public final class ScryfallMapper {
 				images == null ? "" : orEmpty(images.small()),
 				images == null ? "" : orEmpty(images.normal()),
 				images == null ? "" : orEmpty(images.art_crop()),
-				commanderLegality(source));
+				commanderLegality(source),
+				null,
+				null,
+				List.of());
 	}
 
 	/** What Scryfall says about Commander. unknown when it says nothing, so a missing answer is never read as banned. */

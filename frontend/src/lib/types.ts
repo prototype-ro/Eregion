@@ -21,6 +21,8 @@ export interface Card {
   colors: string;
   colorIdentity: string;
   oracleText: string;
+  power?: string;
+  toughness?: string;
   setCode: string;
   setName: string;
   collectorNumber: string;
