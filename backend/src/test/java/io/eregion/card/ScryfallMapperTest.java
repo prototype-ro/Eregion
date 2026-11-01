@@ -111,6 +111,8 @@ class ScryfallMapperTest {
 		assertThat(card.primaryType()).isEqualTo("Creature");
 		assertThat(card.artist()).isEqualTo("Artist One");
 		assertThat(card.imageSmall()).isEqualTo("s.jpg");
+		assertThat(card.power()).isEqualTo("1");
+		assertThat(card.toughness()).isEqualTo("1");
 	}
 
 	@Test
