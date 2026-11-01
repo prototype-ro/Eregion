@@ -10,6 +10,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
@@ -80,18 +81,21 @@ public class CardRenderService {
 			BufferedImage canvas = new BufferedImage(
 					FrameLayout.CARD_WIDTH, FrameLayout.CARD_HEIGHT, BufferedImage.TYPE_INT_ARGB);
 			Graphics2D g = canvas.createGraphics();
-			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			try {
+				g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-			drawArt(g, layout, artBytes);
-			drawFrameBorder(g, selection);
-			drawText(g, layout, selection, card, settings);
-
-			g.dispose();
+				drawArt(g, layout, artBytes);
+				drawFrameBorder(g, selection);
+				drawText(g, layout, selection, card, settings);
+			}
+			finally {
+				g.dispose();
+			}
 
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			ImageIO.write(canvas, "png", out);
 
-			renderRepository.upsert(deckId, cardId, out.toByteArray(), inputsHash(card, selection));
+			renderRepository.upsert(deckId, cardId, out.toByteArray(), inputsHash(card, selection, artBytes));
 		}
 		catch (IOException e) {
 			throw new IllegalStateException("Failed to render card " + cardId + " for deck " + deckId, e);
@@ -101,6 +105,9 @@ public class CardRenderService {
 	private void drawArt(Graphics2D g, FrameLayout layout, byte[] artBytes) throws IOException {
 		Rectangle artBox = layout.region("artBox");
 		BufferedImage art = ImageIO.read(new ByteArrayInputStream(artBytes));
+		if (art == null) {
+			throw new IOException("Uploaded art could not be decoded as an image");
+		}
 		g.drawImage(art, artBox.x, artBox.y, artBox.width, artBox.height, null);
 	}
 
@@ -148,8 +155,10 @@ public class CardRenderService {
 		// note; it's a known, tracked gap.
 	}
 
-	private String inputsHash(Card card, FrameSelection selection) {
-		return Integer.toHexString(
-				(card.name() + selection.frameFamily() + selection.templateSlot() + selection.borderTreatment()).hashCode());
+	private String inputsHash(Card card, FrameSelection selection, byte[] artBytes) {
+		int stringHash = (card.name() + selection.frameFamily() + selection.templateSlot() + selection.borderTreatment())
+				.hashCode();
+		int combined = stringHash * 31 + Arrays.hashCode(artBytes);
+		return Integer.toHexString(combined);
 	}
 }

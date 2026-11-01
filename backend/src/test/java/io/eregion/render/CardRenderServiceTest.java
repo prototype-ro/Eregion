@@ -2,6 +2,8 @@ package io.eregion.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.awt.Color;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -52,10 +54,34 @@ class CardRenderServiceTest extends PostgresTest {
 		BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(row.imageData()));
 		assertThat(decoded.getWidth()).isEqualTo(FrameLayout.CARD_WIDTH);
 		assertThat(decoded.getHeight()).isEqualTo(FrameLayout.CARD_HEIGHT);
+
+		// Guard against a regression where drawArt/drawFrameBorder/drawText silently no-op: an empty
+		// CARD_WIDTH x CARD_HEIGHT transparent canvas would still pass the dimension-only assertions above, so
+		// also check actual pixel content at a point known to be inside the art box (should carry the test art's
+		// distinctive color) and at a point known to be covered only by the frame border (should be opaque, not
+		// the canvas's default transparent background).
+		FrameLayout layout = new FrameLayoutLoader().load("m15", "creature");
+		Rectangle artBox = layout.region("artBox");
+		int artPixelX = artBox.x + artBox.width / 2;
+		int artPixelY = artBox.y + artBox.height / 2;
+		int artPixel = decoded.getRGB(artPixelX, artPixelY);
+		assertThat(new Color(artPixel, true)).isEqualTo(TEST_ART_COLOR);
+
+		int borderOnlyPixel = decoded.getRGB(2, 2);
+		assertThat(new Color(borderOnlyPixel, true).getAlpha())
+				.as("pixel near (0,0) should be covered by the opaque frame border, not left as the transparent "
+						+ "canvas background")
+				.isEqualTo(255);
 	}
+
+	private static final Color TEST_ART_COLOR = new Color(255, 0, 255);
 
 	private static byte[] tinyPng() throws IOException {
 		BufferedImage art = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+		java.awt.Graphics2D g = art.createGraphics();
+		g.setColor(TEST_ART_COLOR);
+		g.fillRect(0, 0, 10, 10);
+		g.dispose();
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ImageIO.write(art, "png", out);
 		return out.toByteArray();
