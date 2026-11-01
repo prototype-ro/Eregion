@@ -1039,7 +1039,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       {/* Cards */}
       <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
         <div className="hidden lg:sticky lg:top-6 lg:block">
-          <CardPreview line={selected} showCollection={checkCollection} />
+          <CardPreview line={selected} showCollection={checkCollection} deckId={deck.id} />
         </div>
         <div>{renderCards(viewProps.groups)}</div>
       </div>
@@ -1305,6 +1305,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       <CardPeek
         line={lineByKey(peekKey)}
         showCollection={checkCollection}
+        deckId={deck.id}
         onClose={() => setPeekKey(null)}
         onChangePrinting={(line) => {
           setPeekKey(null);
@@ -1318,6 +1319,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setProxyCardId(null)}
         cardId={proxyCardId}
         cardName={lines.find((l) => l.cardId === proxyCardId)?.name ?? ""}
+        cardImage={lines.find((l) => l.cardId === proxyCardId)?.imageNormal}
         deckId={deck.id}
         proxies={proxies}
         onNotify={setToast}

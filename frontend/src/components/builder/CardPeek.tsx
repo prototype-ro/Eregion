@@ -1,16 +1,24 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ManaCost, ManaText } from "@/components/Mana";
-import { formatPrice } from "@/lib/links";
+import { cardRenderUrl, formatPrice } from "@/lib/links";
 import type { DeckCardLine } from "@/lib/types";
 
 interface Props {
   line: DeckCardLine | null;
   showCollection: boolean;
+  deckId: string;
   onClose: () => void;
   onChangePrinting: (line: DeckCardLine) => void;
+}
+
+/** Tries the deck's composited render first; falls back to the card's existing art (custom or Scryfall) on error. */
+function RenderImage({ deckId, line }: { deckId: string; line: DeckCardLine }) {
+  const [src, setSrc] = useState(() => cardRenderUrl(deckId, line.cardId));
+  return <Image src={src} alt={`${line.name} card image`} fill sizes="320px" className="object-cover" onError={() => setSrc(line.imageNormal)} />;
 }
 
 const Fact = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -21,13 +29,13 @@ const Fact = ({ label, children }: { label: string; children: React.ReactNode })
 );
 
 /** The center peek: one card in full, with everything we know about it. */
-export function CardPeek({ line, showCollection, onClose, onChangePrinting }: Props) {
+export function CardPeek({ line, showCollection, deckId, onClose, onChangePrinting }: Props) {
   return (
     <Dialog open={line !== null} onClose={onClose} label={line ? `${line.name} details` : "Card details"} size="md">
       {line && (
         <div className="grid gap-8 sm:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
           <div className="relative aspect-[488/680] overflow-hidden rounded-[18px] bg-surface">
-            {line.imageNormal && <Image src={line.imageNormal} alt={`${line.name} card image`} fill sizes="320px" className="object-cover" />}
+            {line.imageNormal && <RenderImage key={line.cardId} deckId={deckId} line={line} />}
           </div>
 
           <div className="flex min-w-0 flex-col">

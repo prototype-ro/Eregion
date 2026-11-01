@@ -1,9 +1,10 @@
 import Image from "next/image";
+import { useState } from "react";
 import { ManaCost } from "@/components/Mana";
-import { formatPrice } from "@/lib/links";
+import { cardRenderUrl, formatPrice } from "@/lib/links";
 import type { DeckCardLine } from "@/lib/types";
 
-export function CardPreview({ line, showCollection }: { line: DeckCardLine | null; showCollection: boolean }) {
+export function CardPreview({ line, showCollection, deckId }: { line: DeckCardLine | null; showCollection: boolean; deckId: string }) {
   if (!line) {
     return (
       <div className="flex aspect-[5/7] items-center justify-center rounded-[18px] border border-line bg-surface p-6 text-center text-[15px] leading-snug text-muted">
@@ -15,7 +16,7 @@ export function CardPreview({ line, showCollection }: { line: DeckCardLine | nul
     <div className="flex flex-col gap-4">
       {line.imageNormal ? (
         <div className="relative aspect-[488/680] overflow-hidden rounded-[18px] bg-surface">
-          <Image src={line.imageNormal} alt={`${line.name} card image`} fill sizes="300px" className="object-cover" />
+          <RenderImage key={line.cardId} deckId={deckId} line={line} />
         </div>
       ) : (
         <div className="flex aspect-[5/7] items-center justify-center rounded-[18px] border border-line bg-surface p-6 text-center text-muted">
@@ -56,4 +57,10 @@ export function CardPreview({ line, showCollection }: { line: DeckCardLine | nul
       </div>
     </div>
   );
+}
+
+/** Tries the deck's composited render first; falls back to the card's existing art (custom or Scryfall) on error. */
+function RenderImage({ deckId, line }: { deckId: string; line: DeckCardLine }) {
+  const [src, setSrc] = useState(() => cardRenderUrl(deckId, line.cardId));
+  return <Image src={src} alt={`${line.name} card image`} fill sizes="300px" className="object-cover" onError={() => setSrc(line.imageNormal)} />;
 }

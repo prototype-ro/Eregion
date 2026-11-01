@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ApiError } from "@/lib/api";
+import { cardRenderUrl } from "@/lib/links";
 import { fullPrompt } from "@/lib/proxy";
 import type { useProxies } from "@/lib/useProxies";
 import type { LoreVerdict, ProxyGeneration, ProxyMode } from "@/lib/types";
@@ -16,6 +18,8 @@ interface Props {
   onClose: () => void;
   cardId: string | null;
   cardName: string;
+  /** The card's existing art (custom or Scryfall), shown if the composited render 404s or hasn't been produced yet. */
+  cardImage?: string;
   deckId: string;
   proxies: Proxies;
   onNotify: (message: string) => void;
@@ -25,12 +29,18 @@ interface Props {
 export function ProxyPanel(props: Props) {
   return (
     <Dialog open={props.open && props.cardId !== null} onClose={props.onClose} label={`Proxy for ${props.cardName}`} size="md">
-      {props.cardId && <Body {...props} cardId={props.cardId} />}
+      {props.cardId && <Body key={props.cardId} {...props} cardId={props.cardId} />}
     </Dialog>
   );
 }
 
-function Body({ cardId, cardName, deckId, proxies, onNotify }: Props & { cardId: string }) {
+/** Tries the deck's composited render first; falls back to the card's existing art (custom or Scryfall) on error. */
+function RenderImage({ deckId, cardId, cardName, cardImage }: { deckId: string; cardId: string; cardName: string; cardImage?: string }) {
+  const [src, setSrc] = useState(() => cardRenderUrl(deckId, cardId));
+  return <Image src={src} alt={`${cardName} card image`} fill sizes="160px" className="object-cover" onError={() => cardImage && setSrc(cardImage)} />;
+}
+
+function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props & { cardId: string }) {
   const treatment = proxies.treatments.find((t) => t.cardId === cardId) ?? null;
   const [mode, setMode] = useState<ProxyMode>(treatment?.mode ?? "NICKNAME");
   const [instruction, setInstruction] = useState("");
@@ -109,6 +119,9 @@ function Body({ cardId, cardName, deckId, proxies, onNotify }: Props & { cardId:
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="relative aspect-[488/680] w-40 overflow-hidden rounded-[18px] bg-surface">
+        <RenderImage deckId={deckId} cardId={cardId} cardName={cardName} cardImage={cardImage} />
+      </div>
       <h2 className="font-display text-[44px] leading-none">{current?.nickname ?? cardName}</h2>
       {current?.nickname && <p className="-mt-3 text-sm text-muted">Proxy for {cardName}</p>}
 
