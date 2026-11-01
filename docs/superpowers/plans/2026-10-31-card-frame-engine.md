@@ -687,53 +687,41 @@ git commit -m "Add pure frame-selection engine"
 
 This task has no automated test — it's asset acquisition and a data-conversion script, verified by manual inspection.
 
+**Corrected after discovery during execution:** the user already has a local CardConjurer checkout at `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer` (a fork of `Investigamer/cardconjurer`, kept locally for **personal/local use only** — this fork has no LICENSE file, and its own README explains the original hosted CardConjurer was taken down by a Wizards of the Coast cease-and-desist over exactly this asset category. The user has explicitly decided to proceed anyway, for personal/local use, accepting that posture — don't re-litigate this decision or re-raise the license question; just don't publish/distribute these assets anywhere beyond this private local use). No cloning needed — read directly from that local path.
+
 **Files:**
-- Create: `backend/src/main/resources/frames/m15/` (frame/symbol images)
+- Create: `backend/src/main/resources/frames/m15/` (frame/symbol images, copied from the local CardConjurer checkout)
 - Create: `backend/src/main/resources/frames/m15/layout.json`
 - Create: `scripts/convert-cardconjurer-layout.mjs` (one-time conversion helper, not part of the running app)
 
-- [ ] **Step 1: Check CardConjurer's license**
+**Confirmed source paths (from direct inspection of the local checkout):**
+- Frame border PNGs: `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/img/frames/m15/regular/` — `m15FrameW.png` (white), `m15FrameU.png` (blue), `m15FrameB.png` (black), `m15FrameR.png` (red), `m15FrameG.png` (green), `m15FrameM.png` (multicolor/gold), `m15FrameA.png` (artifact — also doubles as the colorless border, since there's no separate standalone colorless frame), `m15FrameL.png` (land).
+- P/T box PNGs, same directory: `m15PT{W,U,B,R,G,M,A,C,V}.png` (use `m15PTC.png` for the colorless P/T box).
+- Mana symbol SVGs: `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/img/manaSymbols/` — `w.svg`, `u.svg`, `b.svg`, `r.svg`, `g.svg`, and `0.svg` through `20.svg` for generic costs.
+- Layout/coordinate source: `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/js/frames/packM15Regular-1.js` — defines, as **fractional (0–1) coordinates relative to the card canvas** (not pixels): `card.artBounds`, `card.setSymbolBounds`, `card.watermarkBounds`, and a `loadTextOptions({...})` call with keys `mana`, `title`, `type`, `rules`, `pt`, each an `{x, y, width, height, ...}` object in the same 0–1 fractional scheme. Canvas base size is defined in `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/js/creator-23.js` (`baseWidth`/`baseHeight` constants, with a high-res export path using 2010×2814 — matches this plan's `FrameLayout.CARD_WIDTH`/`CARD_HEIGHT`). The artist/set/collector-number line is defined separately in `creator-23.js` (shared across frames, not per-pack), a `midLeft` text template around `x:0.0647, y:0.9548, width:0.8707, height:0.0171`.
+- The land frame pack (`js/frames/packM15*.js` — find the land-specific one, likely `packM15Lands-*.js` or similar; list the directory to find it) has its own coordinate overrides for the land template slot — check it for any land-specific art-box/title differences rather than assuming the regular pack's numbers apply unchanged to land.
 
-Clone or fetch the CardConjurer repository (the open-source project this plan reuses assets from) and read its `LICENSE` file. Confirm it permits bundling/redistributing the asset pack inside this project. If it does not, stop and flag this to the user before proceeding — do not bundle assets under an incompatible license.
+**Important: these coordinates are fractions (0.0–1.0), not pixels.** `layout.json` should store them as fractions too — don't pre-multiply by canvas size here, since Task 7's `FrameLayout`/`FrameLayoutLoader` is responsible for converting fraction → pixel `Rectangle` against `FrameLayout.CARD_WIDTH`/`CARD_HEIGHT`. (If you're implementing this task before Task 7 exists yet, just be consistent: store fractions, document that choice in a comment at the top of `layout.json` or this task's commit message, since Task 7 depends on it.)
 
-- [ ] **Step 2: Copy the M15 frame family assets**
+- [ ] **Step 1: Copy the frame assets**
 
-From the CardConjurer repo, copy its M15 frame images (border images per color/border-treatment, per the `borderTreatment` values produced by `FrameSelector`: `mono-W`, `mono-U`, `mono-B`, `mono-R`, `mono-G`, `multicolor`, `colorless`, `artifact`, `land`) and its mana symbol icon set into `backend/src/main/resources/frames/m15/`. Use consistent filenames, e.g. `border-mono-G.png`, `symbol-mana-G.png`, `symbol-mana-generic.png`, etc.
+Copy the border PNGs and P/T box PNGs listed above into `backend/src/main/resources/frames/m15/`, renamed to match `FrameSelector`'s `borderTreatment` values: `border-mono-W.png`, `border-mono-U.png`, `border-mono-B.png`, `border-mono-R.png`, `border-mono-G.png`, `border-multicolor.png` (from `m15FrameM.png`), `border-colorless.png` (from `m15FrameA.png`), `border-artifact.png` (also from `m15FrameA.png` — same file copied twice under two names is fine, since `FrameSelector` treats artifact and colorless as separate border-treatment values today even though CardConjurer uses one frame image for both), `border-land.png` (from `m15FrameL.png`). Also copy the mana symbol SVGs into `backend/src/main/resources/frames/m15/mana/` keeping their original filenames (`w.svg`, `u.svg`, etc.) — this plan's compositing step (Task 7) doesn't actually render mana-cost icons yet (it's a documented follow-up), so exact integration isn't needed now, just get the files in place.
 
-- [ ] **Step 3: Write the layout conversion script**
+- [ ] **Step 2: Write the layout conversion script**
 
-CardConjurer defines where each layer (art box, title text, mana cost, type line, rules box, P/T box) sits as pixel coordinates in its own JS template data. Write a small Node script that reads that template data and emits our own flat JSON format:
+Read `packM15Regular-1.js` directly (it's plain JS, not JSON — you'll need to read the relevant `card.artBounds = {...}`/`loadTextOptions({...})` assignments as text and manually transcribe their fractional values, since this isn't parseable as a standalone JSON blob). Write `scripts/convert-cardconjurer-layout.mjs` as a script that just emits the hand-transcribed values as JSON (a "script" in name, but realistically a static data file generator, since the source isn't machine-parseable JSON) — or, simpler and equally acceptable: skip the script and hand-write `backend/src/main/resources/frames/m15/layout.json` directly, documenting in a comment-adjacent README or the commit message which source file/line each value was transcribed from. Either approach is fine; don't over-engineer a general-purpose JS-template parser for a one-time transcription of ~6 template slots.
 
-```javascript
-// scripts/convert-cardconjurer-layout.mjs
-// Usage: node scripts/convert-cardconjurer-layout.mjs <path-to-cardconjurer-template.js> <output-path>
-//
-// Reads CardConjurer's template layout definition and re-emits it as a flat
-// JSON file our Java compositor can load directly, keyed by templateSlot.
-import fs from "node:fs";
+Target `layout.json` shape — one entry per `templateSlot` (`creature`, `land`, `artifact`, `enchantment`, `instant`, `sorcery`, `planeswalker`, `other`), each with fractional `{x, y, width, height}` regions for: `artBox` (from `card.artBounds`), `titleText` (from `loadTextOptions(...).title`), `manaCostArea` (from `.mana`), `typeLineText` (from `.type`), `rulesTextBox` (from `.rules`), `ptBox` (from `.pt`, creature/planeswalker slots only), `artistCredit`/`collectorInfo` (from the shared `midLeft` template in `creator-23.js`), `setSymbol` (from `card.setSymbolBounds`). For slots without a distinct CardConjurer pack of their own (`enchantment`, `instant`, `sorcery`, `other`), reuse the regular M15 pack's non-creature-specific regions (everything except `ptBox`, which those slots omit).
 
-const [, , inputPath, outputPath] = process.argv;
-const raw = fs.readFileSync(inputPath, "utf-8");
+- [ ] **Step 3: Inspect the output**
 
-// CardConjurer's template file assigns its layout object to a known variable;
-// inspect the actual file to find that variable name before writing the
-// extraction regex/eval below — this is intentionally left to be filled in
-// against the real file, since its exact shape is unknown until Step 1's
-// clone happens.
-throw new Error("Inspect the cloned CardConjurer template file's structure, then implement extraction here.");
-```
+Open the resulting `layout.json` and sanity-check: every value is between 0 and 1, every templateSlot from `FrameSelector.resolveTemplateSlot`'s possible outputs has an entry, and the numbers look plausible (e.g. `artBox` roughly in the top 40-50% of the card, `rulesTextBox` roughly in the bottom-middle third).
 
-- [ ] **Step 4: Run the script against the real CardConjurer template and inspect output**
-
-Run: `node scripts/convert-cardconjurer-layout.mjs <path> backend/src/main/resources/frames/m15/layout.json`
-
-Manually open the resulting `layout.json` and confirm it has one entry per `templateSlot` (`creature`, `land`, `artifact`, `enchantment`, `instant`, `sorcery`, `planeswalker`, `other`) with pixel rectangles for: `artBox`, `titleText`, `manaCostArea`, `typeLineText`, `rulesTextBox`, `ptBox` (creature only), `artistCredit`, `collectorInfo`, `setSymbol`.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add backend/src/main/resources/frames/m15 scripts/convert-cardconjurer-layout.mjs
-git commit -m "Add M15 frame assets and layout data from CardConjurer"
+git commit -m "Add M15 frame assets and layout data from the local CardConjurer checkout"
 ```
 
 ---
@@ -1014,9 +1002,11 @@ public record FrameLayout(
 }
 ```
 
-(`CARD_WIDTH`/`CARD_HEIGHT` must match whatever canvas size the Task 5 `layout.json` was authored against — confirm against that file and adjust these constants if different.)
+(`CARD_WIDTH`/`CARD_HEIGHT` = 2010×2814 matches CardConjurer's own high-res export size, confirmed against `creator-23.js` in the local checkout — no adjustment needed unless Task 5 ended up using different source coordinates.)
 
 - [ ] **Step 4: Implement `FrameLayoutLoader`**
+
+**Corrected after discovery during execution:** Task 5's `layout.json` stores regions as **fractions (0.0–1.0) of the card canvas**, matching CardConjurer's own coordinate scheme — not pixels. `FrameLayoutLoader` must multiply each fraction by `FrameLayout.CARD_WIDTH`/`CARD_HEIGHT` when building the `Rectangle`.
 
 ```java
 package io.eregion.render;
@@ -1053,8 +1043,10 @@ public class FrameLayoutLoader {
                 String field = fieldNames.next();
                 JsonNode rect = slotNode.get(field);
                 regions.put(field, new Rectangle(
-                    rect.get("x").asInt(), rect.get("y").asInt(),
-                    rect.get("width").asInt(), rect.get("height").asInt()));
+                    (int) Math.round(rect.get("x").asDouble() * FrameLayout.CARD_WIDTH),
+                    (int) Math.round(rect.get("y").asDouble() * FrameLayout.CARD_HEIGHT),
+                    (int) Math.round(rect.get("width").asDouble() * FrameLayout.CARD_WIDTH),
+                    (int) Math.round(rect.get("height").asDouble() * FrameLayout.CARD_HEIGHT)));
             }
             return new FrameLayout(regions);
         } catch (Exception e) {
