@@ -16,6 +16,9 @@ import io.eregion.auth.CurrentUser;
 import io.eregion.proxy.LoreDtos.CheckRequest;
 import io.eregion.proxy.LoreDtos.DraftRequest;
 import io.eregion.proxy.LoreDtos.LoreDoc;
+import io.eregion.proxy.LoreDtos.RefineRequest;
+import io.eregion.proxy.LoreDtos.TurnReply;
+import io.eregion.proxy.LoreDtos.TurnRequest;
 import io.eregion.proxy.LoreDtos.Verdict;
 import io.eregion.ratelimit.RateLimits;
 import jakarta.validation.Valid;
@@ -51,11 +54,27 @@ public class LoreController {
 		return service.draft(userId, deckId, request.instruction());
 	}
 
+	/** Each refine is a paid call to the language model. */
+	@PostMapping("/refine")
+	public LoreDoc refine(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody RefineRequest request) {
+		UUID userId = CurrentUser.id(jwt);
+		limits.lore(userId);
+		return service.refine(userId, deckId, request.doc(), request.target(), request.instruction());
+	}
+
 	/** Each check is a paid call to the language model. */
 	@PostMapping("/check")
 	public Verdict check(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody CheckRequest request) {
 		UUID userId = CurrentUser.id(jwt);
 		limits.lore(userId);
 		return service.check(userId, deckId, request.cardId());
+	}
+
+	/** Each turn is a paid call to the language model. */
+	@PostMapping("/turn")
+	public TurnReply turn(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody TurnRequest request) {
+		UUID userId = CurrentUser.id(jwt);
+		limits.lore(userId);
+		return service.turn(userId, deckId, request.doc(), request.history(), request.message());
 	}
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { emptyLoreDoc } from "./lore";
-import type { LoreDoc, LoreVerdict } from "./types";
+import type { LoreDoc, LoreTurnMessage, LoreTurnReply, LoreVerdict } from "./types";
 
 /** The structured lore of one deck, with the calls that load, save, draft and check it. */
 export function useLore(deckId: string) {
@@ -40,7 +40,19 @@ export function useLore(deckId: string) {
 
   const draft = useCallback((instruction: string) => api<LoreDoc>(`/api/decks/${deckId}/lore-doc/draft`, { method: "POST", body: { instruction } }), [deckId]);
 
+  const refine = useCallback(
+    (doc: LoreDoc, target: string, instruction: string) =>
+      api<LoreDoc>(`/api/decks/${deckId}/lore-doc/refine`, { method: "POST", body: { doc, target, instruction } }),
+    [deckId],
+  );
+
   const check = useCallback((cardId: string) => api<LoreVerdict>(`/api/decks/${deckId}/lore-doc/check`, { method: "POST", body: { cardId } }), [deckId]);
 
-  return { doc, loaded, loadError, retry: reload, save, draft, check };
+  const turn = useCallback(
+    (doc: LoreDoc, history: LoreTurnMessage[], message: string) =>
+      api<LoreTurnReply>(`/api/decks/${deckId}/lore-doc/turn`, { method: "POST", body: { doc, history, message } }),
+    [deckId],
+  );
+
+  return { doc, loaded, loadError, retry: reload, save, draft, refine, check, turn };
 }

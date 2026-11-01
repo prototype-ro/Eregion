@@ -1315,7 +1315,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setProxyCardId(null)}
         cardId={proxyCardId}
         cardName={lines.find((l) => l.cardId === proxyCardId)?.name ?? ""}
-        cardTypeLine={lines.find((l) => l.cardId === proxyCardId)?.typeLine ?? ""}
         deckId={deck.id}
         proxies={proxies}
         onNotify={setToast}

@@ -8,3 +8,4 @@
 .superpowers/
 frontend/.viz-cand/
 frontend/public/dev/
+.claude/worktrees/

@@ -28,7 +28,7 @@ public class LoreRepository {
 	/** The saved document, or {@link LoreDoc#empty()} when the deck has none (or a damaged one). */
 	public LoreDoc loreDoc(UUID deckId) {
 		String json = jdbc.sql("SELECT lore_doc::text AS doc FROM decks WHERE id = :deck")
-				.param("deck", deckId).query((rs, n) -> rs.getString("doc")).single();
+				.param("deck", deckId).query((rs, n) -> rs.getString("doc")).optional().orElse(null);
 		return readDoc(json);
 	}
 

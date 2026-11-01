@@ -48,10 +48,12 @@ public class ProxyPromptService {
 	/**
 	 * @param previous the current result when refining, otherwise null
 	 * @param instruction what to change when refining, otherwise null
-	 * @param ignoreCreatureType when true, the card's own printed creature type is not binding — the lore decides what kind of being this is
+	 * @param ignoreType when true, the card's own printed type/subtype is not binding — the lore decides what this subject actually is
+	 * @param ignoreRulesText when true, the card's own rules text is not binding — the subject comes from the lore and the type alone
 	 */
-	public Draft generate(String lore, CardFacts card, Mode mode, List<Pick> others, Draft previous, String instruction, boolean ignoreCreatureType) {
-		String user = userMessage(lore, card, mode, others, previous, instruction, ignoreCreatureType);
+	public Draft generate(String lore, CardFacts card, Mode mode, List<Pick> others, Draft previous, String instruction, boolean ignoreType,
+			boolean ignoreRulesText) {
+		String user = userMessage(lore, card, mode, others, previous, instruction, ignoreType, ignoreRulesText);
 		BadReply last = null;
 		for (int attempt = 0; attempt < 2; attempt++) {
 			String reply = llm.complete(rules, user);
@@ -65,7 +67,8 @@ public class ProxyPromptService {
 		throw ApiException.unavailable("The model's answer could not be read (" + last.getMessage() + "). Try again.");
 	}
 
-	static String userMessage(String lore, CardFacts card, Mode mode, List<Pick> others, Draft previous, String instruction, boolean ignoreCreatureType) {
+	static String userMessage(String lore, CardFacts card, Mode mode, List<Pick> others, Draft previous, String instruction, boolean ignoreType,
+			boolean ignoreRulesText) {
 		var out = new StringBuilder();
 		out.append("# Deck lore\n\n").append(lore == null || lore.isBlank() ? "(none given: keep the result generic)" : lore.strip()).append("\n\n");
 		out.append("# Mode\n\n").append(mode).append(mode == Mode.RESKIN ? " (keep the card's own name)" : " (invent a new name)").append("\n\n");
@@ -73,12 +76,17 @@ public class ProxyPromptService {
 		out.append("Name: ").append(card.name()).append('\n');
 		out.append("Mana cost: ").append(nullToEmpty(card.manaCost())).append('\n');
 		out.append("Type: ").append(nullToEmpty(card.typeLine())).append('\n');
-		if (ignoreCreatureType) {
-			out.append("(Ignore this card's own printed creature type/subtype above — it is not binding. Let the deck lore's own groups decide ")
-					.append("entirely what kind of being this is, even where that contradicts the printed type.)\n");
+		if (ignoreType) {
+			out.append("(Ignore this card's own printed type/subtype above — it is not binding. Let the deck lore decide entirely what this ")
+					.append("subject actually is — character, object, place or effect — even where that contradicts the printed type.)\n");
 		}
 		out.append("Colors: ").append(nullToEmpty(card.colors())).append('\n');
-		out.append("Rules text: ").append(nullToEmpty(card.oracleText())).append("\n\n");
+		out.append("Rules text: ").append(nullToEmpty(card.oracleText())).append('\n');
+		if (ignoreRulesText) {
+			out.append("(Ignore this card's own rules text above as an anchor for the subject — do not let it steer who or what this is. ")
+					.append("Decide entirely from the deck lore and the card's type instead.)\n");
+		}
+		out.append('\n');
 		if (!others.isEmpty()) {
 			out.append("# Already chosen for other cards in this deck (do not reuse these names)\n\n");
 			for (Pick pick : others) {

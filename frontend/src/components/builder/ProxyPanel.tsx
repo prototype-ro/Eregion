@@ -16,7 +16,6 @@ interface Props {
   onClose: () => void;
   cardId: string | null;
   cardName: string;
-  cardTypeLine: string;
   deckId: string;
   proxies: Proxies;
   onNotify: (message: string) => void;
@@ -31,12 +30,12 @@ export function ProxyPanel(props: Props) {
   );
 }
 
-function Body({ cardId, cardName, cardTypeLine, deckId, proxies, onNotify }: Props & { cardId: string }) {
+function Body({ cardId, cardName, deckId, proxies, onNotify }: Props & { cardId: string }) {
   const treatment = proxies.treatments.find((t) => t.cardId === cardId) ?? null;
   const [mode, setMode] = useState<ProxyMode>(treatment?.mode ?? "NICKNAME");
   const [instruction, setInstruction] = useState("");
-  const isCreature = cardTypeLine.includes("Creature");
   const [ignoreType, setIgnoreType] = useState(false);
+  const [ignoreRulesText, setIgnoreRulesText] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<ProxyGeneration[]>([]);
@@ -65,7 +64,7 @@ function Body({ cardId, cardName, cardTypeLine, deckId, proxies, onNotify }: Pro
     setBusy(true);
     setError(null);
     try {
-      await proxies.generate(cardId, mode, refine ? instruction : undefined, ignoreType);
+      await proxies.generate(cardId, mode, refine ? instruction : undefined, ignoreType, ignoreRulesText);
       if (refine) setInstruction("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not generate. Try again.");
@@ -132,12 +131,21 @@ function Body({ cardId, cardName, cardTypeLine, deckId, proxies, onNotify }: Pro
         ))}
       </div>
 
-      {isCreature && (
+      <div className="flex flex-col gap-1.5">
         <label className="flex items-center gap-2.5 text-sm text-muted">
           <input type="checkbox" checked={ignoreType} onChange={(event) => setIgnoreType(event.target.checked)} className="size-4 accent-accent-text" />
-          Ignore this card&rsquo;s printed creature type — let the lore decide what it is
+          Ignore this card&rsquo;s printed type — let the lore decide what it is
         </label>
-      )}
+        <label className="flex items-center gap-2.5 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={ignoreRulesText}
+            onChange={(event) => setIgnoreRulesText(event.target.checked)}
+            className="size-4 accent-accent-text"
+          />
+          Ignore this card&rsquo;s rules text — focus entirely on the lore and the type
+        </label>
+      </div>
 
       {current ? (
         <div className="flex flex-col gap-3">

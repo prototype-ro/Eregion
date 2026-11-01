@@ -56,7 +56,7 @@ class ProxyPromptServiceTest {
 
 	@Test
 	void nicknameModeReturnsNameCharacterAndPrompt() {
-		Draft draft = service(new Scripted(GOOD_NICKNAME)).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false);
+		Draft draft = service(new Scripted(GOOD_NICKNAME)).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false);
 
 		assertThat(draft.nickname()).isEqualTo("Sildarion");
 		assertThat(draft.character().tier()).isEqualTo("Lathaar-tier");
@@ -65,7 +65,7 @@ class ProxyPromptServiceTest {
 
 	@Test
 	void aReplyWithoutAnAspectRatioGetsOne() {
-		Draft draft = service(new Scripted(GOOD_NICKNAME)).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false);
+		Draft draft = service(new Scripted(GOOD_NICKNAME)).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false);
 
 		assertThat(draft.prompt()).endsWith("open palm --ar 5:7");
 	}
@@ -84,7 +84,7 @@ class ProxyPromptServiceTest {
 
 	@Test
 	void reskinModeKeepsNoNickname() {
-		Draft draft = service(new Scripted(GOOD_RESKIN)).generate("LORE TEXT", SENTINEL, Mode.RESKIN, List.of(), null, null, false);
+		Draft draft = service(new Scripted(GOOD_RESKIN)).generate("LORE TEXT", SENTINEL, Mode.RESKIN, List.of(), null, null, false, false);
 
 		assertThat(draft.nickname()).isNull();
 		assertThat(draft.character().who()).isEqualTo("a faceless sovereign");
@@ -96,7 +96,7 @@ class ProxyPromptServiceTest {
 		var earlier = List.of(new Pick("Lord of the Void", null, "Maelgrith-submitted"), new Pick("Esper Sentinel", "Old Name", "Lathaar-tier"));
 		var previous = new Draft("Old Name", new ProxyDtos.Character("Lathaar-tier", "w", "r", "o", "s"), "old prompt text");
 
-		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, earlier, previous, "make the armor darker", false);
+		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, earlier, previous, "make the armor darker", false, false);
 
 		String user = llm.users.get(0);
 		assertThat(user).contains("LORE TEXT").contains("Esper Sentinel").contains("draw a card unless they pay X");
@@ -107,35 +107,53 @@ class ProxyPromptServiceTest {
 	}
 
 	@Test
-	void ignoreCreatureTypeTellsTheModelThePrintedTypeIsNotBinding() {
+	void ignoreTypeTellsTheModelThePrintedTypeIsNotBinding() {
 		var llm = new Scripted(GOOD_NICKNAME);
 
-		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, true);
+		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, true, false);
 
-		assertThat(llm.users.get(0)).contains("not binding").contains("Let the deck lore's own groups decide");
+		assertThat(llm.users.get(0)).contains("not binding").contains("Let the deck lore decide entirely what this");
 	}
 
 	@Test
-	void withoutIgnoreCreatureTypeNoOverrideNoteIsSent() {
+	void withoutIgnoreTypeNoOverrideNoteIsSent() {
 		var llm = new Scripted(GOOD_NICKNAME);
 
-		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false);
+		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false);
 
 		assertThat(llm.users.get(0)).doesNotContain("not binding");
+	}
+
+	@Test
+	void ignoreRulesTextTellsTheModelTheRulesTextIsNotAnAnchor() {
+		var llm = new Scripted(GOOD_NICKNAME);
+
+		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, true);
+
+		assertThat(llm.users.get(0)).contains("not let it steer who or what this is");
+	}
+
+	@Test
+	void withoutIgnoreRulesTextNoOverrideNoteIsSent() {
+		var llm = new Scripted(GOOD_NICKNAME);
+
+		service(llm).generate("LORE TEXT", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false);
+
+		assertThat(llm.users.get(0)).doesNotContain("not let it steer");
 	}
 
 	@Test
 	void aReplyInACodeFenceIsStillRead() {
 		var llm = new Scripted("```json\n" + GOOD_NICKNAME + "\n```");
 
-		assertThat(service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false).nickname()).isEqualTo("Sildarion");
+		assertThat(service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false).nickname()).isEqualTo("Sildarion");
 	}
 
 	@Test
 	void aMalformedReplyIsRetriedOnce() {
 		var llm = new Scripted("not json at all", GOOD_NICKNAME);
 
-		Draft draft = service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false);
+		Draft draft = service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false);
 
 		assertThat(draft.nickname()).isEqualTo("Sildarion");
 		assertThat(llm.users).hasSize(2);
@@ -145,7 +163,7 @@ class ProxyPromptServiceTest {
 	void twoBadRepliesFailWithAMessage() {
 		var llm = new Scripted("nope", "{\"character\":{\"who\":\"x\"}}");
 
-		assertThatThrownBy(() -> service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false))
+		assertThatThrownBy(() -> service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("could not be read");
 		assertThat(llm.users).hasSize(2);
@@ -155,7 +173,7 @@ class ProxyPromptServiceTest {
 	void nicknameModeRequiresANickname() {
 		var llm = new Scripted(GOOD_RESKIN, GOOD_RESKIN);
 
-		assertThatThrownBy(() -> service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false)).isInstanceOf(ApiException.class);
+		assertThatThrownBy(() -> service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false)).isInstanceOf(ApiException.class);
 	}
 
 	@Test
@@ -163,7 +181,7 @@ class ProxyPromptServiceTest {
 		String tooLong = GOOD_NICKNAME.replace("a calm toll-keeper", "x".repeat(401));
 		var llm = new Scripted(tooLong, GOOD_NICKNAME);
 
-		Draft draft = service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false);
+		Draft draft = service(llm).generate("L", SENTINEL, Mode.NICKNAME, List.of(), null, null, false, false);
 
 		assertThat(draft.character().who()).isEqualTo("a calm toll-keeper");
 		assertThat(llm.users).hasSize(2);

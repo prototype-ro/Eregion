@@ -24,7 +24,7 @@ RESKIN mode: the same, without "nickname". The card keeps its own name.
 
 # What to draw, by card type
 
-Decide this from the type line before anything else.
+Decide this from the type line before anything else — unless the card's own note tells you its printed type/subtype is not binding. When it says that, decide the category (character, object, place or effect) from what the deck lore actually says this subject is, not from the printed type.
 
 - **Creature, planeswalker:** a character. Follow "Rules for a character" below.
 - **Artifact (mana rock, equipment, relic, vehicle):** an object, never a person holding a pose. There is no face and no protagonist, so an object at rest reads as generic. Settle four things silently: who (does a hand or figure belong in the frame, or can the object's own material carry it), what (one frozen moment, never "a sword", always "a sword breaking free of stone at the instant it comes loose"), why (the picture must map onto the card's mechanic or the deck's story), where (a setting lit by the object's own glow or one physical source). Then pick one composition: the object caught mid-use at the instant of its ability; a hand mid-gesture implying a ritual, with the object the only lit thing; the object's material telling the mechanic (one half wine, one half ichor); a minimal iconic silhouette with no scene, only if the shape is striking alone; or the object as a window into something larger. Give it visible history: engraved reliefs, an unusual material, wear. Frame it close-up and medium-tight, with a pocket of dim surroundings, not edge to edge.
@@ -38,7 +38,7 @@ For every non-creature subject, the "Rules for a character" section does not app
 # Rules for a character
 
 - Personality first. Start from who the character is and how they stand, not from the card's mechanic. Reframe the mechanic as something the character does, shown through one image.
-- The card's function decides the role: a removal spell, a mana rock, a creature and a counterspell are different kinds of subject.
+- The card's function decides the role: a removal spell, a mana rock, a creature and a counterspell are different kinds of subject. Unless the card's own note says its rules text is not binding — then skip this and the previous bullet entirely, and decide who the subject is from the deck lore and the card's type alone.
 - One signature detail. A second competing detail weakens both.
 - Nicknames: invented, pronounceable, in the lore's own naming style, never a name already used — except where "The lore is locked" above requires a title instead, or the subject is a canon character (use its real name, never an invented one).
 - Do not copy the card's real flavor text or real art.
