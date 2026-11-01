@@ -32,7 +32,7 @@ class CardRenderControllerTest extends PostgresTest {
 	@Test
 	void getImage_ownerCanReadOwnPrivateDecksRender() {
 		CardRenderRepository repository = new CardRenderRepository(jdbc);
-		CardRenderController controller = new CardRenderController(repository, new CardRenderService());
+		CardRenderController controller = new CardRenderController(repository, newRenderService(repository));
 		DeckRepository decks = new DeckRepository(jdbc, template());
 		UUID ownerId = newUser("render-owner@example.com");
 		UUID deckId = decks.insertDeck(ownerId, "Render Test Deck", "commander");
@@ -51,7 +51,7 @@ class CardRenderControllerTest extends PostgresTest {
 	@Test
 	void getImage_strangerCannotReadPrivateDecksRender() {
 		CardRenderRepository repository = new CardRenderRepository(jdbc);
-		CardRenderController controller = new CardRenderController(repository, new CardRenderService());
+		CardRenderController controller = new CardRenderController(repository, newRenderService(repository));
 		DeckRepository decks = new DeckRepository(jdbc, template());
 		UUID ownerId = newUser("render-owner-2@example.com");
 		UUID strangerId = newUser("render-stranger@example.com");
@@ -69,7 +69,7 @@ class CardRenderControllerTest extends PostgresTest {
 	@Test
 	void getImage_missingRender_returns404() {
 		CardRenderRepository repository = new CardRenderRepository(jdbc);
-		CardRenderController controller = new CardRenderController(repository, new CardRenderService());
+		CardRenderController controller = new CardRenderController(repository, newRenderService(repository));
 		DeckRepository decks = new DeckRepository(jdbc, template());
 		UUID ownerId = newUser("render-owner-3@example.com");
 		UUID deckId = decks.insertDeck(ownerId, "Render Test Deck 3", "commander");
@@ -77,6 +77,15 @@ class CardRenderControllerTest extends PostgresTest {
 		ResponseEntity<byte[]> response = controller.getImage(jwtFor(ownerId), deckId, UUID.randomUUID());
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	/**
+	 * None of this class's tests actually exercise {@code render(...)} (they seed renders directly via
+	 * {@code repository.upsert}), so the service's other dependencies only need to exist, not do anything real.
+	 */
+	private static CardRenderService newRenderService(CardRenderRepository repository) {
+		return new CardRenderService(
+				new io.eregion.card.CardRepository(jdbc), repository, new FrameLayoutLoader(), new DeckFrameSettingsRepository(jdbc));
 	}
 
 	private static Jwt jwtFor(UUID userId) {
