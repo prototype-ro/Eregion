@@ -306,7 +306,7 @@ class ProxyServiceTest {
 		var renderService = new RecordingRenderService();
 		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(llm), llm, artLookup, renderService);
 
-		svc.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		svc.generate(USER, DECK, CARD, Mode.NICKNAME, null, false, false);
 
 		assertThat(renderService.renderedCardIds).containsExactly(CARD);
 	}
@@ -322,8 +322,8 @@ class ProxyServiceTest {
 		var renderService = new RecordingRenderService();
 		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(llm), llm, artLookup, renderService);
 
-		Treatment first = svc.generate(USER, DECK, CARD, Mode.NICKNAME, null);
-		svc.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		Treatment first = svc.generate(USER, DECK, CARD, Mode.NICKNAME, null, false, false);
+		svc.generate(USER, DECK, CARD, Mode.NICKNAME, null, false, false);
 		renderService.renderedCardIds.clear();
 
 		svc.setCurrent(USER, DECK, CARD, first.current().id());
