@@ -14,6 +14,8 @@ import io.eregion.proxy.ProxyDtos.Generation;
 import io.eregion.proxy.ProxyDtos.Lore;
 import io.eregion.proxy.ProxyDtos.Mode;
 import io.eregion.proxy.ProxyDtos.Treatment;
+import io.eregion.render.ArtLookup;
+import io.eregion.render.CardRenderService;
 
 /** Proxy treatments of a deck: who may touch them, what the model is told, and what is kept. */
 @Service
@@ -23,12 +25,17 @@ public class ProxyService {
 	private final CardRepository cards;
 	private final ProxyPromptService prompts;
 	private final LlmClient llm;
+	private final ArtLookup artLookup;
+	private final CardRenderService cardRenderService;
 
-	public ProxyService(ProxyRepository repository, CardRepository cards, ProxyPromptService prompts, LlmClient llm) {
+	public ProxyService(ProxyRepository repository, CardRepository cards, ProxyPromptService prompts, LlmClient llm,
+			ArtLookup artLookup, CardRenderService cardRenderService) {
 		this.repository = repository;
 		this.cards = cards;
 		this.prompts = prompts;
 		this.llm = llm;
+		this.artLookup = artLookup;
+		this.cardRenderService = cardRenderService;
 	}
 
 	public Lore lore(UUID userId, UUID deckId) {
@@ -71,6 +78,7 @@ public class ProxyService {
 		Draft draft = prompts.generate(lore.lore(), facts(card), mode, repository.picks(deckId, cardId), previous, instruction);
 
 		repository.record(deckId, cardId, mode, instruction, draft, llm.modelName());
+		rerenderIfArtExists(deckId, cardId);
 		return repository.treatment(deckId, cardId).orElseThrow();
 	}
 
@@ -89,12 +97,21 @@ public class ProxyService {
 				.orElseThrow(() -> ApiException.notFound("Generation"));
 		repository.upsertTreatment(deckId, cardId, picked.nickname() != null ? Mode.NICKNAME : Mode.RESKIN);
 		repository.setCurrent(treatment.id(), generationId);
+		rerenderIfArtExists(deckId, cardId);
 		return repository.treatment(deckId, cardId).orElseThrow();
 	}
 
 	private void owned(UUID deckId, UUID userId) {
 		if (!repository.ownsDeck(deckId, userId)) {
 			throw ApiException.notFound("Deck");
+		}
+	}
+
+	/** Re-renders the card's composite when it already has uploaded art; nothing to composite otherwise. */
+	private void rerenderIfArtExists(UUID deckId, UUID cardId) {
+		byte[] artBytes = artLookup.findArtBytes(cardId);
+		if (artBytes != null) {
+			cardRenderService.render(deckId, cardId, artBytes);
 		}
 	}
 

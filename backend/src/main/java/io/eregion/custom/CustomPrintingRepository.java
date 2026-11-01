@@ -70,6 +70,19 @@ public class CustomPrintingRepository {
 				.optional();
 	}
 
+	/**
+	 * The most recently uploaded custom art for a card, of any owner. A card can have several custom printings
+	 * (this table isn't deck-scoped), and nothing on CustomPrinting itself marks one as "current" the way a deck
+	 * line can pin a specific printing via deck_version_cards.custom_printing_id; for a card-only lookup (no deck
+	 * in scope) this is the documented fallback: most-recently-uploaded wins.
+	 */
+	public Optional<byte[]> latestImageForCard(UUID cardId) {
+		return jdbc.sql("SELECT data FROM custom_printings WHERE card_id = :card ORDER BY created_at DESC LIMIT 1")
+				.param("card", cardId)
+				.query(byte[].class)
+				.optional();
+	}
+
 	public void delete(UUID id) {
 		jdbc.sql("DELETE FROM custom_printings WHERE id = :id").param("id", id).update();
 	}

@@ -1,6 +1,7 @@
 package io.eregion.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -31,7 +32,8 @@ class DeckFrameSettingsControllerTest extends PostgresTest {
 		JdbcTemplate template = new JdbcTemplate(dataSource);
 		DeckRepository decks = new DeckRepository(jdbc, template);
 		DeckFrameSettingsRepository repository = new DeckFrameSettingsRepository(jdbc);
-		DeckFrameSettingsService service = new DeckFrameSettingsService(repository, decks, new DeckRenderTrigger());
+		DeckRenderTrigger renderTrigger = new DeckRenderTrigger(mock(CardRenderService.class), mock(ArtLookup.class), decks);
+		DeckFrameSettingsService service = new DeckFrameSettingsService(repository, decks, renderTrigger);
 		controller = new DeckFrameSettingsController(service);
 
 		UUID userId = newUser("frame-settings@example.com");

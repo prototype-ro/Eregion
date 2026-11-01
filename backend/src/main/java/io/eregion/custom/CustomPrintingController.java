@@ -25,7 +25,9 @@ import io.eregion.auth.CurrentUser;
 import io.eregion.card.CardRepository;
 import io.eregion.common.ApiException;
 import io.eregion.custom.CustomPrintingRepository.CustomPrinting;
+import io.eregion.deck.DeckRepository;
 import io.eregion.ratelimit.RateLimits;
+import io.eregion.render.CardRenderService;
 import io.eregion.custom.CustomPrintingRepository.Image;
 
 /** A player's own card art, such as proxies, that can be used in place of a Scryfall printing. */
@@ -42,11 +44,16 @@ public class CustomPrintingController {
 	private final CustomPrintingRepository repository;
 	private final CardRepository cards;
 	private final RateLimits limits;
+	private final DeckRepository decks;
+	private final CardRenderService cardRenderService;
 
-	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits) {
+	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits,
+			DeckRepository decks, CardRenderService cardRenderService) {
 		this.repository = repository;
 		this.cards = cards;
 		this.limits = limits;
+		this.decks = decks;
+		this.cardRenderService = cardRenderService;
 	}
 
 	/** All of the player's custom art, so a page can show which cards have some. */
@@ -82,6 +89,11 @@ public class CustomPrintingController {
 			throw ApiException.conflict("Your custom art takes up the 500 MB you can use. Delete some first");
 		}
 		UUID id = repository.insert(userId, cardId, cleanLabel(label), type, data);
+		// This upload has no deck of its own (custom_printings isn't deck-scoped), so re-render every deck that
+		// currently has this card, using the bytes already in hand rather than re-fetching through ArtLookup.
+		for (UUID deckId : decks.decksContainingCard(cardId)) {
+			cardRenderService.render(deckId, cardId, data);
+		}
 		return repository.findOwned(id, userId).orElseThrow();
 	}
 

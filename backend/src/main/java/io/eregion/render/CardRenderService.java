@@ -16,6 +16,8 @@ import java.util.UUID;
 
 import javax.imageio.ImageIO;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import io.eregion.card.Card;
@@ -29,6 +31,8 @@ import io.eregion.card.CardRepository;
  */
 @Service
 public class CardRenderService {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(CardRenderService.class);
 
 	private final CardRepository cardRepository;
 	private final CardRenderRepository renderRepository;
@@ -65,19 +69,24 @@ public class CardRenderService {
 		this.frameSettingsRepository = frameSettingsRepository;
 	}
 
+	/**
+	 * Composites and stores a card's render. Failures are logged, not thrown: a caller looping over a whole
+	 * deck's cards (such as {@link DeckRenderTrigger#rerenderDeck}) must not have one bad card abort the rest,
+	 * and the previous render (if any) is left in place either way.
+	 */
 	public void render(UUID deckId, UUID cardId, byte[] artBytes) {
-		Card card = cardRepository.findById(cardId)
-				.orElseThrow(() -> new IllegalArgumentException("No card with id " + cardId));
-
-		DeckFrameSettingsRepository.FrameSettingsRow settings = frameSettingsRepository.findByDeckId(deckId)
-				.orElse(new DeckFrameSettingsRepository.FrameSettingsRow(deckId, null, null, FrameSelector.DEFAULT_FAMILY));
-
-		FrameSelection selection = frameSelector.select(
-				card.typeLine(), card.colors(), settings.frameFamily(), card.name(), null);
-
-		FrameLayout layout = layoutLoader.load(selection.frameFamily(), selection.templateSlot());
-
 		try {
+			Card card = cardRepository.findById(cardId)
+					.orElseThrow(() -> new IllegalArgumentException("No card with id " + cardId));
+
+			DeckFrameSettingsRepository.FrameSettingsRow settings = frameSettingsRepository.findByDeckId(deckId)
+					.orElse(new DeckFrameSettingsRepository.FrameSettingsRow(deckId, null, null, FrameSelector.DEFAULT_FAMILY));
+
+			FrameSelection selection = frameSelector.select(
+					card.typeLine(), card.colors(), settings.frameFamily(), card.name(), null);
+
+			FrameLayout layout = layoutLoader.load(selection.frameFamily(), selection.templateSlot());
+
 			BufferedImage canvas = new BufferedImage(
 					FrameLayout.CARD_WIDTH, FrameLayout.CARD_HEIGHT, BufferedImage.TYPE_INT_ARGB);
 			Graphics2D g = canvas.createGraphics();
@@ -97,8 +106,8 @@ public class CardRenderService {
 
 			renderRepository.upsert(deckId, cardId, out.toByteArray(), inputsHash(card, selection, artBytes));
 		}
-		catch (IOException e) {
-			throw new IllegalStateException("Failed to render card " + cardId + " for deck " + deckId, e);
+		catch (Exception e) {
+			LOGGER.error("Failed to render card {} for deck {}; keeping previous render if any", cardId, deckId, e);
 		}
 	}
 
