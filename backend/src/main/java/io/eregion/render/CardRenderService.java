@@ -18,6 +18,7 @@ import javax.imageio.ImageIO;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import io.eregion.card.Card;
@@ -46,6 +47,7 @@ public class CardRenderService {
 	 * only family {@link FrameSelector} is told it can honor; anything else falls back to
 	 * {@code FrameSelector.DEFAULT_FAMILY}.
 	 */
+	@Autowired
 	public CardRenderService(
 			CardRepository cardRepository,
 			CardRenderRepository renderRepository,
