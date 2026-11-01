@@ -1,0 +1,85 @@
+{
+  "_comment": "Fractional (0-1) layout regions transcribed from CardConjurer's packM15Regular-1.js (card.artBounds / card.setSymbolBounds / loadTextOptions) and creator-23.js (shared midLeft artist/set/collector-number line). Canvas base size 2010x2814. packM15Lands.js has no coordinate overrides of its own (loadFrameVersion onclick is null), so the 'land' slot reuses the regular pack's numbers. Values are fractions; a later task converts to pixels using FrameLayout.CARD_WIDTH/CARD_HEIGHT.",
+  "creature": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "ptBox": { "x": 0.7928, "y": 0.902, "width": 0.1367, "height": 0.0372 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "land": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "artifact": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "enchantment": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "instant": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "sorcery": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "planeswalker": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "ptBox": { "x": 0.7928, "y": 0.902, "width": 0.1367, "height": 0.0372 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  },
+  "other": {
+    "artBox": { "x": 0.0767, "y": 0.1129, "width": 0.8476, "height": 0.4429 },
+    "titleText": { "x": 0.0854, "y": 0.0522, "width": 0.8292, "height": 0.0543 },
+    "manaCostArea": { "x": 0.0, "y": 0.0613, "width": 0.9292, "height": 0.033810 },
+    "typeLineText": { "x": 0.0854, "y": 0.5664, "width": 0.8292, "height": 0.0543 },
+    "rulesTextBox": { "x": 0.086, "y": 0.6303, "width": 0.828, "height": 0.2875 },
+    "artistCredit": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "collectorInfo": { "x": 0.0647, "y": 0.9548, "width": 0.8707, "height": 0.0171 },
+    "setSymbol": { "x": 0.9213, "y": 0.5910, "width": 0.12, "height": 0.0410 }
+  }
+}
