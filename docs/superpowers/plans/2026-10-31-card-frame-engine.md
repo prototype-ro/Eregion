@@ -25,6 +25,8 @@
 
 **Corrected after discovery during execution:** this codebase has no JPA. `Card` (`backend/src/main/java/io/eregion/card/Card.java`) is an immutable **record** with 20 positional fields, accessed via bare-name accessors (`card.manaCost()`, not `getManaCost()`). Persistence is raw SQL via `JdbcClient` in `CardRepository.java`, against a table named `cards` (plural). There is also a compact legacy 20-arg constructor in `Card.java` used by some call sites — it needs a matching update too.
 
+**Further correction (discovered on a second attempt at this task):** `ScryfallCard` is also an immutable record, not a mutable POJO — snake_case positional components (`source.type_line()`, `source.mana_cost()`, etc.), built via its canonical constructor, no public mutable fields and no no-arg constructor. Its nested `Face` sub-record (used for double-faced-card fallback) also has no `power`/`toughness` today. Steps 2 and 4 below are corrected for this.
+
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/card/ScryfallCard.java`
 - Modify: `backend/src/main/java/io/eregion/card/Card.java`
@@ -39,16 +41,16 @@ Read `Card.java` in full (both the main record declaration and the legacy compac
 
 - [ ] **Step 2: Write the failing test**
 
-Add to `ScryfallMapperTest.java` (create the file if it doesn't exist yet — check first, follow the existing test style in `backend/src/test/java/io/eregion/card/` if other tests are there):
+Add to `ScryfallMapperTest.java` (create the file if it doesn't exist yet — check first, follow the existing test style in `backend/src/test/java/io/eregion/card/` if other tests are there). Build `ScryfallCard` via its real positional canonical constructor — read `ScryfallCard.java` first to get the exact current component list/order (at last check: `id, name, mana_cost, cmc, type_line, colors, color_identity, oracle_text, set, set_name, collector_number, released_at, rarity, artist, prices, image_uris, card_faces, legalities`, plus the two new `power`/`toughness` components you add in Step 4 — confirm this hasn't drifted before writing the test), passing `null`/empty values for every component the test doesn't care about:
 
 ```java
 @Test
 void toCard_mapsPowerAndToughness() {
-    ScryfallCard scryfallCard = new ScryfallCard();
-    scryfallCard.name = "Grizzly Bears";
-    scryfallCard.type_line = "Creature — Bear";
-    scryfallCard.power = "2";
-    scryfallCard.toughness = "2";
+    ScryfallCard scryfallCard = new ScryfallCard(
+        null, "Grizzly Bears", null, null, "Creature — Bear",
+        List.of(), List.of(), null, null, null, null, null,
+        null, null, null, null, null, null,
+        "2", "2"); // power, toughness as the new trailing components — adjust position to match Step 4
 
     Card card = ScryfallMapper.toCard(scryfallCard);
 
@@ -57,23 +59,16 @@ void toCard_mapsPowerAndToughness() {
 }
 ```
 
-(Note: `card.power()`/`card.toughness()` — record accessor style, matching every other field on `Card`. Every later task in this plan that reads power/toughness must call them this way, not `getPower()`.)
+(Note: `card.power()`/`card.toughness()` — record accessor style, matching every other field on `Card`. Every later task in this plan that reads power/toughness must call them this way, not `getPower()`. If any positional argument above doesn't type-check against the real constructor once you've read it, fix the test's argument list/types to match reality — the exact component list shown here is a best-effort snapshot, not guaranteed current.)
 
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `cd backend && ./mvnw test -Dtest=ScryfallMapperTest#toCard_mapsPowerAndToughness`
 Expected: FAIL — compile error, no `power`/`toughness` fields exist yet.
 
-- [ ] **Step 4: Add fields to `ScryfallCard`**
+- [ ] **Step 4: Add record components to `ScryfallCard` (and its `Face` sub-record)**
 
-In `ScryfallCard.java`, alongside the existing `type_line`/`mana_cost` fields, add:
-
-```java
-public String power;
-public String toughness;
-```
-
-(Use `String`, not a numeric type — Scryfall represents these as strings so values like `"*"` and `"1+*"` round-trip correctly.)
+`ScryfallCard` is a record — add `power` and `toughness` as two new trailing positional components on its canonical declaration (`String power, String toughness`, using `String` not a numeric type — Scryfall represents these as strings so values like `"*"` and `"1+*"` round-trip correctly). Also add the same two components to the nested `Face` record, since Scryfall puts power/toughness on individual `card_faces` entries for double-faced creature cards, matching how `type_line`/`mana_cost` already exist on `Face` for the same reason. Update every other existing construction of `ScryfallCard`/`Face` in the codebase (e.g. wherever the Scryfall JSON response is deserialized into this record — check for a Jackson `@JsonCreator`/constructor-binding setup) so it still compiles once the new components exist.
 
 - [ ] **Step 5: Add record components to `Card`**
 
