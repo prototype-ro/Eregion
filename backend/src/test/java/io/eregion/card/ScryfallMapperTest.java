@@ -56,7 +56,7 @@ class ScryfallMapperTest {
 				"Legendary Creature — Phyrexian Angel Horror", List.of("W", "U", "B", "G"),
 				List.of("W", "U", "B", "G"), "Flying", "c16", "Commander 2016", "10", "2016-11-11", "mythic",
 				"Victor Adame Minguez", new ScryfallCard.Prices("12.50", null, null),
-				new ImageUris("small.jpg", "normal.jpg", "art.jpg"), null, java.util.Map.of("commander", "legal"));
+				new ImageUris("small.jpg", "normal.jpg", "art.jpg"), null, java.util.Map.of("commander", "legal"), null, null);
 
 		Card card = ScryfallMapper.toCard(source);
 
@@ -83,7 +83,7 @@ class ScryfallMapperTest {
 		ScryfallCard source = new ScryfallCard(
 				"22222222-2222-2222-2222-222222222222", "Sol Ring", "{1}", 1.0, "Artifact", List.of(), List.of(),
 				"{T}: Add {C}{C}.", "cmd", "Commander 2011", "250", "2011-06-17", "uncommon", "Mark Tedin",
-				new ScryfallCard.Prices("1.10", null, null), new ImageUris("s.jpg", "n.jpg", "a.jpg"), null, null);
+				new ScryfallCard.Prices("1.10", null, null), new ImageUris("s.jpg", "n.jpg", "a.jpg"), null, null, null, null);
 		java.util.UUID cardId = java.util.UUID.randomUUID();
 
 		Printing printing = ScryfallMapper.toPrinting(source, cardId);
@@ -97,12 +97,12 @@ class ScryfallMapperTest {
 	@Test
 	void mapsADoubleFacedCardFromItsFrontFace() {
 		Face front = new Face("Delver of Secrets", "{U}", "Creature — Human Wizard", "At the beginning...",
-				"Artist One", new ImageUris("s.jpg", "n.jpg", "a.jpg"));
-		Face back = new Face("Insectile Aberration", "", "Creature — Human Insect", "Flying", "Artist One", null);
+				"Artist One", new ImageUris("s.jpg", "n.jpg", "a.jpg"), "1", "1");
+		Face back = new Face("Insectile Aberration", "", "Creature — Human Insect", "Flying", "Artist One", null, "3", "2");
 		ScryfallCard source = new ScryfallCard(
 				"11111111-1111-1111-1111-111111111111", "Delver of Secrets // Insectile Aberration", null, 1.0, null,
 				List.of(), List.of("U"), null, "isd", "Innistrad", "51", "2011-09-30", "common", null, null, null,
-				List.of(front, back), java.util.Map.of("commander", "banned"));
+				List.of(front, back), java.util.Map.of("commander", "banned"), null, null);
 
 		Card card = ScryfallMapper.toCard(source);
 
@@ -111,6 +111,8 @@ class ScryfallMapperTest {
 		assertThat(card.primaryType()).isEqualTo("Creature");
 		assertThat(card.artist()).isEqualTo("Artist One");
 		assertThat(card.imageSmall()).isEqualTo("s.jpg");
+		assertThat(card.power()).isEqualTo("1");
+		assertThat(card.toughness()).isEqualTo("1");
 	}
 
 	@Test
@@ -123,8 +125,21 @@ class ScryfallMapperTest {
 		assertThat(ScryfallMapper.commanderLegality(withLegalities(null))).isEqualTo("unknown");
 	}
 
+	@Test
+	void mapsPowerAndToughness() {
+		ScryfallCard source = new ScryfallCard(
+				"44444444-4444-4444-4444-444444444444", "Grizzly Bears", "{1}{G}", 2.0, "Creature — Bear",
+				List.of("G"), List.of("G"), "", "", "", "", "2000-01-01", "common", "", null, null, null,
+				java.util.Map.of(), "2", "2");
+
+		Card card = ScryfallMapper.toCard(source);
+
+		assertThat(card.power()).isEqualTo("2");
+		assertThat(card.toughness()).isEqualTo("2");
+	}
+
 	private static ScryfallCard withLegalities(java.util.Map<String, String> legalities) {
 		return new ScryfallCard("33333333-3333-3333-3333-333333333333", "X", "", 0.0, "Instant", List.of(), List.of(), "", "s", "S", "1",
-				"2020-01-01", "common", "A", null, null, null, legalities);
+				"2020-01-01", "common", "A", null, null, null, legalities, null, null);
 	}
 }

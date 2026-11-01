@@ -23,90 +23,85 @@
 
 ### Task 1: Add `power`/`toughness` to the card model
 
+**Corrected after discovery during execution:** this codebase has no JPA. `Card` (`backend/src/main/java/io/eregion/card/Card.java`) is an immutable **record** with 20 positional fields, accessed via bare-name accessors (`card.manaCost()`, not `getManaCost()`). Persistence is raw SQL via `JdbcClient` in `CardRepository.java`, against a table named `cards` (plural). There is also a compact legacy 20-arg constructor in `Card.java` used by some call sites — it needs a matching update too.
+
+**Further correction (discovered on a second attempt at this task):** `ScryfallCard` is also an immutable record, not a mutable POJO — snake_case positional components (`source.type_line()`, `source.mana_cost()`, etc.), built via its canonical constructor, no public mutable fields and no no-arg constructor. Its nested `Face` sub-record (used for double-faced-card fallback) also has no `power`/`toughness` today. Steps 2 and 4 below are corrected for this.
+
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/card/ScryfallCard.java`
 - Modify: `backend/src/main/java/io/eregion/card/Card.java`
 - Modify: `backend/src/main/java/io/eregion/card/ScryfallMapper.java`
+- Modify: `backend/src/main/java/io/eregion/card/CardRepository.java` (SQL columns, `map`, `upsert`)
 - Modify: `frontend/src/lib/types.ts`
 - Test: `backend/src/test/java/io/eregion/card/ScryfallMapperTest.java`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Read before writing**
 
-Add to `ScryfallMapperTest.java` (create the file if it doesn't exist yet — check first):
+Read `Card.java` in full (both the main record declaration and the legacy compact constructor), `ScryfallMapper.java` (the `toCard` method and the `colorString` helper), and `CardRepository.java` (`COLUMNS`, `map`, `upsert`) before changing anything — the exact field order matters because the record constructor is positional and several call sites build it that way.
+
+- [ ] **Step 2: Write the failing test**
+
+Add to `ScryfallMapperTest.java` (create the file if it doesn't exist yet — check first, follow the existing test style in `backend/src/test/java/io/eregion/card/` if other tests are there). Build `ScryfallCard` via its real positional canonical constructor — read `ScryfallCard.java` first to get the exact current component list/order (at last check: `id, name, mana_cost, cmc, type_line, colors, color_identity, oracle_text, set, set_name, collector_number, released_at, rarity, artist, prices, image_uris, card_faces, legalities`, plus the two new `power`/`toughness` components you add in Step 4 — confirm this hasn't drifted before writing the test), passing `null`/empty values for every component the test doesn't care about:
 
 ```java
 @Test
 void toCard_mapsPowerAndToughness() {
-    ScryfallCard scryfallCard = new ScryfallCard();
-    scryfallCard.name = "Grizzly Bears";
-    scryfallCard.type_line = "Creature — Bear";
-    scryfallCard.power = "2";
-    scryfallCard.toughness = "2";
+    ScryfallCard scryfallCard = new ScryfallCard(
+        null, "Grizzly Bears", null, null, "Creature — Bear",
+        List.of(), List.of(), null, null, null, null, null,
+        null, null, null, null, null, null,
+        "2", "2"); // power, toughness as the new trailing components — adjust position to match Step 4
 
     Card card = ScryfallMapper.toCard(scryfallCard);
 
-    assertThat(card.getPower()).isEqualTo("2");
-    assertThat(card.getToughness()).isEqualTo("2");
+    assertThat(card.power()).isEqualTo("2");
+    assertThat(card.toughness()).isEqualTo("2");
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+(Note: `card.power()`/`card.toughness()` — record accessor style, matching every other field on `Card`. Every later task in this plan that reads power/toughness must call them this way, not `getPower()`. If any positional argument above doesn't type-check against the real constructor once you've read it, fix the test's argument list/types to match reality — the exact component list shown here is a best-effort snapshot, not guaranteed current.)
+
+- [ ] **Step 3: Run test to verify it fails**
 
 Run: `cd backend && ./mvnw test -Dtest=ScryfallMapperTest#toCard_mapsPowerAndToughness`
-Expected: FAIL — compile error, `getPower()`/`getToughness()` don't exist on `Card`.
+Expected: FAIL — compile error, no `power`/`toughness` fields exist yet.
 
-- [ ] **Step 3: Add fields to `ScryfallCard`**
+- [ ] **Step 4: Add record components to `ScryfallCard` (and its `Face` sub-record)**
 
-In `ScryfallCard.java`, alongside the existing `type_line`/`mana_cost` fields, add:
+`ScryfallCard` is a record — add `power` and `toughness` as two new trailing positional components on its canonical declaration (`String power, String toughness`, using `String` not a numeric type — Scryfall represents these as strings so values like `"*"` and `"1+*"` round-trip correctly). Also add the same two components to the nested `Face` record, since Scryfall puts power/toughness on individual `card_faces` entries for double-faced creature cards, matching how `type_line`/`mana_cost` already exist on `Face` for the same reason. Update every other existing construction of `ScryfallCard`/`Face` in the codebase (e.g. wherever the Scryfall JSON response is deserialized into this record — check for a Jackson `@JsonCreator`/constructor-binding setup) so it still compiles once the new components exist.
 
-```java
-public String power;
-public String toughness;
-```
+- [ ] **Step 5: Add record components to `Card`**
 
-(Use `String`, not a numeric type — Scryfall represents these as strings so values like `"*"` and `"1+*"` round-trip correctly.)
+Add `power` and `toughness` as new positional components on the `Card` record, placed next to `typeLine`/`oracleText` in the declaration found in Step 1. Update the legacy compact constructor found in the same file to pass `null` (or empty string, matching whatever convention nearby optional-looking fields like `priceUsd`/`role` use) for these two new components, so it still compiles.
 
-- [ ] **Step 4: Add fields to `Card`**
+- [ ] **Step 6: Map the fields in `ScryfallMapper.toCard`**
 
-In `Card.java`, alongside the existing `manaCost`/`oracleText` columns, add:
+In `ScryfallMapper.java`, inside `toCard`, add `source.power()` / `source.toughness()` (or the DFC-front-face equivalent, matching exactly how `typeLine`/`manaCost` already pull from the main card vs. `card_faces[0]` for double-faced cards) as new positional arguments to the `new Card(...)` call, in the same position you added the components in Step 5.
 
-```java
-private String power;
-private String toughness;
+- [ ] **Step 7: Update `CardRepository` to persist and read the new columns**
 
-public String getPower() { return power; }
-public void setPower(String power) { this.power = power; }
+In `CardRepository.java`:
+- Add `power, toughness` to the `COLUMNS` constant.
+- In `upsert`, add `power`/`toughness` to the `INSERT INTO cards (...)` column list, the `VALUES (...)` list (`:power`, `:toughness`), the `ON CONFLICT ... DO UPDATE SET` list (`power = EXCLUDED.power, toughness = EXCLUDED.toughness`), and the `.param("power", card.power()).param("toughness", card.toughness())` calls.
+- In `map` (the `ResultSet` row mapper), add `rs.getString("power")` / `rs.getString("toughness")` as new positional arguments to `new Card(...)`, in the same position as Step 5.
 
-public String getToughness() { return toughness; }
-public void setToughness(String toughness) { this.toughness = toughness; }
-```
-
-Also add the corresponding `@Column` annotations matching the style of the existing fields in the same class (e.g. if `oracleText` uses `@Column(columnDefinition = "TEXT")`, mirror that for consistency — `power`/`toughness` are short strings so a plain `@Column` without a length override is fine).
-
-- [ ] **Step 5: Map the fields in `ScryfallMapper.toCard`**
-
-In `ScryfallMapper.java`, inside `toCard`, next to where `manaCost`/`oracleText` are set on the `Card`, add:
-
-```java
-card.setPower(scryfallCard.power);
-card.setToughness(scryfallCard.toughness);
-```
-
-- [ ] **Step 6: Run test to verify it passes**
+- [ ] **Step 8: Run test to verify it passes**
 
 Run: `cd backend && ./mvnw test -Dtest=ScryfallMapperTest#toCard_mapsPowerAndToughness`
 Expected: PASS
 
-- [ ] **Step 7: Add a DB migration**
+- [ ] **Step 9: Add a DB migration**
 
-Find the existing migration directory (e.g. `backend/src/main/resources/db/migration/`) and check the latest `V*.sql` file to find the next version number. Create `V<next>__add_power_toughness_to_card.sql`:
+Check `backend/src/main/resources/db/migration/` for the latest `V*.sql` version (at last check: `V22__lore_doc.sql` was the latest — confirm this is still true before picking the next number). Create `V<next>__add_power_toughness_to_cards.sql`:
 
 ```sql
-ALTER TABLE card ADD COLUMN power VARCHAR(16);
-ALTER TABLE card ADD COLUMN toughness VARCHAR(16);
+ALTER TABLE cards ADD COLUMN power VARCHAR(16);
+ALTER TABLE cards ADD COLUMN toughness VARCHAR(16);
 ```
 
-- [ ] **Step 8: Mirror the fields on the frontend type**
+(Table is `cards`, plural — confirmed against `V1__init.sql` and every query in `CardRepository.java`.)
+
+- [ ] **Step 10: Mirror the fields on the frontend type**
 
 In `frontend/src/lib/types.ts`, inside the `Card` interface, alongside `manaCost`/`oracleText`, add:
 
@@ -115,12 +110,17 @@ power?: string;
 toughness?: string;
 ```
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 11: Fix any other `new Card(...)` call sites**
+
+Search the whole backend for other positional `new Card(` construction (tests, fixtures, other repositories) and update them to match the new field order from Step 5. Run the full test suite (`cd backend && ./mvnw test`) to confirm nothing else broke.
+
+- [ ] **Step 12: Commit**
 
 ```bash
 git add backend/src/main/java/io/eregion/card/ScryfallCard.java \
         backend/src/main/java/io/eregion/card/Card.java \
         backend/src/main/java/io/eregion/card/ScryfallMapper.java \
+        backend/src/main/java/io/eregion/card/CardRepository.java \
         backend/src/test/java/io/eregion/card/ScryfallMapperTest.java \
         backend/src/main/resources/db/migration \
         frontend/src/lib/types.ts
@@ -129,201 +129,234 @@ git commit -m "Add power/toughness to the card model"
 
 ---
 
-### Task 2: `DeckFrameSettings` entity, repository, and endpoint
+### Task 2: `DeckFrameSettings` row, repository, and endpoint
+
+**Corrected after discovery during execution:** no JPA in this codebase. The deck table is `decks` (plural), primary key `UUID`, with no standalone `Deck.java` — the row shape lives as a nested record inside `DeckRepository` (`DeckRow`), and persistence goes through `JdbcClient` with raw SQL. Auth follows a `@AuthenticationPrincipal Jwt jwt` + `CurrentUser.id(jwt)` pattern, and deck-scoped writes go through a service method that checks ownership (see `DeckService.setFlags`, which calls `owned(deckId, userId)` before writing). Follow that exact shape — a one-row-per-deck settings table, same as `V8__deck_flags.sql`'s `pinned`/`archived` columns added directly to `decks`, or a separate table if you prefer (this plan uses a separate table since it's several text fields, following the pattern of `ProxyRepository`'s per-deck lore row — check `ProxyRepository.java` for that upsert style before writing this task's repository).
 
 **Files:**
-- Create: `backend/src/main/java/io/eregion/render/DeckFrameSettings.java`
 - Create: `backend/src/main/java/io/eregion/render/DeckFrameSettingsRepository.java`
+- Create: `backend/src/main/java/io/eregion/render/DeckFrameSettingsService.java`
 - Create: `backend/src/main/java/io/eregion/render/DeckFrameSettingsController.java`
+- Create: `backend/src/main/java/io/eregion/render/DeckRenderTrigger.java` (stub for now, real logic in Task 8)
 - Test: `backend/src/test/java/io/eregion/render/DeckFrameSettingsControllerTest.java`
 - Migration: `backend/src/main/resources/db/migration/V<next>__create_deck_frame_settings.sql`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Read before writing**
+
+Read `DeckRepository.java` (JdbcClient patterns, `DeckRow`), `DeckService.java` (the `owned(deckId, userId)` method and `setFlags` for the service-layer shape), `DeckController.java` (the `@AuthenticationPrincipal Jwt jwt` / `CurrentUser.id(jwt)` controller pattern, e.g. the `flags` endpoint), and `ProxyRepository.java` (an existing upsert-style per-deck settings row, for text fields rather than booleans) before writing any code in this task. Mirror these exactly — don't invent a different auth or persistence style.
+
+- [ ] **Step 2: Write the failing test**
+
+Follow whatever test style `DeckControllerTest` (or similar) already uses for an authenticated `MockMvc` request against a deck the test user owns — including how it creates a test deck and supplies a JWT/principal. Shape of the test:
 
 ```java
-package io.eregion.render;
+@Test
+void putThenGet_roundTripsSettings() throws Exception {
+    // Create a deck owned by the test user (follow the exact helper/pattern
+    // used by existing deck controller tests for this).
 
-import io.eregion.deck.DeckRepository;
-import io.eregion.deck.Deck;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.web.servlet.MockMvc;
+    mockMvc.perform(put("/api/decks/" + deckId + "/frame-settings")
+            .with(/* same auth setup existing deck tests use */)
+            .contentType("application/json")
+            .content("""
+                {"artistName":"Jane Doe","collectionCode":"ERG","frameFamily":"m15"}
+                """))
+        .andExpect(status().isOk());
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-@SpringBootTest
-@AutoConfigureMockMvc
-class DeckFrameSettingsControllerTest {
-
-    @Autowired MockMvc mockMvc;
-    @Autowired DeckRepository deckRepository;
-    @Autowired DeckFrameSettingsRepository frameSettingsRepository;
-
-    @Test
-    void putThenGet_roundTripsSettings() throws Exception {
-        Deck deck = deckRepository.save(new Deck("Test Deck"));
-
-        mockMvc.perform(put("/api/decks/" + deck.getId() + "/frame-settings")
-                .contentType("application/json")
-                .content("""
-                    {"artistName":"Jane Doe","collectionCode":"ERG","frameFamily":"m15"}
-                    """))
-            .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/decks/" + deck.getId() + "/frame-settings"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.artistName").value("Jane Doe"))
-            .andExpect(jsonPath("$.collectionCode").value("ERG"))
-            .andExpect(jsonPath("$.frameFamily").value("m15"));
-    }
+    mockMvc.perform(get("/api/decks/" + deckId + "/frame-settings")
+            .with(/* same auth setup */))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.artistName").value("Jane Doe"))
+        .andExpect(jsonPath("$.collectionCode").value("ERG"))
+        .andExpect(jsonPath("$.frameFamily").value("m15"));
 }
 ```
 
-(Adjust the `Deck` constructor call to match whatever constructor/builder the existing `Deck` entity actually exposes — check `backend/src/main/java/io/eregion/deck/Deck.java` before writing this step for real, since the plan author has not verified its exact signature.)
-
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 3: Run test to verify it fails**
 
 Run: `cd backend && ./mvnw test -Dtest=DeckFrameSettingsControllerTest`
-Expected: FAIL — compile error, `DeckFrameSettings`/repository/controller don't exist.
+Expected: FAIL — repository/service/controller don't exist.
 
-- [ ] **Step 3: Create the entity**
+- [ ] **Step 4: Add the migration**
+
+Check the latest `V*.sql` version (last known: `V22__lore_doc.sql`), then create `V<next>__create_deck_frame_settings.sql`:
+
+```sql
+CREATE TABLE deck_frame_settings (
+    deck_id UUID PRIMARY KEY REFERENCES decks(id),
+    artist_name VARCHAR(255),
+    collection_code VARCHAR(16),
+    frame_family VARCHAR(64) NOT NULL DEFAULT 'm15'
+);
+```
+
+- [ ] **Step 5: Create the repository**
+
+Following `ProxyRepository`'s upsert style (read it first — mirror its exact `JdbcClient` SQL shape for an upsert-by-deck-id row), implement:
 
 ```java
 package io.eregion.render;
 
-import jakarta.persistence.*;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
 
-@Entity
-@Table(name = "deck_frame_settings")
-public class DeckFrameSettings {
+import java.util.Optional;
+import java.util.UUID;
 
-    @Id
-    private Long deckId;
+@Repository
+public class DeckFrameSettingsRepository {
 
-    private String artistName;
-    private String collectionCode;
-    private String frameFamily;
+    public record FrameSettingsRow(UUID deckId, String artistName, String collectionCode, String frameFamily) {}
 
-    protected DeckFrameSettings() {}
+    private final JdbcClient jdbc;
 
-    public DeckFrameSettings(Long deckId, String artistName, String collectionCode, String frameFamily) {
-        this.deckId = deckId;
-        this.artistName = artistName;
-        this.collectionCode = collectionCode;
-        this.frameFamily = frameFamily;
+    public DeckFrameSettingsRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
     }
 
-    public Long getDeckId() { return deckId; }
-    public String getArtistName() { return artistName; }
-    public void setArtistName(String artistName) { this.artistName = artistName; }
-    public String getCollectionCode() { return collectionCode; }
-    public void setCollectionCode(String collectionCode) { this.collectionCode = collectionCode; }
-    public String getFrameFamily() { return frameFamily; }
-    public void setFrameFamily(String frameFamily) { this.frameFamily = frameFamily; }
+    public Optional<FrameSettingsRow> findByDeckId(UUID deckId) {
+        return jdbc.sql("SELECT deck_id, artist_name, collection_code, frame_family FROM deck_frame_settings WHERE deck_id = :deckId")
+            .param("deckId", deckId)
+            .query((rs, n) -> new FrameSettingsRow(
+                rs.getObject("deck_id", UUID.class), rs.getString("artist_name"),
+                rs.getString("collection_code"), rs.getString("frame_family")))
+            .optional();
+    }
+
+    public FrameSettingsRow upsert(UUID deckId, String artistName, String collectionCode, String frameFamily) {
+        return jdbc.sql("""
+                INSERT INTO deck_frame_settings (deck_id, artist_name, collection_code, frame_family)
+                VALUES (:deckId, :artistName, :collectionCode, :frameFamily)
+                ON CONFLICT (deck_id) DO UPDATE SET
+                    artist_name = EXCLUDED.artist_name,
+                    collection_code = EXCLUDED.collection_code,
+                    frame_family = EXCLUDED.frame_family
+                RETURNING deck_id, artist_name, collection_code, frame_family
+                """)
+            .param("deckId", deckId).param("artistName", artistName)
+            .param("collectionCode", collectionCode).param("frameFamily", frameFamily)
+            .query((rs, n) -> new FrameSettingsRow(
+                rs.getObject("deck_id", UUID.class), rs.getString("artist_name"),
+                rs.getString("collection_code"), rs.getString("frame_family")))
+            .single();
+    }
 }
 ```
 
-(`deckId` is the primary key — one settings row per deck, no separate surrogate key needed.)
+- [ ] **Step 6: Create the service**
 
-- [ ] **Step 4: Create the repository**
+Mirror `DeckService.setFlags`'s shape exactly — call the same ownership-check helper (`owned(deckId, userId)`, found in Step 1) before writing:
 
 ```java
 package io.eregion.render;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Service;
 
-public interface DeckFrameSettingsRepository extends JpaRepository<DeckFrameSettings, Long> {
-}
-```
+import java.util.UUID;
 
-- [ ] **Step 5: Create the controller**
-
-```java
-package io.eregion.render;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-@RestController
-@RequestMapping("/api/decks/{deckId}/frame-settings")
-public class DeckFrameSettingsController {
+@Service
+public class DeckFrameSettingsService {
 
     private final DeckFrameSettingsRepository repository;
     private final DeckRenderTrigger renderTrigger;
+    // inject whatever DeckService uses for the ownership check (likely DeckRepository,
+    // or DeckService itself if its `owned` method is accessible) — match Step 1's finding.
 
-    public DeckFrameSettingsController(DeckFrameSettingsRepository repository, DeckRenderTrigger renderTrigger) {
+    public DeckFrameSettingsService(DeckFrameSettingsRepository repository, DeckRenderTrigger renderTrigger /*, ownership dependency */) {
         this.repository = repository;
         this.renderTrigger = renderTrigger;
     }
 
     public record FrameSettingsRequest(String artistName, String collectionCode, String frameFamily) {}
 
-    @GetMapping
-    public ResponseEntity<DeckFrameSettings> get(@PathVariable Long deckId) {
-        return repository.findById(deckId)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.ok(new DeckFrameSettings(deckId, null, null, "m15")));
+    public DeckFrameSettingsRepository.FrameSettingsRow get(UUID deckId, UUID userId) {
+        // owned(deckId, userId); — call the real ownership check here
+        return repository.findByDeckId(deckId)
+            .orElse(new DeckFrameSettingsRepository.FrameSettingsRow(deckId, null, null, "m15"));
     }
 
-    @PutMapping
-    public ResponseEntity<DeckFrameSettings> put(@PathVariable Long deckId, @RequestBody FrameSettingsRequest request) {
-        DeckFrameSettings settings = new DeckFrameSettings(
-            deckId, request.artistName(), request.collectionCode(), request.frameFamily());
-        DeckFrameSettings saved = repository.save(settings);
+    public DeckFrameSettingsRepository.FrameSettingsRow save(UUID deckId, UUID userId, FrameSettingsRequest request) {
+        // owned(deckId, userId); — call the real ownership check here
+        DeckFrameSettingsRepository.FrameSettingsRow saved =
+            repository.upsert(deckId, request.artistName(), request.collectionCode(), request.frameFamily());
         renderTrigger.rerenderDeck(deckId);
-        return ResponseEntity.ok(saved);
+        return saved;
     }
 }
 ```
 
-`DeckRenderTrigger` is created in Task 8 — for now, create a placeholder so this compiles:
+- [ ] **Step 7: Create the controller**
+
+Mirror `DeckController`'s `flags` endpoint exactly for the `@AuthenticationPrincipal Jwt jwt` / `CurrentUser.id(jwt)` pattern:
+
+```java
+package io.eregion.render;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/decks/{deckId}/frame-settings")
+public class DeckFrameSettingsController {
+
+    private final DeckFrameSettingsService service;
+
+    public DeckFrameSettingsController(DeckFrameSettingsService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public DeckFrameSettingsRepository.FrameSettingsRow get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+        return service.get(deckId, CurrentUser.id(jwt));
+    }
+
+    @PutMapping
+    public DeckFrameSettingsRepository.FrameSettingsRow put(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId,
+        @RequestBody DeckFrameSettingsService.FrameSettingsRequest request
+    ) {
+        return service.save(deckId, CurrentUser.id(jwt), request);
+    }
+}
+```
+
+(Confirm `CurrentUser`'s exact package/import from `DeckController.java` — use that import, don't guess the package.)
+
+- [ ] **Step 8: Create the `DeckRenderTrigger` stub**
 
 ```java
 package io.eregion.render;
 
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 public class DeckRenderTrigger {
-    public void rerenderDeck(Long deckId) {
+    public void rerenderDeck(UUID deckId) {
         // Replaced with real rendering logic in Task 8.
     }
 }
 ```
 
-- [ ] **Step 6: Add the migration**
-
-Check the latest `V*.sql` version number, then create `V<next>__create_deck_frame_settings.sql`:
-
-```sql
-CREATE TABLE deck_frame_settings (
-    deck_id BIGINT PRIMARY KEY REFERENCES deck(id),
-    artist_name VARCHAR(255),
-    collection_code VARCHAR(16),
-    frame_family VARCHAR(64)
-);
-```
-
-(Confirm the existing `deck` table's actual name/PK column by checking its migration file before running this — adjust `REFERENCES deck(id)` if it differs.)
-
-- [ ] **Step 7: Run test to verify it passes**
+- [ ] **Step 9: Run test to verify it passes**
 
 Run: `cd backend && ./mvnw test -Dtest=DeckFrameSettingsControllerTest`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add backend/src/main/java/io/eregion/render/DeckFrameSettings.java \
-        backend/src/main/java/io/eregion/render/DeckFrameSettingsRepository.java \
+git add backend/src/main/java/io/eregion/render/DeckFrameSettingsRepository.java \
+        backend/src/main/java/io/eregion/render/DeckFrameSettingsService.java \
         backend/src/main/java/io/eregion/render/DeckFrameSettingsController.java \
         backend/src/main/java/io/eregion/render/DeckRenderTrigger.java \
         backend/src/test/java/io/eregion/render/DeckFrameSettingsControllerTest.java \
         backend/src/main/resources/db/migration
-git commit -m "Add DeckFrameSettings entity, repository, and endpoint"
+git commit -m "Add DeckFrameSettings row, repository, service, and endpoint"
 ```
 
 ---
@@ -474,6 +507,8 @@ git commit -m "Add Frame settings tab to the deck builder"
 
 ### Task 4: Frame selection engine (pure function)
 
+**Corrected after discovery during execution:** `Card.colors()`/`colorIdentity()` are **not** a `Set<String>` — they're a compact string in fixed WUBRG order (e.g. `"WU"`, `"G"`, `""`), produced by `ScryfallMapper.colorString`. `FrameSelector.select` must take that `String colors` form directly (its length gives the color count; iterate its characters for per-color treatment) rather than a `Set`.
+
 **Files:**
 - Create: `backend/src/main/java/io/eregion/render/FrameSelection.java`
 - Create: `backend/src/main/java/io/eregion/render/FrameSelector.java`
@@ -485,7 +520,6 @@ git commit -m "Add Frame settings tab to the deck builder"
 package io.eregion.render;
 
 import org.junit.jupiter.api.Test;
-import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -497,7 +531,7 @@ class FrameSelectorTest {
     @Test
     void monoColorCreature_selectsColorBorder() {
         FrameSelection selection = selector.select(
-            "Creature — Bear", Set.of("G"), "m15", "Grizzly Bears", null);
+            "Creature — Bear", "G", "m15", "Grizzly Bears", null);
 
         assertThat(selection.templateSlot()).isEqualTo("creature");
         assertThat(selection.borderTreatment()).isEqualTo("mono-G");
@@ -508,7 +542,7 @@ class FrameSelectorTest {
     @Test
     void multicolorCard_selectsGoldBorder() {
         FrameSelection selection = selector.select(
-            "Creature — Angel", Set.of("W", "U"), "m15", "Alela", null);
+            "Creature — Angel", "WU", "m15", "Alela", null);
 
         assertThat(selection.borderTreatment()).isEqualTo("multicolor");
     }
@@ -516,7 +550,7 @@ class FrameSelectorTest {
     @Test
     void colorlessNonArtifactNonLand_selectsColorlessBorder() {
         FrameSelection selection = selector.select(
-            "Creature — Eldrazi", Set.of(), "m15", "Emrakul", null);
+            "Creature — Eldrazi", "", "m15", "Emrakul", null);
 
         assertThat(selection.borderTreatment()).isEqualTo("colorless");
     }
@@ -524,7 +558,7 @@ class FrameSelectorTest {
     @Test
     void artifactType_selectsArtifactBorderRegardlessOfColor() {
         FrameSelection selection = selector.select(
-            "Artifact — Equipment", Set.of("R"), "m15", "Sword", null);
+            "Artifact — Equipment", "R", "m15", "Sword", null);
 
         assertThat(selection.templateSlot()).isEqualTo("artifact");
         assertThat(selection.borderTreatment()).isEqualTo("artifact");
@@ -533,7 +567,7 @@ class FrameSelectorTest {
     @Test
     void landType_selectsLandTemplate() {
         FrameSelection selection = selector.select(
-            "Basic Land — Forest", Set.of(), "m15", "Forest", null);
+            "Basic Land — Forest", "", "m15", "Forest", null);
 
         assertThat(selection.templateSlot()).isEqualTo("land");
     }
@@ -541,7 +575,7 @@ class FrameSelectorTest {
     @Test
     void nicknamePresent_usesNicknameAsTitleAndNameAsSubtitle() {
         FrameSelection selection = selector.select(
-            "Creature — Bear", Set.of("G"), "m15", "Grizzly Bears", "Ashcrown the Devourer");
+            "Creature — Bear", "G", "m15", "Grizzly Bears", "Ashcrown the Devourer");
 
         assertThat(selection.title()).isEqualTo("Ashcrown the Devourer");
         assertThat(selection.subtitle()).isEqualTo("Grizzly Bears");
@@ -552,7 +586,7 @@ class FrameSelectorTest {
         FrameSelector selectorWithoutFamily = new FrameSelector(Set.of()); // no families support planeswalker
 
         FrameSelection selection = selectorWithoutFamily.select(
-            "Legendary Planeswalker — Jace", Set.of("U"), "nonexistent-family", "Jace", null);
+            "Legendary Planeswalker — Jace", "U", "nonexistent-family", "Jace", null);
 
         assertThat(selection.frameFamily()).isEqualTo(FrameSelector.DEFAULT_FAMILY);
     }
@@ -596,7 +630,7 @@ public class FrameSelector {
     }
 
     public FrameSelection select(
-        String typeLine, Set<String> colors, String requestedFamily, String name, String nickname
+        String typeLine, String colors, String requestedFamily, String name, String nickname
     ) {
         String templateSlot = resolveTemplateSlot(typeLine);
         String borderTreatment = resolveBorderTreatment(typeLine, colors);
@@ -622,12 +656,12 @@ public class FrameSelector {
         return "other";
     }
 
-    private String resolveBorderTreatment(String typeLine, Set<String> colors) {
+    private String resolveBorderTreatment(String typeLine, String colors) {
         String lower = typeLine.toLowerCase();
         if (lower.contains("land")) return "land";
         if (lower.contains("artifact")) return "artifact";
-        if (colors.size() >= 2) return "multicolor";
-        if (colors.size() == 1) return "mono-" + colors.iterator().next();
+        if (colors.length() >= 2) return "multicolor";
+        if (colors.length() == 1) return "mono-" + colors.charAt(0);
         return "colorless";
     }
 }
@@ -653,159 +687,160 @@ git commit -m "Add pure frame-selection engine"
 
 This task has no automated test — it's asset acquisition and a data-conversion script, verified by manual inspection.
 
+**Corrected after discovery during execution:** the user already has a local CardConjurer checkout at `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer` (a fork of `Investigamer/cardconjurer`, kept locally for **personal/local use only** — this fork has no LICENSE file, and its own README explains the original hosted CardConjurer was taken down by a Wizards of the Coast cease-and-desist over exactly this asset category. The user has explicitly decided to proceed anyway, for personal/local use, accepting that posture — don't re-litigate this decision or re-raise the license question; just don't publish/distribute these assets anywhere beyond this private local use). No cloning needed — read directly from that local path.
+
 **Files:**
-- Create: `backend/src/main/resources/frames/m15/` (frame/symbol images)
+- Create: `backend/src/main/resources/frames/m15/` (frame/symbol images, copied from the local CardConjurer checkout)
 - Create: `backend/src/main/resources/frames/m15/layout.json`
 - Create: `scripts/convert-cardconjurer-layout.mjs` (one-time conversion helper, not part of the running app)
 
-- [ ] **Step 1: Check CardConjurer's license**
+**Confirmed source paths (from direct inspection of the local checkout):**
+- Frame border PNGs: `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/img/frames/m15/regular/` — `m15FrameW.png` (white), `m15FrameU.png` (blue), `m15FrameB.png` (black), `m15FrameR.png` (red), `m15FrameG.png` (green), `m15FrameM.png` (multicolor/gold), `m15FrameA.png` (artifact — also doubles as the colorless border, since there's no separate standalone colorless frame), `m15FrameL.png` (land).
+- P/T box PNGs, same directory: `m15PT{W,U,B,R,G,M,A,C,V}.png` (use `m15PTC.png` for the colorless P/T box).
+- Mana symbol SVGs: `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/img/manaSymbols/` — `w.svg`, `u.svg`, `b.svg`, `r.svg`, `g.svg`, and `0.svg` through `20.svg` for generic costs.
+- Layout/coordinate source: `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/js/frames/packM15Regular-1.js` — defines, as **fractional (0–1) coordinates relative to the card canvas** (not pixels): `card.artBounds`, `card.setSymbolBounds`, `card.watermarkBounds`, and a `loadTextOptions({...})` call with keys `mana`, `title`, `type`, `rules`, `pt`, each an `{x, y, width, height, ...}` object in the same 0–1 fractional scheme. Canvas base size is defined in `/Users/rodgz_mac/Developer/MTG-CardMaker/assets/cardconjurer/js/creator-23.js` (`baseWidth`/`baseHeight` constants, with a high-res export path using 2010×2814 — matches this plan's `FrameLayout.CARD_WIDTH`/`CARD_HEIGHT`). The artist/set/collector-number line is defined separately in `creator-23.js` (shared across frames, not per-pack), a `midLeft` text template around `x:0.0647, y:0.9548, width:0.8707, height:0.0171`.
+- The land frame pack (`js/frames/packM15*.js` — find the land-specific one, likely `packM15Lands-*.js` or similar; list the directory to find it) has its own coordinate overrides for the land template slot — check it for any land-specific art-box/title differences rather than assuming the regular pack's numbers apply unchanged to land.
 
-Clone or fetch the CardConjurer repository (the open-source project this plan reuses assets from) and read its `LICENSE` file. Confirm it permits bundling/redistributing the asset pack inside this project. If it does not, stop and flag this to the user before proceeding — do not bundle assets under an incompatible license.
+**Important: these coordinates are fractions (0.0–1.0), not pixels.** `layout.json` should store them as fractions too — don't pre-multiply by canvas size here, since Task 7's `FrameLayout`/`FrameLayoutLoader` is responsible for converting fraction → pixel `Rectangle` against `FrameLayout.CARD_WIDTH`/`CARD_HEIGHT`. (If you're implementing this task before Task 7 exists yet, just be consistent: store fractions, document that choice in a comment at the top of `layout.json` or this task's commit message, since Task 7 depends on it.)
 
-- [ ] **Step 2: Copy the M15 frame family assets**
+- [ ] **Step 1: Copy the frame assets**
 
-From the CardConjurer repo, copy its M15 frame images (border images per color/border-treatment, per the `borderTreatment` values produced by `FrameSelector`: `mono-W`, `mono-U`, `mono-B`, `mono-R`, `mono-G`, `multicolor`, `colorless`, `artifact`, `land`) and its mana symbol icon set into `backend/src/main/resources/frames/m15/`. Use consistent filenames, e.g. `border-mono-G.png`, `symbol-mana-G.png`, `symbol-mana-generic.png`, etc.
+Copy the border PNGs and P/T box PNGs listed above into `backend/src/main/resources/frames/m15/`, renamed to match `FrameSelector`'s `borderTreatment` values: `border-mono-W.png`, `border-mono-U.png`, `border-mono-B.png`, `border-mono-R.png`, `border-mono-G.png`, `border-multicolor.png` (from `m15FrameM.png`), `border-colorless.png` (from `m15FrameA.png`), `border-artifact.png` (also from `m15FrameA.png` — same file copied twice under two names is fine, since `FrameSelector` treats artifact and colorless as separate border-treatment values today even though CardConjurer uses one frame image for both), `border-land.png` (from `m15FrameL.png`). Also copy the mana symbol SVGs into `backend/src/main/resources/frames/m15/mana/` keeping their original filenames (`w.svg`, `u.svg`, etc.) — this plan's compositing step (Task 7) doesn't actually render mana-cost icons yet (it's a documented follow-up), so exact integration isn't needed now, just get the files in place.
 
-- [ ] **Step 3: Write the layout conversion script**
+- [ ] **Step 2: Write the layout conversion script**
 
-CardConjurer defines where each layer (art box, title text, mana cost, type line, rules box, P/T box) sits as pixel coordinates in its own JS template data. Write a small Node script that reads that template data and emits our own flat JSON format:
+Read `packM15Regular-1.js` directly (it's plain JS, not JSON — you'll need to read the relevant `card.artBounds = {...}`/`loadTextOptions({...})` assignments as text and manually transcribe their fractional values, since this isn't parseable as a standalone JSON blob). Write `scripts/convert-cardconjurer-layout.mjs` as a script that just emits the hand-transcribed values as JSON (a "script" in name, but realistically a static data file generator, since the source isn't machine-parseable JSON) — or, simpler and equally acceptable: skip the script and hand-write `backend/src/main/resources/frames/m15/layout.json` directly, documenting in a comment-adjacent README or the commit message which source file/line each value was transcribed from. Either approach is fine; don't over-engineer a general-purpose JS-template parser for a one-time transcription of ~6 template slots.
 
-```javascript
-// scripts/convert-cardconjurer-layout.mjs
-// Usage: node scripts/convert-cardconjurer-layout.mjs <path-to-cardconjurer-template.js> <output-path>
-//
-// Reads CardConjurer's template layout definition and re-emits it as a flat
-// JSON file our Java compositor can load directly, keyed by templateSlot.
-import fs from "node:fs";
+Target `layout.json` shape — one entry per `templateSlot` (`creature`, `land`, `artifact`, `enchantment`, `instant`, `sorcery`, `planeswalker`, `other`), each with fractional `{x, y, width, height}` regions for: `artBox` (from `card.artBounds`), `titleText` (from `loadTextOptions(...).title`), `manaCostArea` (from `.mana`), `typeLineText` (from `.type`), `rulesTextBox` (from `.rules`), `ptBox` (from `.pt`, creature/planeswalker slots only), `artistCredit`/`collectorInfo` (from the shared `midLeft` template in `creator-23.js`), `setSymbol` (from `card.setSymbolBounds`). For slots without a distinct CardConjurer pack of their own (`enchantment`, `instant`, `sorcery`, `other`), reuse the regular M15 pack's non-creature-specific regions (everything except `ptBox`, which those slots omit).
 
-const [, , inputPath, outputPath] = process.argv;
-const raw = fs.readFileSync(inputPath, "utf-8");
+- [ ] **Step 3: Inspect the output**
 
-// CardConjurer's template file assigns its layout object to a known variable;
-// inspect the actual file to find that variable name before writing the
-// extraction regex/eval below — this is intentionally left to be filled in
-// against the real file, since its exact shape is unknown until Step 1's
-// clone happens.
-throw new Error("Inspect the cloned CardConjurer template file's structure, then implement extraction here.");
-```
+Open the resulting `layout.json` and sanity-check: every value is between 0 and 1, every templateSlot from `FrameSelector.resolveTemplateSlot`'s possible outputs has an entry, and the numbers look plausible (e.g. `artBox` roughly in the top 40-50% of the card, `rulesTextBox` roughly in the bottom-middle third).
 
-- [ ] **Step 4: Run the script against the real CardConjurer template and inspect output**
-
-Run: `node scripts/convert-cardconjurer-layout.mjs <path> backend/src/main/resources/frames/m15/layout.json`
-
-Manually open the resulting `layout.json` and confirm it has one entry per `templateSlot` (`creature`, `land`, `artifact`, `enchantment`, `instant`, `sorcery`, `planeswalker`, `other`) with pixel rectangles for: `artBox`, `titleText`, `manaCostArea`, `typeLineText`, `rulesTextBox`, `ptBox` (creature only), `artistCredit`, `collectorInfo`, `setSymbol`.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add backend/src/main/resources/frames/m15 scripts/convert-cardconjurer-layout.mjs
-git commit -m "Add M15 frame assets and layout data from CardConjurer"
+git commit -m "Add M15 frame assets and layout data from the local CardConjurer checkout"
 ```
 
 ---
 
-### Task 6: `CardRender` entity, repository, and image endpoint
+### Task 6: `CardRender` row, repository, and image endpoint
+
+**Corrected after discovery during execution:** no JPA. `cards.id` is `UUID` (confirmed in `CardRepository`/migrations), persistence is `JdbcClient` raw SQL, Postgres is the real dialect (confirmed via `now()`, `ILIKE` usage elsewhere) so `BYTEA` is correct for image bytes.
+
+**Further correction (found by code review after an initial implementation):** a `card_renders` table keyed only by `card_id` is a privacy and correctness bug. Rendered images carry per-deck private data (uploaded art, nicknames) — keying by `card_id` alone means (a) two different decks rendering the same base card stomp each other's row, and (b) a public, unauthenticated `GET` by card id would leak one user's private deck art/nickname to anyone who guesses a card's UUID. Fixed by keying `card_renders` by `(deck_id, card_id)` and adding the same owner-or-public-deck visibility check that `CustomPrintingRepository.imageFor` already uses for custom art (read that method first — in `backend/src/main/java/io/eregion/custom/CustomPrintingRepository.java`, `imageFor(UUID id, UUID viewerId)` — and mirror its exact `cp.user_id = :viewer OR EXISTS (SELECT 1 FROM decks d JOIN deck_version_cards dc ON dc.version_id = d.published_version_id WHERE d.visibility = 'public' AND ...)` shape, adapted to join through `decks` directly by `deck_id` since `card_renders` already carries that column — no need to join through `deck_version_cards`/`custom_printings` the way the art lookup does).
 
 **Files:**
-- Create: `backend/src/main/java/io/eregion/render/CardRender.java`
 - Create: `backend/src/main/java/io/eregion/render/CardRenderRepository.java`
 - Create: `backend/src/main/java/io/eregion/render/CardRenderController.java`
 - Test: `backend/src/test/java/io/eregion/render/CardRenderControllerTest.java`
-- Migration: `backend/src/main/resources/db/migration/V<next>__create_card_render.sql`
+- Migration: `backend/src/main/resources/db/migration/V<next>__create_card_renders.sql`
 
 - [ ] **Step 1: Write the failing test**
 
+Follow the `PostgresTest`-base-class + hand-wired-real-objects convention established in Tasks 2/6 (no MockMvc exists anywhere in this codebase — confirmed repeatedly). The test needs: a real `decks` row (owned by a test user), a real `cards` row (for the FK), and an `@AuthenticationPrincipal Jwt`-equivalent viewer id to exercise both the owner-can-read and stranger-cannot-read-a-private-deck's-render paths:
+
 ```java
-package io.eregion.render;
+@Test
+void getImage_ownerCanReadPrivateDeckRender() {
+    // create a deck owned by userA, a card, insert a render row for (deck.id, card.id)
+    // call controller.getImage(jwtFor(userA), deck.id, card.id) -> 200, correct bytes
+}
 
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.web.servlet.MockMvc;
+@Test
+void getImage_strangerCannotReadPrivateDeckRender() {
+    // same setup, but call controller.getImage(jwtFor(userB)/* or null */, deck.id, card.id) -> 404
+}
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@Test
+void getImage_anyoneCanReadPublicDeckRender() {
+    // deck.visibility = 'public' (and has a published_version_id, per the decks_public_needs_version
+    // constraint — check V5__public_decks.sql for exactly what that requires), render row present,
+    // call controller.getImage(null, deck.id, card.id) -> 200
+}
 
-@SpringBootTest
-@AutoConfigureMockMvc
-class CardRenderControllerTest {
-
-    @Autowired MockMvc mockMvc;
-    @Autowired CardRenderRepository repository;
-
-    @Test
-    void getImage_returnsStoredPng() throws Exception {
-        byte[] fakePng = new byte[] { (byte) 0x89, 'P', 'N', 'G' };
-        CardRender render = new CardRender(1L, fakePng, "hash-123");
-        repository.save(render);
-
-        mockMvc.perform(get("/api/cards/1/render/image"))
-            .andExpect(status().isOk())
-            .andExpect(content().contentType("image/png"))
-            .andExpect(content().bytes(fakePng));
-    }
-
-    @Test
-    void getImage_missingRender_returns404() throws Exception {
-        mockMvc.perform(get("/api/cards/999/render/image"))
-            .andExpect(status().isNotFound());
-    }
+@Test
+void getImage_missingRender_returns404() {
+    // no render row for (deck.id, card.id) -> 404, regardless of viewer
 }
 ```
+(Treat these as the required behaviors, not literal copy-paste code — adapt to this codebase's actual test-fixture helpers for creating a deck/card/JWT, found by reading `DeckFrameSettingsControllerTest.java` and `CardRenderControllerTest`'s prior version if one already exists on this branch.)
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && ./mvnw test -Dtest=CardRenderControllerTest`
-Expected: FAIL — `CardRender`/repository/controller don't exist.
 
-- [ ] **Step 3: Create the entity**
+- [ ] **Step 3: Add the migration**
 
-```java
-package io.eregion.render;
-
-import jakarta.persistence.*;
-import java.time.Instant;
-
-@Entity
-@Table(name = "card_render")
-public class CardRender {
-
-    @Id
-    private Long cardId;
-
-    @Lob
-    private byte[] imageData;
-
-    private String inputsHash;
-    private Instant renderedAt;
-
-    protected CardRender() {}
-
-    public CardRender(Long cardId, byte[] imageData, String inputsHash) {
-        this.cardId = cardId;
-        this.imageData = imageData;
-        this.inputsHash = inputsHash;
-        this.renderedAt = Instant.now();
-    }
-
-    public Long getCardId() { return cardId; }
-    public byte[] getImageData() { return imageData; }
-    public String getInputsHash() { return inputsHash; }
-    public Instant getRenderedAt() { return renderedAt; }
-}
+```sql
+CREATE TABLE card_renders (
+    deck_id UUID NOT NULL REFERENCES decks(id),
+    card_id UUID NOT NULL REFERENCES cards(id),
+    image_data BYTEA NOT NULL,
+    inputs_hash VARCHAR(64) NOT NULL,
+    rendered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (deck_id, card_id)
+);
 ```
+
+(If a `card_renders` table already exists on this branch from a prior implementation attempt, this migration **alters** it rather than creating fresh — check first and adjust: `ALTER TABLE card_renders ADD COLUMN deck_id UUID REFERENCES decks(id)`, drop the old single-column PK, add the new composite PK, backfill or truncate existing rows as appropriate since any pre-existing data has no deck_id to backfill with.)
 
 - [ ] **Step 4: Create the repository**
 
 ```java
 package io.eregion.render;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
 
-public interface CardRenderRepository extends JpaRepository<CardRender, Long> {
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public class CardRenderRepository {
+
+    public record CardRenderRow(UUID deckId, UUID cardId, byte[] imageData, String inputsHash) {}
+
+    private final JdbcClient jdbc;
+
+    public CardRenderRepository(JdbcClient jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    /** The render, when the viewer owns the deck or the deck is public. Anything else looks like a missing render. */
+    public Optional<CardRenderRow> findVisibleTo(UUID deckId, UUID cardId, UUID viewerId) {
+        return jdbc.sql("""
+                SELECT cr.deck_id, cr.card_id, cr.image_data, cr.inputs_hash FROM card_renders cr
+                JOIN decks d ON d.id = cr.deck_id
+                WHERE cr.deck_id = :deckId AND cr.card_id = :cardId
+                  AND (d.owner_id = :viewer OR d.visibility = 'public')
+                """)
+            .param("deckId", deckId).param("cardId", cardId).param("viewer", viewerId)
+            .query((rs, n) -> new CardRenderRow(
+                rs.getObject("deck_id", UUID.class), rs.getObject("card_id", UUID.class),
+                rs.getBytes("image_data"), rs.getString("inputs_hash")))
+            .optional();
+    }
+
+    public void upsert(UUID deckId, UUID cardId, byte[] imageData, String inputsHash) {
+        jdbc.sql("""
+                INSERT INTO card_renders (deck_id, card_id, image_data, inputs_hash, rendered_at)
+                VALUES (:deckId, :cardId, :imageData, :inputsHash, now())
+                ON CONFLICT (deck_id, card_id) DO UPDATE SET
+                    image_data = EXCLUDED.image_data,
+                    inputs_hash = EXCLUDED.inputs_hash,
+                    rendered_at = now()
+                """)
+            .param("deckId", deckId).param("cardId", cardId)
+            .param("imageData", imageData).param("inputsHash", inputsHash)
+            .update();
+    }
 }
 ```
+
+(`viewerId` may be `null` for an anonymous caller — `d.owner_id = NULL` is simply false in Postgres, never throws, so an anonymous viewer falls through to the `visibility = 'public'` check only, same behavior as `CustomPrintingRepository.imageFor`.)
 
 - [ ] **Step 5: Create the controller**
 
@@ -815,10 +850,14 @@ package io.eregion.render;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
-@RequestMapping("/api/cards/{cardId}/render")
+@RequestMapping("/api/decks/{deckId}/cards/{cardId}/render")
 public class CardRenderController {
 
     private final CardRenderRepository repository;
@@ -830,70 +869,64 @@ public class CardRenderController {
     }
 
     @GetMapping("/image")
-    public ResponseEntity<byte[]> getImage(@PathVariable Long cardId) {
-        return repository.findById(cardId)
+    public ResponseEntity<byte[]> getImage(
+        @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID cardId
+    ) {
+        return repository.findVisibleTo(deckId, cardId, CurrentUser.idOrNull(jwt))
             .map(render -> ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
-                .body(render.getImageData()))
+                .body(render.imageData()))
             .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
-    }
-
-    @PostMapping
-    public ResponseEntity<Void> renderNow(@PathVariable Long cardId) {
-        renderService.render(cardId);
-        return ResponseEntity.ok().build();
     }
 }
 ```
 
-`CardRenderService` is implemented in Task 7 — create a minimal stub now so this compiles:
+(Use the real `CurrentUser.idOrNull` import — found in `io.eregion.auth.CurrentUser` per Task 2's research; it returns `null` when `jwt == null` instead of throwing, matching `CustomPrintingController`'s usage.) Since this endpoint takes an optional/nullable JWT and must work for anonymous callers viewing a public deck, add it to `SecurityConfig`'s `permitAll` GET list and `SessionTokenResolver.isOptional`, mirroring `/api/custom-printings/*/image`'s exact two-part treatment there (both files need the new path pattern, e.g. `/api/decks/*/cards/*/render/image`) — the DB-level `findVisibleTo` check is what actually enforces privacy; the HTTP-level permit is just "don't require a valid token to attempt the request."
+
+`CardRenderService` is implemented in Task 7 — create a minimal stub now so this compiles (note the signature now takes `deckId` too):
 
 ```java
 package io.eregion.render;
 
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class CardRenderService {
-    public void render(Long cardId) {
+    public void render(UUID deckId, UUID cardId, byte[] artBytes) {
         // Replaced with real compositing logic in Task 7.
     }
 }
 ```
 
-- [ ] **Step 6: Add the migration**
-
-```sql
-CREATE TABLE card_render (
-    card_id BIGINT PRIMARY KEY REFERENCES card(id),
-    image_data BYTEA,
-    inputs_hash VARCHAR(64),
-    rendered_at TIMESTAMP
-);
-```
-
-(Confirm the real `card` table/PK name and adjust the `REFERENCES` clause and `BYTEA` type to match the project's actual DB — check an existing migration for the dialect in use, e.g. Postgres vs. H2, since `BYTEA` is Postgres-specific; use `BLOB` if the project targets H2/MySQL instead.)
-
-- [ ] **Step 7: Run tests to verify they pass**
+- [ ] **Step 6: Run tests to verify they pass**
 
 Run: `cd backend && ./mvnw test -Dtest=CardRenderControllerTest`
 Expected: PASS
 
+- [ ] **Step 7: Run the full suite** to confirm no regressions: `cd backend && ./mvnw test`
+
 - [ ] **Step 8: Commit**
 
 ```bash
-git add backend/src/main/java/io/eregion/render/CardRender.java \
-        backend/src/main/java/io/eregion/render/CardRenderRepository.java \
+git add backend/src/main/java/io/eregion/render/CardRenderRepository.java \
         backend/src/main/java/io/eregion/render/CardRenderController.java \
         backend/src/main/java/io/eregion/render/CardRenderService.java \
+        backend/src/main/java/io/eregion/config/SecurityConfig.java \
+        backend/src/main/java/io/eregion/config/SessionTokenResolver.java \
         backend/src/test/java/io/eregion/render/CardRenderControllerTest.java \
         backend/src/main/resources/db/migration
-git commit -m "Add CardRender entity, repository, and image endpoint"
+git commit -m "Scope CardRender storage/access by deck ownership and visibility"
 ```
 
 ---
 
 ### Task 7: Implement `CardRenderService` compositing
+
+**Corrected after discovery during execution:** `Card` is an immutable record, built via `CardRepository.upsert`/`findById` — there's no mutable builder. Build a test `Card` via `cardRepository.upsert(new Card(...))` with the full positional constructor (check its current field order — it changed in Task 1 to include `power`/`toughness`) rather than setters. `cardId`/`deckId` are both `UUID`, matching the `render(UUID deckId, UUID cardId, byte[] artBytes)` signature already stubbed in Task 6 (Task 6 was corrected to scope renders by deck, not just card, to avoid leaking private deck data — see Task 6's own correction note).
+
+**Second correction:** the draft below originally hardcoded `"m15"` as the frame family and never read the deck's actual `DeckFrameSettings` (frame family, artist name, collection code) from Task 2 — meaning those settings would go completely unused by compositing, contradicting the original ask (deck-chosen frame family + artist name + collection code baked into every render). Fixed: `CardRenderService` now injects `DeckFrameSettingsRepository` (from Task 2) and looks up the deck's settings at the top of `render(...)`, using its `frameFamily` instead of a literal, and threading `artistName`/`collectionCode` into `drawText` for the artist-credit/set-symbol line (even though that specific text rendering is still a documented placeholder per the "Known follow-ups" section — at least read the real values now instead of ignoring them, so finishing that follow-up later doesn't also require re-wiring this data access).
 
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/render/CardRenderService.java`
@@ -915,7 +948,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.util.Set;
+import java.io.ByteArrayOutputStream;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -928,27 +962,31 @@ class CardRenderServiceTest {
 
     @Test
     void render_producesNonEmptyPngOfExpectedSize() throws Exception {
-        Card card = new Card();
-        card.setName("Grizzly Bears");
-        card.setTypeLine("Creature — Bear");
-        card.setColors(Set.of("G"));
-        card.setPower("2");
-        card.setToughness("2");
-        card = cardRepository.save(card);
+        // Build via CardRepository.upsert using the current full positional
+        // Card constructor (confirm its field order in Card.java/CardRepository.java
+        // first — it changed in Task 1 to add power/toughness). Set name="Grizzly Bears",
+        // typeLine="Creature — Bear", colors="G", power="2", toughness="2";
+        // other fields can be empty strings / null / 0 as appropriate.
+        Card card = cardRepository.upsert(/* ... */);
+        // Also create a real deck owned by the test user (follow Task 2's test
+        // fixture pattern) — deckId is needed for the new render() signature.
+        UUID deckId = /* ... */ null;
 
-        service.render(card.getId());
+        BufferedImage tinyArt = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream artOut = new ByteArrayOutputStream();
+        ImageIO.write(tinyArt, "png", artOut);
 
-        CardRender render = renderRepository.findById(card.getId()).orElseThrow();
-        assertThat(render.getImageData()).isNotEmpty();
+        service.render(deckId, card.id(), artOut.toByteArray());
 
-        BufferedImage image = ImageIO.read(new ByteArrayInputStream(render.getImageData()));
+        CardRenderRepository.CardRenderRow render = renderRepository.findVisibleTo(deckId, card.id(), /* owner's user id */ null).orElseThrow();
+        assertThat(render.imageData()).isNotEmpty();
+
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(render.imageData()));
         assertThat(image.getWidth()).isEqualTo(FrameLayout.CARD_WIDTH);
         assertThat(image.getHeight()).isEqualTo(FrameLayout.CARD_HEIGHT);
     }
 }
 ```
-
-(Adjust the `Card` setters used here to match whatever actually exists on `Card` — `setColors`, `setTypeLine`, `setName` are assumed from the fields already confirmed present in the spec's research; verify exact method names against `Card.java` before running this step.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -979,9 +1017,11 @@ public record FrameLayout(
 }
 ```
 
-(`CARD_WIDTH`/`CARD_HEIGHT` must match whatever canvas size the Task 5 `layout.json` was authored against — confirm against that file and adjust these constants if different.)
+(`CARD_WIDTH`/`CARD_HEIGHT` = 2010×2814 matches CardConjurer's own high-res export size, confirmed against `creator-23.js` in the local checkout — no adjustment needed unless Task 5 ended up using different source coordinates.)
 
 - [ ] **Step 4: Implement `FrameLayoutLoader`**
+
+**Corrected after discovery during execution:** Task 5's `layout.json` stores regions as **fractions (0.0–1.0) of the card canvas**, matching CardConjurer's own coordinate scheme — not pixels. `FrameLayoutLoader` must multiply each fraction by `FrameLayout.CARD_WIDTH`/`CARD_HEIGHT` when building the `Rectangle`.
 
 ```java
 package io.eregion.render;
@@ -1018,8 +1058,10 @@ public class FrameLayoutLoader {
                 String field = fieldNames.next();
                 JsonNode rect = slotNode.get(field);
                 regions.put(field, new Rectangle(
-                    rect.get("x").asInt(), rect.get("y").asInt(),
-                    rect.get("width").asInt(), rect.get("height").asInt()));
+                    (int) Math.round(rect.get("x").asDouble() * FrameLayout.CARD_WIDTH),
+                    (int) Math.round(rect.get("y").asDouble() * FrameLayout.CARD_HEIGHT),
+                    (int) Math.round(rect.get("width").asDouble() * FrameLayout.CARD_WIDTH),
+                    (int) Math.round(rect.get("height").asDouble() * FrameLayout.CARD_HEIGHT)));
             }
             return new FrameLayout(regions);
         } catch (Exception e) {
@@ -1044,6 +1086,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.UUID;
 
 @Service
 public class CardRenderService {
@@ -1052,25 +1095,31 @@ public class CardRenderService {
     private final CardRenderRepository renderRepository;
     private final FrameSelector frameSelector;
     private final FrameLayoutLoader layoutLoader;
+    private final DeckFrameSettingsRepository frameSettingsRepository;
 
     public CardRenderService(
         CardRepository cardRepository,
         CardRenderRepository renderRepository,
         FrameSelector frameSelector,
-        FrameLayoutLoader layoutLoader
+        FrameLayoutLoader layoutLoader,
+        DeckFrameSettingsRepository frameSettingsRepository
     ) {
         this.cardRepository = cardRepository;
         this.renderRepository = renderRepository;
         this.frameSelector = frameSelector;
         this.layoutLoader = layoutLoader;
+        this.frameSettingsRepository = frameSettingsRepository;
     }
 
-    public void render(Long cardId) {
+    public void render(UUID deckId, UUID cardId, byte[] artBytes) {
         Card card = cardRepository.findById(cardId)
             .orElseThrow(() -> new IllegalArgumentException("No card with id " + cardId));
 
+        DeckFrameSettingsRepository.FrameSettingsRow settings = frameSettingsRepository.findByDeckId(deckId)
+            .orElse(new DeckFrameSettingsRepository.FrameSettingsRow(deckId, null, null, FrameSelector.DEFAULT_FAMILY));
+
         FrameSelection selection = frameSelector.select(
-            card.getTypeLine(), card.getColors(), "m15", card.getName(), null);
+            card.typeLine(), card.colors(), settings.frameFamily(), card.name(), null);
 
         FrameLayout layout = layoutLoader.load(selection.frameFamily(), selection.templateSlot());
 
@@ -1080,30 +1129,25 @@ public class CardRenderService {
             Graphics2D g = canvas.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            drawArt(g, layout);
+            drawArt(g, layout, artBytes);
             drawFrameBorder(g, selection);
-            drawText(g, layout, selection, card);
+            drawText(g, layout, selection, card, settings);
 
             g.dispose();
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ImageIO.write(canvas, "png", out);
 
-            CardRender render = new CardRender(cardId, out.toByteArray(), inputsHash(card, selection));
-            renderRepository.save(render);
+            renderRepository.upsert(deckId, cardId, out.toByteArray(), inputsHash(card, selection));
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to render card " + cardId, e);
+            throw new IllegalStateException("Failed to render card " + cardId + " for deck " + deckId, e);
         }
     }
 
-    private void drawArt(Graphics2D g, FrameLayout layout) {
-        // Art source wiring (loading the uploaded custom-printing blob) is
-        // deferred to Task 8, where the real art byte source is available
-        // from the trigger call site. For now this draws a gray placeholder
-        // rectangle so the pipeline is exercisable end-to-end.
+    private void drawArt(Graphics2D g, FrameLayout layout, byte[] artBytes) throws IOException {
         Rectangle artBox = layout.region("artBox");
-        g.setColor(Color.GRAY);
-        g.fillRect(artBox.x, artBox.y, artBox.width, artBox.height);
+        BufferedImage art = ImageIO.read(new java.io.ByteArrayInputStream(artBytes));
+        g.drawImage(art, artBox.x, artBox.y, artBox.width, artBox.height, null);
     }
 
     private void drawFrameBorder(Graphics2D g, FrameSelection selection) throws IOException {
@@ -1117,7 +1161,10 @@ public class CardRenderService {
         }
     }
 
-    private void drawText(Graphics2D g, FrameLayout layout, FrameSelection selection, Card card) {
+    private void drawText(
+        Graphics2D g, FrameLayout layout, FrameSelection selection, Card card,
+        DeckFrameSettingsRepository.FrameSettingsRow settings
+    ) {
         g.setColor(Color.BLACK);
 
         Rectangle titleBox = layout.region("titleText");
@@ -1132,12 +1179,12 @@ public class CardRenderService {
 
         Rectangle typeLineBox = layout.region("typeLineText");
         g.setFont(new Font("Serif", Font.PLAIN, 36));
-        g.drawString(card.getTypeLine(), typeLineBox.x, typeLineBox.y + typeLineBox.height);
+        g.drawString(card.typeLine(), typeLineBox.x, typeLineBox.y + typeLineBox.height);
 
-        if (card.getPower() != null && card.getToughness() != null) {
+        if (card.power() != null && card.toughness() != null) {
             Rectangle ptBox = layout.region("ptBox");
             g.setFont(new Font("Serif", Font.BOLD, 40));
-            g.drawString(card.getPower() + "/" + card.getToughness(), ptBox.x, ptBox.y + ptBox.height);
+            g.drawString(card.power() + "/" + card.toughness(), ptBox.x, ptBox.y + ptBox.height);
         }
 
         // Rules text auto-shrink-to-fit, mana symbol icon substitution, and
@@ -1150,7 +1197,7 @@ public class CardRenderService {
 
     private String inputsHash(Card card, FrameSelection selection) {
         return Integer.toHexString(
-            (card.getName() + selection.frameFamily() + selection.templateSlot() + selection.borderTreatment()).hashCode());
+            (card.name() + selection.frameFamily() + selection.templateSlot() + selection.borderTreatment()).hashCode());
     }
 }
 ```
@@ -1174,189 +1221,184 @@ git commit -m "Implement card compositing: art, frame border, and basic text lay
 
 ### Task 8: Wire render triggers (art upload, nickname save, deck setting save)
 
+**Corrected after discovery during execution:** `CardRenderService.render(UUID deckId, UUID cardId, byte[] artBytes)` already takes art bytes directly plus a `deckId` (fixed in Task 6/7 — the render is scoped per-deck now, to avoid leaking private deck data across decks that share the same base card; no further signature change needed here, but every call site below must pass a `deckId`, not just a `cardId`). Art is stored per `CustomPrinting` (table `custom_printings`), **not** 1:1 with a card — a card can have multiple custom printings. `CustomPrintingRepository` exposes `imageFor(id, viewerId)` keyed by *printing* id, not card id — this task needs a card-id-keyed lookup for "the" art to use when re-rendering, which doesn't exist yet. Read `CustomPrintingController.java` and `CustomPrintingRepository.java` in full before writing this task's code, and resolve this gap explicitly in Step 1 rather than assuming a method that isn't there. `DeckRenderTrigger.rerenderDeck` takes `UUID deckId` (already stubbed that way in Task 2) — that `deckId` is both "which deck to iterate cards for" and "which deck to pass into `render(...)`" for every card in it. There is no `Deck.java`/`Card("name")` single-arg constructor — card-in-deck membership must be read from whatever table backs `DeckDtos`/deck card lists (check `DeckRepository`/`DeckService` for how deck contents are queried — likely `deck_version_cards`, joined through the deck's current/published version) rather than guessed. The art-upload trigger (Step 3) also needs a `deckId` to pass to `render(...)` — check whether `CustomPrintingController`'s upload endpoint already receives a `deckId` (e.g. as a request param, since a custom printing isn't deck-scoped in its own table) or whether you need to resolve "which deck is this upload happening in the context of" some other way; this is a real design question to resolve by reading the actual upload request shape, not to guess.
+
 **Files:**
 - Modify: `backend/src/main/java/io/eregion/custom/CustomPrintingController.java` (locate the existing art upload endpoint)
-- Modify: `backend/src/main/java/io/eregion/proxy/ProxyService.java` (locate the existing nickname-save path)
+- Modify: `backend/src/main/java/io/eregion/custom/CustomPrintingRepository.java` (add a card-id-keyed "latest art for this card" lookup if one doesn't already exist)
+- Modify: `backend/src/main/java/io/eregion/proxy/ProxyService.java` (locate the existing nickname-save path, e.g. where `Draft`/`Treatment` gets persisted)
 - Modify: `backend/src/main/java/io/eregion/render/DeckRenderTrigger.java`
-- Modify: `backend/src/main/java/io/eregion/render/CardRenderService.java` (wire real art bytes in, replacing the Task 7 placeholder)
+- Create: `backend/src/main/java/io/eregion/render/ArtLookup.java`
 - Test: `backend/src/test/java/io/eregion/render/DeckRenderTriggerTest.java`
 
-- [ ] **Step 1: Pass real art bytes into `CardRenderService.render`**
+- [ ] **Step 1: Read before writing, and decide what counts as "the" art for a card**
 
-Change the signature so callers can supply art bytes directly instead of the service reaching for them itself (keeps `CardRenderService` decoupled from `CustomPrintingController`'s storage details):
+Read `CustomPrintingController.java`, `CustomPrintingRepository.java`, `ProxyService.java`, `DeckRepository.java` (how it lists a deck's cards), and `DeckRenderTrigger`/`DeckFrameSettingsService` from Task 2. Since a card can have multiple custom printings, decide (consistent with how the frontend already picks which art to display — check `customArtUrl`/`DeckBuilder.tsx` for the existing "pick the art to show" logic, e.g. most recent upload, or one marked current) which printing's bytes `ArtLookup` should return. If the frontend has no single clear "current art" concept either, use most-recently-uploaded for that card as the rule, and note this as a `DONE_WITH_CONCERNS` item in your report rather than silently picking something arbitrary.
 
-```java
-public void render(Long cardId, byte[] artBytes) {
-    // ... existing body, but drawArt(g, layout) becomes:
-    drawArt(g, layout, artBytes);
-}
-
-private void drawArt(Graphics2D g, FrameLayout layout, byte[] artBytes) throws IOException {
-    Rectangle artBox = layout.region("artBox");
-    BufferedImage art = ImageIO.read(new java.io.ByteArrayInputStream(artBytes));
-    g.drawImage(art, artBox.x, artBox.y, artBox.width, artBox.height, null);
-}
-```
-
-Update `CardRenderServiceTest` (Task 7) to pass a small in-memory PNG as `artBytes` instead of relying on the removed no-arg `render(cardId)` — e.g. generate a 10x10 `BufferedImage`, write it to a `ByteArrayOutputStream`, and pass `.toByteArray()`.
-
-Update `CardRenderController.renderNow` (Task 6) to fetch art bytes from wherever `CustomPrintingController` stores them before calling `renderService.render(cardId, artBytes)` — read `CustomPrintingController` first to find the right repository/method to reuse.
-
-- [ ] **Step 2: Trigger render on art upload**
-
-In `CustomPrintingController`, find the existing upload endpoint method body. After it persists the uploaded art successfully, add a call to re-render that card:
-
-```java
-cardRenderService.render(cardId, uploadedBytes);
-```
-
-(`uploadedBytes` and `cardId` should already be in scope as the method's existing parameters/locals — read the method first to confirm their actual names and wire the call using those, rather than the placeholder names shown here.) Inject `CardRenderService` into the controller's constructor alongside its existing dependencies.
-
-- [ ] **Step 3: Trigger render on nickname save**
-
-In `ProxyService`, find the method that saves a nickname (from the spec's research: the `Draft`/`Treatment` save path). After the nickname is persisted, fetch the card's current art bytes (same lookup used in Step 2) and call `cardRenderService.render(cardId, artBytes)`. If no art has been uploaded yet for that card, skip the render call — there's nothing to composite yet.
-
-- [ ] **Step 4: Write the failing test for deck-wide re-render**
+- [ ] **Step 2: Create `ArtLookup`**
 
 ```java
 package io.eregion.render;
 
-import io.eregion.card.Card;
-import io.eregion.card.CardRepository;
-import io.eregion.deck.Deck;
-import io.eregion.deck.DeckRepository;
+import io.eregion.custom.CustomPrintingRepository;
+import org.springframework.stereotype.Component;
+
+import java.util.UUID;
+
+@Component
+public class ArtLookup {
+
+    private final CustomPrintingRepository customPrintingRepository;
+
+    public ArtLookup(CustomPrintingRepository customPrintingRepository) {
+        this.customPrintingRepository = customPrintingRepository;
+    }
+
+    public byte[] findArtBytes(UUID cardId) {
+        // Wire to whichever CustomPrintingRepository method Step 1 determined
+        // is the right "latest/current art for this card" lookup. If none
+        // exists yet, add one to CustomPrintingRepository following its
+        // existing JdbcClient query style (e.g. ORDER BY created_at DESC LIMIT 1
+        // WHERE card_id = :cardId), returning Optional<byte[]> or similar,
+        // and unwrap it here (null if absent — callers already handle null).
+        return null;
+    }
+}
+```
+
+- [ ] **Step 3: Trigger render on art upload**
+
+In `CustomPrintingController`'s upload endpoint (`upload(...)`, confirmed signature takes `cardId` and a `MultipartFile file`), determine the `deckId` to use (per the note above — read the real request/route shape; if the upload endpoint has no deck context at all, this card-level upload may need to trigger a render for every deck that currently contains this card, similar to how `ArtLookup`/`DeckRenderTrigger` already has to enumerate deck→card relationships, rather than a single deckId). After the upload is persisted successfully, call `cardRenderService.render(deckId, cardId, file.getBytes())` for each relevant deck (inject `CardRenderService` into the controller's constructor). Use the just-uploaded bytes directly rather than re-fetching through `ArtLookup` — it's already in hand.
+
+- [ ] **Step 4: Trigger render on nickname save**
+
+In `ProxyService`, find the method that persists a nickname via `ProxyRepository` (from the `generate(...)`/`Draft` flow) — nicknames are already deck-scoped (per the Proxy feature's existing design), so this method should already have a `deckId` in scope. After the nickname is persisted, use `ArtLookup.findArtBytes(cardId)`; if non-null, call `cardRenderService.render(deckId, cardId, artBytes)`. If null (no art uploaded yet), skip — nothing to composite.
+
+- [ ] **Step 5: Write the failing test for deck-wide re-render**
+
+Follow whatever fixture pattern existing deck/card integration tests use for seeding a deck with cards (check `DeckServiceTest`/`DeckControllerTest` for the helper). Shape:
+
+```java
+package io.eregion.render;
+
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
+import java.util.UUID;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 class DeckRenderTriggerTest {
 
     @Autowired DeckRenderTrigger trigger;
-    @Autowired DeckRepository deckRepository;
-    @Autowired CardRepository cardRepository;
     @MockBean CardRenderService cardRenderService;
+    @MockBean ArtLookup artLookup;
 
     @Test
-    void rerenderDeck_rendersEveryCardInDeck() {
-        Deck deck = deckRepository.save(new Deck("Test Deck"));
-        Card cardA = cardRepository.save(new Card("Card A"));
-        Card cardB = cardRepository.save(new Card("Card B"));
-        // Wire cardA/cardB into deck per however deck<->card membership
-        // actually works in this codebase — inspect DeckRepository/Deck
-        // before finalizing this setup; the exact association API is not
-        // confirmed by the spec's research and must be checked here.
+    void rerenderDeck_rendersEveryCardInDeckThatHasArt() {
+        // Seed a deck with two cards, following the existing deck-fixture
+        // helper found in Step 1's research.
+        UUID deckId = /* ... */ null;
+        UUID cardAId = /* ... */ null;
+        UUID cardBId = /* ... */ null;
 
-        trigger.rerenderDeck(deck.getId());
+        when(artLookup.findArtBytes(cardAId)).thenReturn(new byte[] { 1 });
+        when(artLookup.findArtBytes(cardBId)).thenReturn(new byte[] { 2 });
 
-        verify(cardRenderService, times(1)).render(eq(cardA.getId()), any());
-        verify(cardRenderService, times(1)).render(eq(cardB.getId()), any());
+        trigger.rerenderDeck(deckId);
+
+        verify(cardRenderService, times(1)).render(eq(deckId), eq(cardAId), any());
+        verify(cardRenderService, times(1)).render(eq(deckId), eq(cardBId), any());
     }
 }
 ```
 
-- [ ] **Step 5: Run test to verify it fails**
+- [ ] **Step 6: Run test to verify it fails**
 
 Run: `cd backend && ./mvnw test -Dtest=DeckRenderTriggerTest`
 Expected: FAIL — `DeckRenderTrigger.rerenderDeck` is currently a no-op.
 
-- [ ] **Step 6: Implement `DeckRenderTrigger.rerenderDeck`**
+- [ ] **Step 7: Implement `DeckRenderTrigger.rerenderDeck`**
 
 ```java
 package io.eregion.render;
 
-import io.eregion.card.Card;
-import io.eregion.card.CardRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class DeckRenderTrigger {
 
-    private final CardRepository cardRepository; // or deck-membership lookup, per Step 4's finding
     private final CardRenderService cardRenderService;
-    private final ArtLookup artLookup; // small helper wrapping the art-byte lookup from Step 1/2
+    private final ArtLookup artLookup;
+    // Inject whatever repository/method Step 1 found for listing a deck's card ids
+    // (e.g. DeckRepository, if it exposes one — check before guessing a new method name).
 
-    public DeckRenderTrigger(CardRepository cardRepository, CardRenderService cardRenderService, ArtLookup artLookup) {
-        this.cardRepository = cardRepository;
+    public DeckRenderTrigger(CardRenderService cardRenderService, ArtLookup artLookup /*, deck-card lookup */) {
         this.cardRenderService = cardRenderService;
         this.artLookup = artLookup;
     }
 
-    public void rerenderDeck(Long deckId) {
-        List<Card> cards = cardRepository.findAllByDeckId(deckId); // adjust to the real query method found in Step 4
-        for (Card card : cards) {
-            byte[] artBytes = artLookup.findArtBytes(card.getId());
+    public void rerenderDeck(UUID deckId) {
+        List<UUID> cardIds = /* real deck-card-id lookup from Step 1 */ List.of();
+        for (UUID cardId : cardIds) {
+            byte[] artBytes = artLookup.findArtBytes(cardId);
             if (artBytes != null) {
-                cardRenderService.render(card.getId(), artBytes);
+                cardRenderService.render(deckId, cardId, artBytes);
             }
         }
     }
 }
 ```
 
-Create the small `ArtLookup` helper referenced above, wrapping whatever repository/method Step 2 used to fetch art bytes by card id, so this logic isn't duplicated across `CustomPrintingController`, `ProxyService`, and `DeckRenderTrigger`:
-
-```java
-package io.eregion.render;
-
-import org.springframework.stereotype.Component;
-
-@Component
-public class ArtLookup {
-    // Constructor-inject whatever repository Step 2 used to fetch stored art
-    // bytes by card id, and expose that lookup here.
-    public byte[] findArtBytes(Long cardId) {
-        throw new UnsupportedOperationException("Wire this to the real art-storage repository found in Task 8 Step 2");
-    }
-}
-```
-
-- [ ] **Step 7: Run test to verify it passes**
+- [ ] **Step 8: Run test to verify it passes**
 
 Run: `cd backend && ./mvnw test -Dtest=DeckRenderTriggerTest`
 Expected: PASS
 
-- [ ] **Step 8: Add failure resilience**
+- [ ] **Step 9: Add failure resilience**
 
-In `CardRenderService.render`, wrap the compositing body in a try/catch that logs on failure without deleting any existing `CardRender` row:
+In `CardRenderService.render` (from Task 7), wrap the compositing body in a try/catch that logs on failure without deleting any existing render row:
 
 ```java
-public void render(Long cardId, byte[] artBytes) {
+public void render(UUID deckId, UUID cardId, byte[] artBytes) {
     try {
         // existing body from Task 7 Step 5
     } catch (Exception e) {
-        LOGGER.error("Failed to render card {}; keeping previous render if any", cardId, e);
+        LOGGER.error("Failed to render card {} for deck {}; keeping previous render if any", cardId, deckId, e);
     }
 }
 ```
 
 Add a `private static final Logger LOGGER = LoggerFactory.getLogger(CardRenderService.class);` field and the corresponding import.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add backend/src/main/java/io/eregion/custom/CustomPrintingController.java \
+        backend/src/main/java/io/eregion/custom/CustomPrintingRepository.java \
         backend/src/main/java/io/eregion/proxy/ProxyService.java \
         backend/src/main/java/io/eregion/render/DeckRenderTrigger.java \
         backend/src/main/java/io/eregion/render/ArtLookup.java \
         backend/src/main/java/io/eregion/render/CardRenderService.java \
-        backend/src/test/java/io/eregion/render/DeckRenderTriggerTest.java \
-        backend/src/test/java/io/eregion/render/CardRenderServiceTest.java
+        backend/src/test/java/io/eregion/render/DeckRenderTriggerTest.java
 git commit -m "Trigger card renders on art upload, nickname save, and deck setting save"
 ```
 
 ---
 
 ### Task 9: Frontend displays composited render with fallback
+
+**Corrected after discovery during execution:** the render endpoint is deck-scoped (`GET /api/decks/{deckId}/cards/{cardId}/render/image`, not `/api/cards/{cardId}/render/image` — Task 6 was corrected to avoid leaking private deck data across decks sharing the same base card). `cardRenderUrl` needs both ids.
 
 **Files:**
 - Modify: `frontend/src/components/builder/DeckBuilder.tsx`
@@ -1368,18 +1410,18 @@ git commit -m "Trigger card renders on art upload, nickname save, and deck setti
 In `frontend/src/lib/links.ts`, alongside the existing `customArtUrl` helper, add:
 
 ```typescript
-export function cardRenderUrl(cardId: string): string {
-  return `/api/cards/${cardId}/render/image`;
+export function cardRenderUrl(deckId: string, cardId: string): string {
+  return `/api/decks/${deckId}/cards/${cardId}/render/image`;
 }
 ```
 
 - [ ] **Step 2: Swap the displayed image with fallback**
 
-In both `DeckBuilder.tsx` (around the existing `customArtUrl`/`imageNormal` usage found during Task 1's spec research, near lines 84-86 and 596-599) and `ProxyPanel.tsx`, change the `<img>` `src` to try the render endpoint first, falling back to the existing art/Scryfall image on load error:
+In both `DeckBuilder.tsx` (around the existing `customArtUrl`/`imageNormal` usage found during Task 1's spec research, near lines 84-86 and 596-599) and `ProxyPanel.tsx`, change the `<img>` `src` to try the render endpoint first, falling back to the existing art/Scryfall image on load error. Both components already have the deck's id in scope (same `deck.id` passed to sibling sections like `FramePanel`/`LoreSection`) — thread it through:
 
 ```tsx
 <img
-  src={cardRenderUrl(card.id)}
+  src={cardRenderUrl(deck.id, card.id)}
   onError={(e) => {
     e.currentTarget.onerror = null;
     e.currentTarget.src = customArtUrl(card.id) ?? card.imageNormal;
@@ -1424,9 +1466,10 @@ void uploadArt_rendersOnlyThatCard() throws Exception {
     // whatever MockMvc setup the existing upload tests in this file already
     // use ...
 
-    verify(cardRenderService, times(1)).render(eq(cardId), any());
+    verify(cardRenderService, times(1)).render(any(), eq(cardId), any());
 }
 ```
+(`render(deckId, cardId, artBytes)` — match any `deckId` here since the upload-trigger's exact deck-resolution logic is Task 8's concern, not this test's; just confirm `cardId` and the call count.)
 
 - [ ] **Step 2: Run test to verify it fails**
 

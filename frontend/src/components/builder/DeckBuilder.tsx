@@ -22,6 +22,7 @@ import { CardList } from "./CardList";
 import { ProxyPanel } from "./ProxyPanel";
 import { ProxiesSection } from "./ProxiesSection";
 import { LoreDialog } from "./LoreDialog";
+import { FramePanel } from "./FramePanel";
 import { useProxies } from "@/lib/useProxies";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -1039,7 +1040,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       {/* Cards */}
       <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
         <div className="hidden lg:sticky lg:top-6 lg:block">
-          <CardPreview line={selected} showCollection={checkCollection} />
+          <CardPreview line={selected} showCollection={checkCollection} deckId={deck.id} />
         </div>
         <div>{renderCards(viewProps.groups)}</div>
       </div>
@@ -1073,6 +1074,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           showCollection={checkCollection}
         />
       </div>
+
+      <FramePanel deckId={deck.id} />
 
       <ProxiesSection lines={withOwned} proxies={proxies} onOpen={setProxyCardId} />
 
@@ -1302,6 +1305,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       <CardPeek
         line={lineByKey(peekKey)}
         showCollection={checkCollection}
+        deckId={deck.id}
         onClose={() => setPeekKey(null)}
         onChangePrinting={(line) => {
           setPeekKey(null);
@@ -1315,6 +1319,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setProxyCardId(null)}
         cardId={proxyCardId}
         cardName={lines.find((l) => l.cardId === proxyCardId)?.name ?? ""}
+        cardImage={lines.find((l) => l.cardId === proxyCardId)?.imageNormal}
         deckId={deck.id}
         proxies={proxies}
         onNotify={setToast}

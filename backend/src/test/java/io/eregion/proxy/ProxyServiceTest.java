@@ -21,6 +21,8 @@ import io.eregion.proxy.ProxyDtos.Lore;
 import io.eregion.proxy.ProxyDtos.Mode;
 import io.eregion.proxy.ProxyDtos.Pick;
 import io.eregion.proxy.ProxyDtos.Treatment;
+import io.eregion.render.ArtLookup;
+import io.eregion.render.CardRenderService;
 
 class ProxyServiceTest {
 
@@ -148,9 +150,38 @@ class ProxyServiceTest {
 		}
 	}
 
+	/** No art uploaded for any card, so these tests' render triggers are no-ops unless overridden. */
+	static class NoArt extends ArtLookup {
+		NoArt() {
+			super(null);
+		}
+
+		@Override
+		public byte[] findArtBytes(UUID cardId) {
+			return null;
+		}
+	}
+
+	/** Remembers which (deckId, cardId) pairs were asked to render, instead of actually compositing anything. */
+	static class RecordingRenderService extends CardRenderService {
+		final List<UUID> renderedCardIds = new ArrayList<>();
+
+		RecordingRenderService() {
+			super(null, null, null, null);
+		}
+
+		@Override
+		public void render(UUID deckId, UUID cardId, byte[] artBytes) {
+			renderedCardIds.add(cardId);
+		}
+	}
+
+	/** A dummy that is never actually invoked, since NoArt always reports no art to render. */
+	static final CardRenderService NOT_INVOKED = new RecordingRenderService();
+
 	MemoryRepository repo = new MemoryRepository();
 	Counting llm = new Counting();
-	ProxyService service = new ProxyService(repo, new OneCard(), new ProxyPromptService(llm), llm);
+	ProxyService service = new ProxyService(repo, new OneCard(), new ProxyPromptService(llm), llm, new NoArt(), NOT_INVOKED);
 
 	@Test
 	void firstGenerationCreatesTheTreatmentAndMakesItCurrent() {
@@ -257,10 +288,46 @@ class ProxyServiceTest {
 				return "fake";
 			}
 		};
-		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(failing), failing);
+		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(failing), failing, new NoArt(), NOT_INVOKED);
 
 		assertThatThrownBy(() -> svc.generate(USER, DECK, CARD, Mode.NICKNAME, null, false, false)).isInstanceOf(ApiException.class).hasMessageContaining("down");
 		assertThat(repo.treatmentId).isNull();
 		assertThat(repo.generations).isEmpty();
+	}
+
+	@Test
+	void generatingRerendersTheCardWhenArtAlreadyExists() {
+		var artLookup = new ArtLookup(null) {
+			@Override
+			public byte[] findArtBytes(UUID cardId) {
+				return cardId.equals(CARD) ? new byte[] { 9 } : null;
+			}
+		};
+		var renderService = new RecordingRenderService();
+		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(llm), llm, artLookup, renderService);
+
+		svc.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+
+		assertThat(renderService.renderedCardIds).containsExactly(CARD);
+	}
+
+	@Test
+	void settingAnOlderGenerationCurrentAlsoRerendersWhenArtExists() {
+		var artLookup = new ArtLookup(null) {
+			@Override
+			public byte[] findArtBytes(UUID cardId) {
+				return cardId.equals(CARD) ? new byte[] { 9 } : null;
+			}
+		};
+		var renderService = new RecordingRenderService();
+		var svc = new ProxyService(repo, new OneCard(), new ProxyPromptService(llm), llm, artLookup, renderService);
+
+		Treatment first = svc.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		svc.generate(USER, DECK, CARD, Mode.NICKNAME, null);
+		renderService.renderedCardIds.clear();
+
+		svc.setCurrent(USER, DECK, CARD, first.current().id());
+
+		assertThat(renderService.renderedCardIds).containsExactly(CARD);
 	}
 }

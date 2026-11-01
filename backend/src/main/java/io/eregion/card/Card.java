@@ -13,6 +13,9 @@ public record Card(
 		String colors,
 		String colorIdentity,
 		String oracleText,
+		/** Scryfall sends these as strings so values like "*" round-trip; null for non-creatures. */
+		String power,
+		String toughness,
 		String setCode,
 		String setName,
 		String collectorNumber,
@@ -35,7 +38,7 @@ public record Card(
 	public Card(UUID id, UUID scryfallId, String name, String manaCost, double manaValue, String typeLine, String primaryType, String colors,
 			String colorIdentity, String oracleText, String setCode, String setName, String collectorNumber, String rarity, String artist,
 			Double priceUsd, String imageSmall, String imageNormal, String imageArtCrop, String commanderLegality) {
-		this(id, scryfallId, name, manaCost, manaValue, typeLine, primaryType, colors, colorIdentity, oracleText, setCode, setName,
+		this(id, scryfallId, name, manaCost, manaValue, typeLine, primaryType, colors, colorIdentity, oracleText, null, null, setCode, setName,
 				collectorNumber, rarity, artist, priceUsd, imageSmall, imageNormal, imageArtCrop, commanderLegality, null, null, java.util.List.of());
 	}
 }

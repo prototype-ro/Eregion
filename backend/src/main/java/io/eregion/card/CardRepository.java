@@ -14,7 +14,7 @@ public class CardRepository {
 
 	private static final String COLUMNS = """
 			id, scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors, color_identity,
-			oracle_text, set_code, set_name, collector_number, rarity, artist, price_usd,
+			oracle_text, power, toughness, set_code, set_name, collector_number, rarity, artist, price_usd,
 			image_small, image_normal, image_art_crop, commander_legality,
 			""" + FunctionalTagSql.columns("cards.id") + "\n";
 
@@ -122,10 +122,10 @@ public class CardRepository {
 	public Card upsert(Card card) {
 		return jdbc.sql("""
 				INSERT INTO cards (scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors,
-				                   color_identity, oracle_text, set_code, set_name, collector_number, rarity,
+				                   color_identity, oracle_text, power, toughness, set_code, set_name, collector_number, rarity,
 				                   artist, price_usd, price_updated_at, image_small, image_normal, image_art_crop, commander_legality)
 				VALUES (:scryfallId, :name, :manaCost, :manaValue, :typeLine, :primaryType, :colors,
-				        :colorIdentity, :oracleText, :setCode, :setName, :collectorNumber, :rarity,
+				        :colorIdentity, :oracleText, :power, :toughness, :setCode, :setName, :collectorNumber, :rarity,
 				        :artist, :priceUsd, now(), :imageSmall, :imageNormal, :imageArtCrop, :commanderLegality)
 				ON CONFLICT (lower(name)) DO UPDATE SET
 				    scryfall_id = EXCLUDED.scryfall_id,
@@ -136,6 +136,8 @@ public class CardRepository {
 				    colors = EXCLUDED.colors,
 				    color_identity = EXCLUDED.color_identity,
 				    oracle_text = EXCLUDED.oracle_text,
+				    power = EXCLUDED.power,
+				    toughness = EXCLUDED.toughness,
 				    set_code = EXCLUDED.set_code,
 				    set_name = EXCLUDED.set_name,
 				    collector_number = EXCLUDED.collector_number,
@@ -157,6 +159,8 @@ public class CardRepository {
 				.param("colors", card.colors())
 				.param("colorIdentity", card.colorIdentity())
 				.param("oracleText", card.oracleText())
+				.param("power", card.power())
+				.param("toughness", card.toughness())
 				.param("setCode", card.setCode())
 				.param("setName", card.setName())
 				.param("collectorNumber", card.collectorNumber())
@@ -183,6 +187,8 @@ public class CardRepository {
 				rs.getString("colors"),
 				rs.getString("color_identity"),
 				rs.getString("oracle_text"),
+				rs.getString("power"),
+				rs.getString("toughness"),
 				rs.getString("set_code"),
 				rs.getString("set_name"),
 				rs.getString("collector_number"),

@@ -206,7 +206,7 @@ export default function PublicDeckPage() {
 
           <div className="grid items-start gap-x-10 gap-y-8 pt-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
             <div className="lg:sticky lg:top-6">
-              <CardPreview line={selected} showCollection={false} />
+              <CardPreview line={selected} showCollection={false} deckId={id} />
             </div>
             <div>
               {view === "list" && <CardList {...viewProps} />}

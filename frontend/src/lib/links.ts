@@ -29,3 +29,8 @@ export const sortColors = (identity: string) => "WUBRG".split("").filter((color)
 
 /** Where a custom art's image is served from. */
 export const customArtUrl = (id: string) => `/api/custom-printings/${id}/image`;
+
+/** Where a card's composited frame render is served from. 404s until Task 8's trigger has produced one. */
+export function cardRenderUrl(deckId: string, cardId: string): string {
+  return `/api/decks/${deckId}/cards/${cardId}/render/image`;
+}

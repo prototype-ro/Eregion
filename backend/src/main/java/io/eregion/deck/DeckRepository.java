@@ -521,6 +521,42 @@ public class DeckRepository {
 				.list();
 	}
 
+	/**
+	 * The distinct card ids in a deck's most recently saved version, on whichever branch -- the same "current
+	 * cards" definition DeckService already uses for editing (findLatestVersion + versionLines). Used for
+	 * internal operations like re-rendering that don't need a viewing user's owned-copy counts, so it skips
+	 * versionLines's extra joins.
+	 */
+	public List<UUID> currentCardIds(UUID deckId) {
+		return jdbc.sql("""
+				SELECT DISTINCT dc.card_id
+				  FROM deck_version_cards dc
+				  JOIN deck_versions v ON v.id = dc.version_id
+				 WHERE v.deck_id = :deck
+				   AND v.version_number = (SELECT MAX(x.version_number) FROM deck_versions x WHERE x.deck_id = :deck)
+				""")
+				.param("deck", deckId)
+				.query(UUID.class)
+				.list();
+	}
+
+	/**
+	 * Every deck that currently has this card in its most recently saved version. Used when a card-level action
+	 * (such as an art upload, which isn't deck-scoped) needs to know which decks it affects.
+	 */
+	public List<UUID> decksContainingCard(UUID cardId) {
+		return jdbc.sql("""
+				SELECT DISTINCT v.deck_id
+				  FROM deck_version_cards dc
+				  JOIN deck_versions v ON v.id = dc.version_id
+				 WHERE dc.card_id = :card
+				   AND v.version_number = (SELECT MAX(x.version_number) FROM deck_versions x WHERE x.deck_id = v.deck_id)
+				""")
+				.param("card", cardId)
+				.query(UUID.class)
+				.list();
+	}
+
 	public boolean hasVersions(UUID deckId) {
 		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM deck_versions WHERE deck_id = :deck)")
 				.param("deck", deckId)
