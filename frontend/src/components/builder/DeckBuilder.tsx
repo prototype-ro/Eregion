@@ -22,6 +22,7 @@ import { CardList } from "./CardList";
 import { ProxyPanel } from "./ProxyPanel";
 import { ProxiesSection } from "./ProxiesSection";
 import { LoreSection } from "./LoreSection";
+import { FramePanel } from "./FramePanel";
 import { useProxies } from "@/lib/useProxies";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -1072,6 +1073,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           showCollection={checkCollection}
         />
       </div>
+
+      <FramePanel deckId={deck.id} />
 
       <LoreSection deckId={deck.id} />
 

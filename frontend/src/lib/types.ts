@@ -542,6 +542,14 @@ export interface DeckLore {
   mjParams: string | null;
 }
 
+/** The artist, collection/set code and frame family used when compositing a deck's proxies. */
+export interface FrameSettings {
+  deckId: string;
+  artistName: string | null;
+  collectionCode: string | null;
+  frameFamily: string;
+}
+
 /** ADDITION mutates the subject but keeps its personhood; ERASURE subtracts until it keeps only a title or function. */
 export type LoreMechanism = "ADDITION" | "ERASURE";
 
