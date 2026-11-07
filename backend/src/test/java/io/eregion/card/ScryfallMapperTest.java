@@ -116,6 +116,39 @@ class ScryfallMapperTest {
 	}
 
 	@Test
+	void aSplitCardKeepsBothFacesOracleText() {
+		Face fire = new Face("Fire", "{1}{R}", "Instant", "Fire deals 2 damage divided as you choose among one or two targets.",
+				"Artist One", null, null, null);
+		Face ice = new Face("Ice", "{1}{U}", "Instant", "Tap target permanent.\nDraw a card.", "Artist One", null, null, null);
+		ScryfallCard source = new ScryfallCard(
+				"55555555-5555-5555-5555-555555555555", "Fire // Ice", "{1}{R} // {1}{U}", 2.0, "Instant // Instant",
+				List.of("R", "U"), List.of("R", "U"), null, "apc", "Apocalypse", "131", "2001-06-04", "uncommon", "Edward P. Beard, Jr.",
+				null, null, List.of(fire, ice), java.util.Map.of("commander", "legal"), null, null);
+
+		Card card = ScryfallMapper.toCard(source);
+
+		assertThat(card.oracleText()).isEqualTo(
+				"Fire deals 2 damage divided as you choose among one or two targets.\n // \nTap target permanent.\nDraw a card.");
+		assertThat(card.typeLine()).isEqualTo("Instant // Instant");
+		assertThat(card.manaCost()).isEqualTo("{1}{R} // {1}{U}");
+	}
+
+	@Test
+	void aTransformCardOnlyUsesTheFrontFacesOracleText() {
+		Face front = new Face("Delver of Secrets", "{U}", "Creature — Human Wizard", "At the beginning...",
+				"Artist One", new ImageUris("s.jpg", "n.jpg", "a.jpg"), "1", "1");
+		Face back = new Face("Insectile Aberration", "", "Creature — Human Insect", "Flying", "Artist One", null, "3", "2");
+		ScryfallCard source = new ScryfallCard(
+				"11111111-1111-1111-1111-111111111112", "Delver of Secrets // Insectile Aberration", null, 1.0, null,
+				List.of(), List.of("U"), null, "isd", "Innistrad", "51", "2011-09-30", "common", null, null, null,
+				List.of(front, back), java.util.Map.of("commander", "legal"), null, null);
+
+		Card card = ScryfallMapper.toCard(source);
+
+		assertThat(card.oracleText()).isEqualTo("At the beginning...");
+	}
+
+	@Test
 	void commanderLegalityIsReadFromScryfallAndUnknownWhenMissing() {
 		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("commander", "legal")))).isEqualTo("legal");
 		assertThat(ScryfallMapper.commanderLegality(withLegalities(java.util.Map.of("commander", "banned")))).isEqualTo("banned");

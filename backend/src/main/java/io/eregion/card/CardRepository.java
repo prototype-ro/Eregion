@@ -37,23 +37,39 @@ public class CardRepository {
 	 * a token of that name, and a search for a token never offers a card.
 	 */
 	public List<Card> search(String query, int limit, boolean commandersOnly, boolean tokens) {
-		String escaped = query.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-		return jdbc.sql("SELECT " + COLUMNS + """
+		String trimmed = query.trim();
+		String escapedWhole = escape(trimmed);
+		// One ILIKE per word, all required, rather than one substring match on the whole phrase: a split or
+		// adventure card's real name ("Fire // Ice", "Bonecrusher Giant // Stomp") has punctuation between the
+		// words that a typed query never includes, so a single whole-phrase match would never find it.
+		String[] words = trimmed.split("\\s+");
+		var where = new StringBuilder();
+		for (int i = 0; i < words.length; i++) {
+			where.append(i == 0 ? "" : " AND ").append("name ILIKE :w").append(i);
+		}
+		var spec = jdbc.sql("SELECT " + COLUMNS + """
 				 FROM cards
-				WHERE name ILIKE :contains
+				WHERE """ + " " + where + """
+
 				  AND ((type_line LIKE 'Token%') = :tokens)
 				  AND (:commandersOnly = false OR (type_line ILIKE '%legendary%'
 				       AND (type_line ILIKE '%creature%' OR oracle_text ILIKE '%can be your commander%')))
 				ORDER BY (name ILIKE :prefix) DESC, name
 				LIMIT :limit
-				""")
-				.param("contains", "%" + escaped + "%")
-				.param("prefix", escaped + "%")
+				""");
+		for (int i = 0; i < words.length; i++) {
+			spec = spec.param("w" + i, "%" + escape(words[i]) + "%");
+		}
+		return spec.param("prefix", escapedWhole + "%")
 				.param("limit", limit)
 				.param("commandersOnly", commandersOnly)
 				.param("tokens", tokens)
 				.query(CardRepository::map)
 				.list();
+	}
+
+	private static String escape(String s) {
+		return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 	}
 
 	/** Whether a real card (not a token) already has this name. A token with the same name must not take its row over. */
@@ -173,6 +189,46 @@ public class CardRepository {
 				.param("commanderLegality", card.commanderLegality())
 				.query(CardRepository::map)
 				.single();
+	}
+
+	/**
+	 * Adds a card only if its name is not already in the catalog; an existing row, Token or not, is left completely
+	 * untouched. Used by the bulk catalog load, which must never change a card a deck may already be pinning a
+	 * specific printing or piece of art for — unlike {@link #upsert}, which is for refreshing a card we are
+	 * deliberately re-fetching by its own identity (a search hit, a price refresh).
+	 */
+	public int insertIfMissing(Card card) {
+		return jdbc.sql("""
+				INSERT INTO cards (scryfall_id, name, mana_cost, mana_value, type_line, primary_type, colors,
+				                   color_identity, oracle_text, power, toughness, set_code, set_name, collector_number, rarity,
+				                   artist, price_usd, price_updated_at, image_small, image_normal, image_art_crop, commander_legality)
+				VALUES (:scryfallId, :name, :manaCost, :manaValue, :typeLine, :primaryType, :colors,
+				        :colorIdentity, :oracleText, :power, :toughness, :setCode, :setName, :collectorNumber, :rarity,
+				        :artist, :priceUsd, now(), :imageSmall, :imageNormal, :imageArtCrop, :commanderLegality)
+				ON CONFLICT (lower(name)) DO NOTHING
+				""")
+				.param("scryfallId", card.scryfallId())
+				.param("name", card.name())
+				.param("manaCost", card.manaCost())
+				.param("manaValue", card.manaValue())
+				.param("typeLine", card.typeLine())
+				.param("primaryType", card.primaryType())
+				.param("colors", card.colors())
+				.param("colorIdentity", card.colorIdentity())
+				.param("oracleText", card.oracleText())
+				.param("power", card.power())
+				.param("toughness", card.toughness())
+				.param("setCode", card.setCode())
+				.param("setName", card.setName())
+				.param("collectorNumber", card.collectorNumber())
+				.param("rarity", card.rarity())
+				.param("artist", card.artist())
+				.param("priceUsd", card.priceUsd())
+				.param("imageSmall", card.imageSmall())
+				.param("imageNormal", card.imageNormal())
+				.param("imageArtCrop", card.imageArtCrop())
+				.param("commanderLegality", card.commanderLegality())
+				.update();
 	}
 
 	public static Card map(ResultSet rs, int rowNum) throws SQLException {

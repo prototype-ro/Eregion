@@ -1,12 +1,23 @@
 package io.eregion.card;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class ScryfallClient {
@@ -34,7 +45,12 @@ public class ScryfallClient {
 		}
 	}
 
+	private static final JsonMapper JSON = JsonMapper.builder().build();
+
 	private final RestClient http;
+	private final String userAgent;
+	/** A plain client for bulk-data downloads, which live on a different host (Scryfall's CDN) and are not rate-limited like the API. */
+	private final HttpClient bulkHttp = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
 	private long lastCallAt;
 	/** When Scryfall answers 429 we stay away until this time. */
 	private volatile long coolUntil;
@@ -43,6 +59,7 @@ public class ScryfallClient {
 
 	public ScryfallClient(@Value("${eregion.scryfall.user-agent}") String userAgent,
 			@Value("${eregion.scryfall.sync-gap-ms:250}") long syncGapMs) {
+		this.userAgent = userAgent;
 		this.syncGapMs = syncGapMs;
 		this.http = RestClient.builder()
 				.baseUrl("https://api.scryfall.com")
@@ -225,6 +242,59 @@ public class ScryfallClient {
 		return new CollectionResult(
 				body.data() == null ? List.of() : body.data().stream().filter(card -> card.id() != null).toList(),
 				body.not_found() == null ? List.of() : body.not_found());
+	}
+
+	/** Scryfall serves bulk files gzip-compressed, one JSON object per line ("jsonl"), not as one big JSON array. */
+	public record BulkDataEntry(String type, String jsonl_download_uri) {
+	}
+
+	public record BulkDataList(List<BulkDataEntry> data) {
+	}
+
+	/** The current gzipped JSON-Lines download URL for one bulk-data file, such as "oracle_cards": one row per unique card name. */
+	public String bulkDataUri(String type) {
+		throttle();
+		BulkDataList body = http.get().uri("/bulk-data").retrieve().body(BulkDataList.class);
+		if (body == null || body.data() == null) {
+			throw new IllegalStateException("Scryfall's bulk-data list came back empty");
+		}
+		return body.data().stream()
+				.filter(entry -> type.equals(entry.type()) && entry.jsonl_download_uri() != null)
+				.map(BulkDataEntry::jsonl_download_uri)
+				.findFirst()
+				.orElseThrow(() -> new IllegalStateException("No bulk-data file of type " + type));
+	}
+
+	/**
+	 * Streams a bulk-data file straight from Scryfall's CDN into {@code consumer}, one card at a time, without holding
+	 * the whole file (tens of megabytes) in memory. The file is gzip-compressed JSON-Lines: one card object per line.
+	 * These downloads are not rate-limited the way the API is, so this does not go through {@link #throttle()}.
+	 */
+	public void streamBulkData(String uri, Consumer<ScryfallCard> consumer) {
+		HttpRequest request = HttpRequest.newBuilder(URI.create(uri)).header("User-Agent", userAgent).header("Accept", "application/json").build();
+		try {
+			HttpResponse<InputStream> response = bulkHttp.send(request, HttpResponse.BodyHandlers.ofInputStream());
+			if (response.statusCode() != 200) {
+				throw new IllegalStateException("Bulk data download answered " + response.statusCode());
+			}
+			try (InputStream raw = response.body();
+					java.util.zip.GZIPInputStream gzip = new java.util.zip.GZIPInputStream(raw);
+					java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(gzip, java.nio.charset.StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					if (!line.isBlank()) {
+						consumer.accept(JSON.readValue(line, ScryfallCard.class));
+					}
+				}
+			}
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException(ex);
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("Interrupted while downloading bulk data", ex);
+		}
 	}
 
 	private void throttle() {
