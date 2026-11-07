@@ -25,6 +25,9 @@ const PLAIN = /^(\d{1,3})\s*[xX]?\s+(.+)$/;
 // " (SET) 123" and the foil marker, which only describe a printing
 const PRINTING_SUFFIX = /\s+\([A-Za-z0-9]{2,8}\)(?:\s+[\w★-]+)?(?:\s+\*[A-Za-z]+\*)?\s*$/;
 const FOIL_SUFFIX = /\s+\*[A-Za-z]+\*\s*$/;
+// Archidekt tags every line with the card's type, e.g. "(mkc) 221 [Creature]" or "(ltr) 224 [Commander{top}]".
+// It must be stripped before PRINTING_SUFFIX, which otherwise can never match at the true end of the line.
+const TAG_SUFFIX = /\s+\[[^[\]]*\]\s*$/;
 const HEADER_ROW = /^"?(quantity|count|qty)"?\s*,/i;
 
 /** Splits one CSV line into fields, honoring quotes so "Atraxa, Praetors' Voice" stays one field. */
@@ -61,6 +64,7 @@ export function cleanName(raw: string): string {
   return raw
     .trim()
     .replace(/^"+|"+$/g, "")
+    .replace(TAG_SUFFIX, "")
     .replace(PRINTING_SUFFIX, "")
     .replace(FOIL_SUFFIX, "")
     .replace(/\s+/g, " ")
