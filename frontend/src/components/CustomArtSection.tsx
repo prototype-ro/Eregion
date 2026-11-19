@@ -174,6 +174,10 @@ export function CustomArtSection({ cardId, currentId = null, onChoose, onChanged
           </label>
         </li>
       </ul>
+      <p className="text-xs text-muted">
+        Only add art you made or have the right to use. Art on a card in a published version is shown to everyone who
+        opens that deck. It is for personal, casual play: not for sale or sanctioned events.
+      </p>
     </section>
   );
 }

@@ -44,10 +44,10 @@ export default function Home() {
               Start a deck
             </Link>
             <Link
-              href="/login"
+              href="/explore"
               className="pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center whitespace-nowrap rounded-full border border-ink px-7 text-base font-medium"
             >
-              View demo deck
+              Browse shared decks
             </Link>
           </div>
         </div>
@@ -166,10 +166,6 @@ export default function Home() {
       </section>
       </main>
 
-      <footer className="flex flex-wrap justify-between gap-3 pt-8 pb-10 text-[13px] text-muted">
-        <p>Eregion, a deck ledger for Commander players.</p>
-        <p>Placeholder card art belongs to Wizards of the Coast and the artists. Not affiliated.</p>
-      </footer>
     </div>
   );
 }

@@ -328,7 +328,7 @@ export default function DecksPage() {
 
         {decks !== null && decks.length === 0 && (
           <div className="max-w-[460px] border-t border-line pt-8">
-            <p className="text-lg leading-normal text-muted">No decks yet. Name one above, then add cards and save your first version.</p>
+            <p className="text-lg leading-normal text-muted">No decks yet. Press New deck, name it, then add cards and save your first version.</p>
             <p className="mt-4 text-[15px] text-muted">
               Want ideas first?{" "}
               <Link href="/explore" className="text-accent-text underline underline-offset-4">

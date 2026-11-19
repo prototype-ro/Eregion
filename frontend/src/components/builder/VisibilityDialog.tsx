@@ -72,7 +72,7 @@ function Form({ onClose, deckId, timeline, visibility, publishedVersion, current
 
       <div className="flex flex-col gap-3">
         {option("private", "Private", "Only you can see it.")}
-        {option("public", "Public", "Listed on Explore for every signed in player, with your display name.")}
+        {option("public", "Public", "Anyone with the link can see it, and it is listed on Explore with your display name.")}
       </div>
 
       {choice === "public" && (

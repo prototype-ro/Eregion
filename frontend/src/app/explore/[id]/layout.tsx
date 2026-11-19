@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
 
@@ -30,6 +31,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+/**
+ * A deck that is private, deleted or never existed answers a real 404, so search engines drop it and link
+ * previews do not show an empty deck page. If the API cannot be reached, the page renders and shows its own error.
+ */
+export default async function Layout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const status = await fetch(`${backend}/api/explore/${id}`, { cache: "no-store" }).then(
+    (response) => response.status,
+    () => null,
+  );
+  if (status === 404) notFound();
   return children;
 }
