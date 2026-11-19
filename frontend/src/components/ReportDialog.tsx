@@ -42,7 +42,7 @@ function Form({ onClose, deckId }: Props) {
     return (
       <div className="flex flex-col gap-5">
         <h2 className="font-display text-[44px] leading-none">Report sent</h2>
-        <p className="text-muted">Thank you. Someone will look at this deck.</p>
+        <p className="text-muted">Thank you. The report reached the people who run Eregion.</p>
         <button type="button" onClick={onClose} className={`${btn.large.secondary} self-start`}>
           Close
         </button>

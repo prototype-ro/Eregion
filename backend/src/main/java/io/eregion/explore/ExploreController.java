@@ -3,6 +3,7 @@ package io.eregion.explore;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.eregion.auth.CurrentUser;
+import io.eregion.auth.Mailer;
 import io.eregion.common.ApiException;
 import io.eregion.deck.DeckDtos.DeckCardLine;
 import io.eregion.deck.DeckDtos.DeckStats;
@@ -41,11 +43,19 @@ public class ExploreController {
 	private final ExploreRepository explore;
 	private final DeckRepository decks;
 	private final RateLimits limits;
+	private final Mailer mail;
+	/** Who hears about each report. Blank leaves reports in the deck_reports table only. */
+	private final String moderationEmail;
+	private final String publicUrl;
 
-	public ExploreController(ExploreRepository explore, DeckRepository decks, RateLimits limits) {
+	public ExploreController(ExploreRepository explore, DeckRepository decks, RateLimits limits, Mailer mail,
+			@Value("${eregion.moderation.email:}") String moderationEmail, @Value("${eregion.public-url:http://localhost:3000}") String publicUrl) {
 		this.explore = explore;
 		this.decks = decks;
 		this.limits = limits;
+		this.mail = mail;
+		this.moderationEmail = moderationEmail;
+		this.publicUrl = publicUrl;
 	}
 
 	@GetMapping
@@ -66,8 +76,15 @@ public class ExploreController {
 	public void report(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody ReportRequest request) {
 		UUID reporter = CurrentUser.id(jwt);
 		limits.report(reporter);
-		if (!explore.report(deckId, reporter, request.reason().strip())) {
+		String reason = request.reason().strip();
+		if (!explore.report(deckId, reporter, reason)) {
 			throw ApiException.notFound("Deck");
+		}
+		// A report nobody reads protects nobody: whoever runs the site hears about it straight away.
+		if (!moderationEmail.isBlank()) {
+			mail.send(moderationEmail, "A deck was reported", "A player reported this deck:\n" + publicUrl + "/explore/" + deckId
+					+ "\n\nTheir reason:\n" + reason + "\n\nTo take it off Explore, run:\nUPDATE decks SET visibility = 'private', published_version_id = NULL, published_at = NULL WHERE id = '"
+					+ deckId + "';\n\nEvery report is kept in the deck_reports table.");
 		}
 	}
 
