@@ -6,6 +6,7 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -82,18 +83,27 @@ public class BulkCatalogSyncService {
 		String uri = scryfall.bulkDataUri("oracle_cards");
 		int[] seen = { 0 };
 		int[] added = { 0 };
+		int[] skipped = { 0 };
 		scryfall.streamBulkData(uri, card -> {
-			if (card.id() == null || card.name() == null) {
+			if (card.id() == null || card.name() == null || ScryfallMapper.isArtSeries(card)) {
 				return;
 			}
 			seen[0]++;
-			added[0] += cards.insertIfMissing(ScryfallMapper.toCard(card));
+			try {
+				added[0] += cards.insertIfMissing(ScryfallMapper.toCard(card));
+			}
+			catch (DuplicateKeyException ex) {
+				// The same Scryfall card already stored under another spelling of its name ("Spirit Sorcerer Token").
+				// One such card must not stop the other thirty thousand from loading.
+				skipped[0]++;
+			}
 		});
 		if (seen[0] < MIN_PLAUSIBLE) {
 			throw new IllegalStateException("Only " + seen[0] + " cards came back from the bulk download, not recording this as a successful run");
 		}
 		syncState.recordRun(JOB);
-		log.info("Bulk catalog sync: {} cards seen, {} new cards added in {} s", seen[0], added[0], Duration.between(start, Instant.now()).toSeconds());
+		log.info("Bulk catalog sync: {} cards seen, {} new cards added, {} already stored under another name, in {} s", seen[0], added[0], skipped[0],
+				Duration.between(start, Instant.now()).toSeconds());
 		return seen[0];
 	}
 }

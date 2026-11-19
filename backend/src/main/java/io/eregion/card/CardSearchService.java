@@ -52,7 +52,7 @@ public class CardSearchService {
 			String query = ScryfallQuery.toScryfall(cleaned) + (commandersOnly ? " is:commander" : "") + (tokens ? " t:token" : "");
 			for (ScryfallCard found : scryfall.search(query, MAX_FROM_SCRYFALL)) {
 				// Cards are kept one per name, so a token that shares a name with a real card would overwrite it. It is left out.
-				if (tokens && cards.realCardExists(found.name())) {
+				if (tokens && cards.realCardExists(found.name()) || ScryfallMapper.isArtSeries(found)) {
 					continue;
 				}
 				cards.upsert(ScryfallMapper.toCard(found));
@@ -61,7 +61,13 @@ public class CardSearchService {
 		}
 		catch (RuntimeException ex) {
 			// Scryfall being slow or down must not break search: fall back to what we have.
-			log.warn("Scryfall search failed for '{}', answering from the local catalog", cleaned, ex);
+			// Scryfall asking us to slow down is expected now and then: one line, not a stack trace that buries real errors.
+			if (ex instanceof ScryfallClient.BusyException) {
+				log.info("Scryfall is cooling down, answering '{}' from the local catalog", cleaned);
+			}
+			else {
+				log.warn("Scryfall search failed for '{}', answering from the local catalog", cleaned, ex);
+			}
 			return local;
 		}
 		return cards.search(cleaned, limit, commandersOnly, tokens);

@@ -65,7 +65,7 @@ public class CardResolveService {
 			List<String> batch = missing.subList(start, Math.min(start + BATCH, missing.size()));
 			try {
 				ScryfallClient.CollectionResult found = scryfall.collection(batch);
-				found.data().forEach(card -> cards.upsert(ScryfallMapper.toCard(card)));
+				found.data().stream().filter(card -> !ScryfallMapper.isArtSeries(card)).forEach(card -> cards.upsert(ScryfallMapper.toCard(card)));
 				found.not_found().forEach(id -> stillMissing.add(id.name()));
 			}
 			catch (ScryfallClient.BusyException | HttpClientErrorException.TooManyRequests ex) {
@@ -86,7 +86,9 @@ public class CardResolveService {
 				break;
 			}
 			try {
-				scryfall.fuzzy(name).ifPresent(card -> fuzzy.put(NameNormalizer.normalize(name), cards.upsert(ScryfallMapper.toCard(card))));
+				scryfall.fuzzy(name)
+						.filter(card -> !ScryfallMapper.isArtSeries(card))
+						.ifPresent(card -> fuzzy.put(NameNormalizer.normalize(name), cards.upsert(ScryfallMapper.toCard(card))));
 			}
 			catch (ScryfallClient.BusyException | HttpClientErrorException.TooManyRequests ex) {
 				// Asking again while Scryfall shuts us out risks a ban, so the rest wait for the next try.
@@ -99,7 +101,11 @@ public class CardResolveService {
 		}
 
 		Map<String, Card> catalog = new LinkedHashMap<>();
-		for (Card card : cards.findByNames(byKey.keySet())) {
+		// A real card wins over a token whose name or front face says the same thing.
+		List<Card> named = cards.findByNames(byKey.keySet()).stream()
+				.sorted(java.util.Comparator.comparing((Card card) -> card.typeLine() != null && card.typeLine().startsWith("Token")))
+				.toList();
+		for (Card card : named) {
 			keysOf(card.name()).forEach(key -> catalog.putIfAbsent(key, card));
 		}
 

@@ -83,7 +83,7 @@ public class AdvancedSearchService {
 		List<Card> saved = new ArrayList<>();
 		if (found.data() != null) {
 			for (ScryfallCard card : found.data()) {
-				if (card.id() != null) {
+				if (card.id() != null && !ScryfallMapper.isArtSeries(card)) {
 					saved.add(cards.upsert(ScryfallMapper.toCard(card)));
 				}
 			}

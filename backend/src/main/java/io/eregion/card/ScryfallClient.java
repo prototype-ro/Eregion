@@ -61,7 +61,12 @@ public class ScryfallClient {
 			@Value("${eregion.scryfall.sync-gap-ms:250}") long syncGapMs) {
 		this.userAgent = userAgent;
 		this.syncGapMs = syncGapMs;
+		// Searches and imports call Scryfall while a person waits, so a hung answer must not hold the request forever.
+		var requests = new org.springframework.http.client.JdkClientHttpRequestFactory(
+				HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+		requests.setReadTimeout(Duration.ofSeconds(15));
 		this.http = RestClient.builder()
+				.requestFactory(requests)
 				.baseUrl("https://api.scryfall.com")
 				.defaultHeader("User-Agent", userAgent)
 				.defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)

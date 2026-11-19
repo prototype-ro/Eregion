@@ -52,6 +52,7 @@ public class CardRepository {
 				WHERE """ + " " + where + """
 
 				  AND ((type_line LIKE 'Token%') = :tokens)
+				  AND type_line <> 'Card // Card'
 				  AND (:commandersOnly = false OR (type_line ILIKE '%legendary%'
 				       AND (type_line ILIKE '%creature%' OR oracle_text ILIKE '%can be your commander%')))
 				ORDER BY (name ILIKE :prefix) DESC, name
@@ -102,12 +103,16 @@ public class CardRepository {
 				.list());
 	}
 
-	/** Cards whose full name, or front face, matches any of these names once case, accents and quotes are ignored. */
+	/**
+	 * Cards whose full name, or front face, matches any of these names once case, accents and quotes are ignored.
+	 * Art Series cards ("Mana Drain // Mana Drain") are never matched: their front face is a real card's name.
+	 */
 	public List<Card> findByNames(java.util.Collection<String> names) {
 		if (names.isEmpty()) {
 			return List.of();
 		}
-		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE eregion_norm(name) IN (:names) OR eregion_norm(split_part(name, ' // ', 1)) IN (:names)")
+		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE type_line <> 'Card // Card'"
+				+ " AND (eregion_norm(name) IN (:names) OR eregion_norm(split_part(name, ' // ', 1)) IN (:names))")
 				.param("names", names.stream().map(NameNormalizer::normalize).distinct().toList())
 				.query(CardRepository::map)
 				.list();
@@ -192,10 +197,13 @@ public class CardRepository {
 	}
 
 	/**
-	 * Adds a card only if its name is not already in the catalog; an existing row, Token or not, is left completely
+	 * Adds a card only if its name is not already in the catalog; an existing real card is left completely
 	 * untouched. Used by the bulk catalog load, which must never change a card a deck may already be pinning a
-	 * specific printing or piece of art for — unlike {@link #upsert}, which is for refreshing a card we are
+	 * specific printing or piece of art for, unlike {@link #upsert}, which is for refreshing a card we are
 	 * deliberately re-fetching by its own identity (a search hit, a price refresh).
+	 * <p>
+	 * One exception: names are unique, so a token stored first ("Llanowar Elves" from a token set) would keep the
+	 * real card of that name out of the catalog for good. A real card therefore takes over a token's row.
 	 */
 	public int insertIfMissing(Card card) {
 		return jdbc.sql("""
@@ -205,7 +213,30 @@ public class CardRepository {
 				VALUES (:scryfallId, :name, :manaCost, :manaValue, :typeLine, :primaryType, :colors,
 				        :colorIdentity, :oracleText, :power, :toughness, :setCode, :setName, :collectorNumber, :rarity,
 				        :artist, :priceUsd, now(), :imageSmall, :imageNormal, :imageArtCrop, :commanderLegality)
-				ON CONFLICT (lower(name)) DO NOTHING
+				ON CONFLICT (lower(name)) DO UPDATE SET
+				    scryfall_id = EXCLUDED.scryfall_id,
+				    name = EXCLUDED.name,
+				    mana_cost = EXCLUDED.mana_cost,
+				    mana_value = EXCLUDED.mana_value,
+				    type_line = EXCLUDED.type_line,
+				    primary_type = EXCLUDED.primary_type,
+				    colors = EXCLUDED.colors,
+				    color_identity = EXCLUDED.color_identity,
+				    oracle_text = EXCLUDED.oracle_text,
+				    power = EXCLUDED.power,
+				    toughness = EXCLUDED.toughness,
+				    set_code = EXCLUDED.set_code,
+				    set_name = EXCLUDED.set_name,
+				    collector_number = EXCLUDED.collector_number,
+				    rarity = EXCLUDED.rarity,
+				    artist = EXCLUDED.artist,
+				    price_usd = EXCLUDED.price_usd,
+				    price_updated_at = now(),
+				    image_small = EXCLUDED.image_small,
+				    image_normal = EXCLUDED.image_normal,
+				    image_art_crop = EXCLUDED.image_art_crop,
+				    commander_legality = EXCLUDED.commander_legality
+				 WHERE cards.type_line LIKE 'Token%' AND EXCLUDED.type_line NOT LIKE 'Token%'
 				""")
 				.param("scryfallId", card.scryfallId())
 				.param("name", card.name())

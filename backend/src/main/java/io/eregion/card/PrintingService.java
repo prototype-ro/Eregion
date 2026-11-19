@@ -40,7 +40,12 @@ public class PrintingService {
 			}
 			catch (RuntimeException ex) {
 				// Serve whatever is stored rather than failing the picker.
-				log.warn("Could not fetch printings for '{}'", card.name(), ex);
+				if (ex instanceof ScryfallClient.BusyException) {
+					log.info("Scryfall is cooling down, printings for '{}' come from the catalog", card.name());
+				}
+				else {
+					log.warn("Could not fetch printings for '{}'", card.name(), ex);
+				}
 			}
 		}
 		return printings.forCard(cardId);

@@ -19,6 +19,17 @@ public final class ScryfallMapper {
 	private ScryfallMapper() {
 	}
 
+	/** Scryfall gives every Art Series card (a collectible art card, not a game piece) this type line. */
+	public static final String ART_SERIES_TYPE_LINE = "Card // Card";
+
+	/**
+	 * Whether this is an Art Series card such as "Mana Drain // Mana Drain". Those are never stored: their front face
+	 * carries a real card's name, so a pasted "Mana Drain" could otherwise resolve to one (not legal, mana value 0).
+	 */
+	public static boolean isArtSeries(ScryfallCard source) {
+		return ART_SERIES_TYPE_LINE.equals(source.type_line());
+	}
+
 	public static Card toCard(ScryfallCard source) {
 		Face front = source.card_faces() == null || source.card_faces().isEmpty() ? null : source.card_faces().get(0);
 
