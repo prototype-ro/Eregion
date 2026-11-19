@@ -17,6 +17,15 @@ class PasswordPolicyTest {
 	}
 
 	@Test
+	void commonWordsWithDigitsSymbolsOrRepeatsAreRefused() {
+		for (String weak : new String[] { "passwordpassword", "password12345", "Password123!", "iloveyou123", "letmein12345", "qwerty123456",
+				"abcdefghij1", "!!dragon2024", "dragondragon" }) {
+			assertThat(problem(weak)).as(weak).contains("most common");
+		}
+		assertThat(problem("dragonfire-2024-keep")).isNull();
+	}
+
+	@Test
 	void tooShortIsRefused() {
 		assertThat(problem("short1!")).contains("at least 10");
 		assertThat(problem(null)).contains("at least 10");

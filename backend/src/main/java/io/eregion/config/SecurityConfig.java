@@ -41,8 +41,12 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 public class SecurityConfig {
 
 	@Bean
-	SecretKey jwtSecretKey(JwtProperties properties, @org.springframework.beans.factory.annotation.Value("${eregion.env:dev}") String environment) {
-		if ("production".equalsIgnoreCase(environment) && isPlaceholder(properties.secret())) {
+	SecretKey jwtSecretKey(JwtProperties properties, @org.springframework.beans.factory.annotation.Value("${eregion.env:dev}") String environment,
+			@org.springframework.beans.factory.annotation.Value("${eregion.public-url:}") String publicUrl) {
+		// A server people reach over HTTPS is a deployment even if EREGION_ENV was forgotten, and the default secret
+		// is public in the repository: anyone could sign a login for any account with it.
+		boolean deployed = "production".equalsIgnoreCase(environment) || publicUrl.startsWith("https://");
+		if (deployed && isPlaceholder(properties.secret())) {
 			throw new IllegalStateException("EREGION_JWT_SECRET is still the development default. Set a long random secret before running in production, for example the output of: openssl rand -base64 48");
 		}
 		byte[] bytes = properties.secret().getBytes(StandardCharsets.UTF_8);

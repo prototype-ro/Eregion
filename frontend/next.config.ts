@@ -10,7 +10,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://cards.scryfall.io",
   "font-src 'self' data:",
-  `connect-src 'self'${dev ? " ws: wss:" : ""}`,
+  // Scryfall too: the deck page reads a commander's art pixels (lib/artColor.ts) to colour its graphs.
+  `connect-src 'self' https://cards.scryfall.io${dev ? " ws: wss:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -30,6 +31,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Sent with every page and asset. Kept here (not in proxy.ts) because the proxy only runs for /api.
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
+  poweredByHeader: false,
   // Next blocks its development resources (hot reload, hydration) for any host but localhost, which leaves a page opened on 127.0.0.1
   // a static shell with no developer tools. Development only: it has no effect on a production build.
   allowedDevOrigins: ["127.0.0.1"],

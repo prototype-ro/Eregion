@@ -19,15 +19,24 @@ public class MailService implements Mailer {
 
 	private final ObjectProvider<JavaMailSender> smtp;
 	private final String from;
+	private final boolean production;
 
-	public MailService(ObjectProvider<JavaMailSender> smtp, @Value("${eregion.mail.from:Eregion <no-reply@localhost>}") String from) {
-		this.smtp = smtp;
+	public MailService(ObjectProvider<JavaMailSender> smtp, @Value("${eregion.mail.from:Eregion <no-reply@localhost>}") String from,
+			@Value("${eregion.env:dev}") String environment, @Value("${spring.mail.host:}") String host) {
+		// Spring Boot builds a sender for any spring.mail.host, even an empty one passed through by docker compose.
+		this.smtp = host.isBlank() ? null : smtp;
 		this.from = from;
+		this.production = "production".equalsIgnoreCase(environment);
+		// Without mail, nobody can confirm an address (needed to publish a deck) or reset a password, and the
+		// one-use links would only exist in the log. Production refuses to start rather than fail quietly.
+		if (production && (this.smtp == null || smtp.getIfAvailable() == null)) {
+			throw new IllegalStateException("No mail server is configured. Set SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME and SPRING_MAIL_PASSWORD before running in production.");
+		}
 	}
 
 	@Override
 	public void send(String to, String subject, String body) {
-		JavaMailSender sender = smtp.getIfAvailable();
+		JavaMailSender sender = smtp == null ? null : smtp.getIfAvailable();
 		if (sender == null) {
 			log.info("MAIL (no mail server configured, not sent)\n  to: {}\n  subject: {}\n{}", to, subject, body);
 			return;
@@ -42,7 +51,8 @@ public class MailService implements Mailer {
 		}
 		catch (RuntimeException ex) {
 			// A mail problem must not turn a request into an error, and must not reveal whether an address exists.
-			log.error("Could not send mail to {}: {}", to, ex.getMessage());
+			// The address is personal data, so production logs only what was being sent.
+			log.error("Could not send mail ({}) to {}: {}", subject, production ? "a user" : to, ex.getMessage());
 		}
 	}
 }

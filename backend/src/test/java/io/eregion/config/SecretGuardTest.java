@@ -21,21 +21,28 @@ class SecretGuardTest {
 	void productionRefusesToStartWithAPlaceholderSecret() {
 		var placeholder = new JwtProperties("dev-only-secret-change-me-dev-only-secret", 60);
 
-		assertThatThrownBy(() -> config.jwtSecretKey(placeholder, "production")).isInstanceOf(IllegalStateException.class).hasMessageContaining("EREGION_JWT_SECRET");
+		assertThatThrownBy(() -> config.jwtSecretKey(placeholder, "production", "")).isInstanceOf(IllegalStateException.class).hasMessageContaining("EREGION_JWT_SECRET");
 	}
 
 	@Test
 	void developmentStillAllowsThePlaceholder() {
-		assertThat(config.jwtSecretKey(new JwtProperties("dev-only-secret-change-me-dev-only-secret", 60), "dev")).isNotNull();
+		assertThat(config.jwtSecretKey(new JwtProperties("dev-only-secret-change-me-dev-only-secret", 60), "dev", "http://localhost:3000")).isNotNull();
+	}
+
+	@Test
+	void anHttpsSiteCountsAsDeployedEvenWithoutTheEnvironmentSet() {
+		var placeholder = new JwtProperties("dev-only-secret-change-me-dev-only-secret", 60);
+
+		assertThatThrownBy(() -> config.jwtSecretKey(placeholder, "dev", "https://eregion.example")).isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test
 	void productionAcceptsARealSecret() {
-		assertThat(config.jwtSecretKey(new JwtProperties("q8Lw2Zs9uXvJp0Rk4NtB7yHcE1aGdFmV5oIiUhYb", 60), "production")).isNotNull();
+		assertThat(config.jwtSecretKey(new JwtProperties("q8Lw2Zs9uXvJp0Rk4NtB7yHcE1aGdFmV5oIiUhYb", 60), "production", "")).isNotNull();
 	}
 
 	@Test
 	void aShortSecretIsAlwaysRefused() {
-		assertThatThrownBy(() -> config.jwtSecretKey(new JwtProperties("short", 60), "production")).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> config.jwtSecretKey(new JwtProperties("short", 60), "production", "")).isInstanceOf(IllegalStateException.class);
 	}
 }

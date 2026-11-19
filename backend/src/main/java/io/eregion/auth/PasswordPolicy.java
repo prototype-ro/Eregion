@@ -32,7 +32,7 @@ public final class PasswordPolicy {
 			return "Use at least " + MIN_LENGTH + " characters.";
 		}
 		String lower = password.toLowerCase(Locale.ROOT);
-		if (COMMON.contains(lower)) {
+		if (COMMON.contains(lower) || isCommonWithPadding(lower)) {
 			return "That password is on lists of the most common ones. Choose something less guessable.";
 		}
 		if (password.chars().distinct().count() < 4) {
@@ -49,6 +49,29 @@ public final class PasswordPolicy {
 			return "Do not include your display name in the password.";
 		}
 		return null;
+	}
+
+	/**
+	 * Guessing tools try the common words with digits or symbols added and with the word typed twice, so
+	 * "Password123!", "letmein12345" and "passwordpassword" are as weak as "password".
+	 */
+	static boolean isCommonWithPadding(String lower) {
+		String stem = lower.replaceAll("^[^a-z]+|[^a-z]+$", "");
+		if (stem.isEmpty()) {
+			return false;
+		}
+		if (COMMON.contains(stem)) {
+			return true;
+		}
+		for (int size = 1; size <= stem.length() / 2; size++) {
+			if (stem.length() % size == 0) {
+				String unit = stem.substring(0, size);
+				if (unit.repeat(stem.length() / size).equals(stem) && COMMON.contains(unit)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/** True for text that walks the alphabet or digits one step at a time, such as "abcdefghij" or "1234567890". */
