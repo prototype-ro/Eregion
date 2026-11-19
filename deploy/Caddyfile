@@ -1,0 +1,8 @@
+# The only public entry point. Caddy gets and renews the TLS certificate for EREGION_DOMAIN by itself, redirects
+# plain HTTP to HTTPS, and sets X-Forwarded-For to the real visitor (it ignores one sent by the visitor), which is
+# what the API's rate limits count. If another proxy or CDN sits in front of Caddy, add its ranges as
+# trusted_proxies, or every visitor will share that proxy's address.
+{$EREGION_DOMAIN:localhost} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}

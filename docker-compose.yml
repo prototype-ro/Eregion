@@ -2,12 +2,14 @@ services:
   db:
     image: postgres:17-alpine
     container_name: eregion-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: eregion
       POSTGRES_USER: eregion
-      POSTGRES_PASSWORD: eregion
+      POSTGRES_PASSWORD: ${EREGION_DB_PASSWORD:-eregion}
+    # Only this machine can reach the database. The app services talk to it over the compose network.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - eregion-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -16,32 +18,71 @@ services:
       timeout: 3s
       retries: 10
 
-  # The whole app, for trying a production-like setup: docker compose --profile app up --build
-  # It needs EREGION_JWT_SECRET (openssl rand -base64 48) and refuses to start without a real one.
+  # The whole app, for a production-like run: docker compose --profile app up --build
+  # Put the settings in a .env file next to this one (see .env.example). The API refuses to start without a real
+  # EREGION_JWT_SECRET (openssl rand -base64 48) and without a mail server (SPRING_MAIL_*).
   backend:
     profiles: ["app"]
     build: ./backend
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
       EREGION_DB_URL: jdbc:postgresql://db:5432/eregion
       EREGION_DB_USER: eregion
-      EREGION_DB_PASSWORD: eregion
-      EREGION_JWT_SECRET: "${EREGION_JWT_SECRET:?set EREGION_JWT_SECRET, for example with: openssl rand -base64 48}"
+      EREGION_DB_PASSWORD: ${EREGION_DB_PASSWORD:-eregion}
+      EREGION_JWT_SECRET: ${EREGION_JWT_SECRET:-}
       EREGION_ENV: production
+      EREGION_PUBLIC_URL: ${EREGION_PUBLIC_URL:-http://localhost:3000}
       EREGION_CORS_ORIGINS: ${EREGION_PUBLIC_URL:-http://localhost:3000}
+      EREGION_COOKIE_SECURE: "true"
+      # Only the site reaches the API, so the one X-Forwarded-For hop it adds is trusted.
       EREGION_TRUST_PROXY: "true"
+      EREGION_MAIL_FROM: ${EREGION_MAIL_FROM:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      EREGION_ASSISTANT_ENABLED: ${EREGION_ASSISTANT_ENABLED:-false}
+      EREGION_LLM_API_KEY: ${EREGION_LLM_API_KEY:-}
+      EREGION_MODERATION_EMAIL: ${EREGION_MODERATION_EMAIL:-}
+    mem_limit: 1g
 
   frontend:
     profiles: ["app"]
     build: ./frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       BACKEND_URL: http://backend:8080
+      SITE_URL: ${EREGION_PUBLIC_URL:-http://localhost:3000}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+    mem_limit: 512m
+
+  # HTTPS in front of the site. Set EREGION_DOMAIN to the public name and point its DNS at this machine.
+  proxy:
+    profiles: ["app"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+    environment:
+      EREGION_DOMAIN: ${EREGION_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   eregion-pgdata:
+  caddy-data:
+  caddy-config:

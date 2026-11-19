@@ -10,3 +10,6 @@ frontend/.viz-cand/
 frontend/public/dev/
 .claude/worktrees/
 .claude/settings.local.json
+
+# Merge leftovers
+*.orig

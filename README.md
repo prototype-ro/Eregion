@@ -101,7 +101,7 @@ Custom printings are images a player uploads for a card. A deck line can pin one
 
 ### Running it for real
 
-- `docker compose --profile app up --build` starts the database, the API and the site together. It needs `EREGION_JWT_SECRET` (for example `openssl rand -base64 48`). With `EREGION_ENV=production` the API refuses to start on a placeholder secret and always sets the login cookie as Secure, so put it behind HTTPS.
+- `docker compose --profile app up --build` starts the database, the API, the site and Caddy (HTTPS) together. The step by step for a real server, backups and monitoring is in [docs/deploy.md](docs/deploy.md). The API refuses to start in production on a placeholder `EREGION_JWT_SECRET` or without a mail server, and always sets the login cookie as Secure.
 - `GET /api/health` answers 200 when the API can reach its database, for load balancers and uptime checks.
 - Rate limits (sign in per network and per account, sign ups, card searches, list lookups, uploads) are kept in memory per server. Defaults and the settings that change them are in `.env.example`. Behind a proxy, set `EREGION_TRUST_PROXY=true` so limits count real visitors, not the proxy.
 - Passwords need 10 characters and may not be a common password, a run of keys, or contain the email name or display name.
