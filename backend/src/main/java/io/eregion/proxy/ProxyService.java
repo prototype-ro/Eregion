@@ -9,13 +9,13 @@ import io.eregion.card.Card;
 import io.eregion.card.CardRepository;
 import io.eregion.common.ApiException;
 import io.eregion.proxy.ProxyDtos.CardFacts;
+import io.eregion.proxy.ProxyDtos.ChatReply;
+import io.eregion.proxy.ProxyDtos.ChatTurn;
 import io.eregion.proxy.ProxyDtos.Draft;
 import io.eregion.proxy.ProxyDtos.Generation;
 import io.eregion.proxy.ProxyDtos.Lore;
 import io.eregion.proxy.ProxyDtos.Mode;
 import io.eregion.proxy.ProxyDtos.Treatment;
-import io.eregion.render.ArtLookup;
-import io.eregion.render.CardRenderService;
 
 /** Proxy treatments of a deck: who may touch them, what the model is told, and what is kept. */
 @Service
@@ -25,17 +25,12 @@ public class ProxyService {
 	private final CardRepository cards;
 	private final ProxyPromptService prompts;
 	private final LlmClient llm;
-	private final ArtLookup artLookup;
-	private final CardRenderService cardRenderService;
 
-	public ProxyService(ProxyRepository repository, CardRepository cards, ProxyPromptService prompts, LlmClient llm,
-			ArtLookup artLookup, CardRenderService cardRenderService) {
+	public ProxyService(ProxyRepository repository, CardRepository cards, ProxyPromptService prompts, LlmClient llm) {
 		this.repository = repository;
 		this.cards = cards;
 		this.prompts = prompts;
 		this.llm = llm;
-		this.artLookup = artLookup;
-		this.cardRenderService = cardRenderService;
 	}
 
 	public Lore lore(UUID userId, UUID deckId) {
@@ -66,6 +61,21 @@ public class ProxyService {
 	 * is sent along so the model changes only what was asked. Nothing is written when the model fails.
 	 */
 	public Treatment generate(UUID userId, UUID deckId, UUID cardId, Mode mode, String instruction, boolean ignoreType, boolean ignoreRulesText) {
+		return generate(userId, deckId, cardId, mode, instruction, ignoreType, ignoreRulesText, false);
+	}
+
+	public Treatment generate(UUID userId, UUID deckId, UUID cardId, Mode mode, String instruction, boolean ignoreType, boolean ignoreRulesText,
+			boolean loreOnly) {
+		return generate(userId, deckId, cardId, mode, instruction, ignoreType, ignoreRulesText, loreOnly, null);
+	}
+
+	public Treatment generate(UUID userId, UUID deckId, UUID cardId, Mode mode, String instruction, boolean ignoreType, boolean ignoreRulesText,
+			boolean loreOnly, String tier) {
+		return generate(userId, deckId, cardId, mode, instruction, ignoreType, ignoreRulesText, loreOnly, tier, false);
+	}
+
+	public Treatment generate(UUID userId, UUID deckId, UUID cardId, Mode mode, String instruction, boolean ignoreType, boolean ignoreRulesText,
+			boolean loreOnly, String tier, boolean ignoreLore) {
 		owned(deckId, userId);
 		Card card = cards.findById(cardId).orElseThrow(() -> ApiException.notFound("Card"));
 		Lore lore = repository.lore(deckId);
@@ -75,12 +85,38 @@ public class ProxyService {
 				.map(g -> g == null ? null : new Draft(g.nickname(), g.character(), g.prompt()))
 				.orElse(null);
 
-		Draft draft = prompts.generate(lore.lore(), facts(card), mode, repository.picks(deckId, cardId), previous, instruction, ignoreType,
-				ignoreRulesText);
+		String effectiveLore = ignoreLore ? "" : lore.lore();
+		Draft draft = prompts.generate(effectiveLore, facts(card), mode, repository.picks(deckId, cardId), previous, instruction, ignoreType,
+				ignoreRulesText, loreOnly && !ignoreLore, ignoreLore ? null : tier);
 
 		repository.record(deckId, cardId, mode, instruction, draft, llm.modelName());
-		rerenderIfArtExists(deckId, cardId);
 		return repository.treatment(deckId, cardId).orElseThrow();
+	}
+
+	/** A free-form, non-committing reply: discuss a direction before spending a generation on it. Nothing is saved. */
+	public ChatReply chat(UUID userId, UUID deckId, UUID cardId, Mode mode, boolean ignoreType, boolean ignoreRulesText, List<ChatTurn> messages) {
+		return chat(userId, deckId, cardId, mode, ignoreType, ignoreRulesText, false, messages);
+	}
+
+	public ChatReply chat(UUID userId, UUID deckId, UUID cardId, Mode mode, boolean ignoreType, boolean ignoreRulesText, boolean loreOnly,
+			List<ChatTurn> messages) {
+		return chat(userId, deckId, cardId, mode, ignoreType, ignoreRulesText, loreOnly, messages, false);
+	}
+
+	public ChatReply chat(UUID userId, UUID deckId, UUID cardId, Mode mode, boolean ignoreType, boolean ignoreRulesText, boolean loreOnly,
+			List<ChatTurn> messages, boolean ignoreLore) {
+		owned(deckId, userId);
+		Card card = cards.findById(cardId).orElseThrow(() -> ApiException.notFound("Card"));
+		Lore lore = repository.lore(deckId);
+		Draft current = repository.treatment(deckId, cardId)
+				.map(Treatment::current)
+				.map(g -> g == null ? null : new Draft(g.nickname(), g.character(), g.prompt()))
+				.orElse(null);
+
+		String effectiveLore = ignoreLore ? "" : lore.lore();
+		String system = prompts.chatSystem(effectiveLore, facts(card), mode, ignoreType, ignoreRulesText, loreOnly && !ignoreLore, current);
+		List<LlmClient.Turn> turns = messages.stream().map(m -> new LlmClient.Turn(m.role(), m.content())).toList();
+		return new ChatReply(llm.chat(system, turns));
 	}
 
 	public List<Generation> history(UUID userId, UUID deckId, UUID cardId) {
@@ -98,21 +134,12 @@ public class ProxyService {
 				.orElseThrow(() -> ApiException.notFound("Generation"));
 		repository.upsertTreatment(deckId, cardId, picked.nickname() != null ? Mode.NICKNAME : Mode.RESKIN);
 		repository.setCurrent(treatment.id(), generationId);
-		rerenderIfArtExists(deckId, cardId);
 		return repository.treatment(deckId, cardId).orElseThrow();
 	}
 
 	private void owned(UUID deckId, UUID userId) {
 		if (!repository.ownsDeck(deckId, userId)) {
 			throw ApiException.notFound("Deck");
-		}
-	}
-
-	/** Re-renders the card's composite when it already has uploaded art; nothing to composite otherwise. */
-	private void rerenderIfArtExists(UUID deckId, UUID cardId) {
-		byte[] artBytes = artLookup.findArtBytes(cardId);
-		if (artBytes != null) {
-			cardRenderService.render(deckId, cardId, artBytes);
 		}
 	}
 

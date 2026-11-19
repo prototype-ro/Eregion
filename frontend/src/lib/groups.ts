@@ -165,6 +165,12 @@ function setTitle(line: DeckCardLine): string {
   return line.setName || line.setCode.toUpperCase() || "Unknown set";
 }
 
+/** One group holding every line, sorted but not split apart. For a board too small to benefit from grouping. */
+export function flatGroup(lines: DeckCardLine[], sort: SortMode = "name", direction: SortDirection = "asc"): LineGroup[] {
+  if (lines.length === 0) return [];
+  return [{ title: "", lines: [...lines].sort(comparator(sort, direction)) }];
+}
+
 /** The commander always sits in its own group first. Everything else groups the chosen way. */
 export function groupLines(lines: DeckCardLine[], mode: GroupMode, sort: SortMode = "name", direction: SortDirection = "asc"): LineGroup[] {
   const compare = comparator(sort, direction);

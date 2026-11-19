@@ -183,6 +183,11 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* The command dock's search field sits bare over the page, with nothing of its own to carry a ring; it stays borderless on focus. */
+.dock-search-field:focus-visible {
+  outline: none;
+}
+
 /* Matte key: the secondary look from the button standard (lib/ui.ts), for the controls that still carry the pill class. */
 .pill {
   background: color-mix(in srgb, var(--text) 8%, var(--bg));

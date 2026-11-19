@@ -4,11 +4,11 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ApiError } from "@/lib/api";
-import { cardRenderUrl } from "@/lib/links";
 import { fullPrompt } from "@/lib/proxy";
 import type { useProxies } from "@/lib/useProxies";
-import type { LoreVerdict, ProxyGeneration, ProxyMode } from "@/lib/types";
+import type { LoreVerdict, ProxyChatTurn, ProxyGeneration, ProxyMode } from "@/lib/types";
 import { useLore } from "@/lib/useLore";
+import { tierOptions } from "@/lib/proxyTiers";
 import { btn } from "@/lib/ui";
 
 type Proxies = ReturnType<typeof useProxies>;
@@ -34,10 +34,10 @@ export function ProxyPanel(props: Props) {
   );
 }
 
-/** Tries the deck's composited render first; falls back to the card's existing art (custom or Scryfall) on error. */
-function RenderImage({ deckId, cardId, cardName, cardImage }: { deckId: string; cardId: string; cardName: string; cardImage?: string }) {
-  const [src, setSrc] = useState(() => cardRenderUrl(deckId, cardId));
-  return <Image src={src} alt={`${cardName} card image`} fill sizes="160px" className="object-cover" onError={() => cardImage && setSrc(cardImage)} />;
+/** The card's existing art (custom or Scryfall); there is no composited render anymore. */
+function RenderImage({ cardName, cardImage }: { cardName: string; cardImage?: string }) {
+  if (!cardImage) return null;
+  return <Image src={cardImage} alt={`${cardName} card image`} fill sizes="160px" className="object-cover" />;
 }
 
 function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props & { cardId: string }) {
@@ -46,12 +46,21 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
   const [instruction, setInstruction] = useState("");
   const [ignoreType, setIgnoreType] = useState(false);
   const [ignoreRulesText, setIgnoreRulesText] = useState(false);
+  const [loreOnly, setLoreOnly] = useState(false);
+  const [ignoreLore, setIgnoreLore] = useState(false);
+  const [tier, setTier] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<ProxyGeneration[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ProxyChatTurn[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const current = treatment?.current ?? null;
   const touchedMode = useRef(false);
   const lore = useLore(deckId);
+  const tiers = tierOptions(lore.doc);
   const [verdict, setVerdict] = useState<LoreVerdict | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -74,13 +83,37 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
     setBusy(true);
     setError(null);
     try {
-      await proxies.generate(cardId, mode, refine ? instruction : undefined, ignoreType, ignoreRulesText);
+      await proxies.generate(cardId, mode, refine ? instruction : undefined, ignoreType, ignoreRulesText, loreOnly, tier, ignoreLore);
       if (refine) setInstruction("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not generate. Try again.");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function sendChat() {
+    const text = chatInput.trim();
+    if (!text) return;
+    const next = [...chatMessages, { role: "user", content: text } as ProxyChatTurn];
+    setChatMessages(next);
+    setChatInput("");
+    setChatBusy(true);
+    setChatError(null);
+    try {
+      const reply = await proxies.chat(cardId, mode, ignoreType, ignoreRulesText, next, loreOnly, ignoreLore);
+      setChatMessages([...next, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setChatError(err instanceof ApiError ? err.message : "Could not reach the model. Try again.");
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
+  /** Carries a chat message over as the refine instruction, then closes the chat so the player reviews it before committing. */
+  function useAsInstruction(text: string) {
+    setInstruction(text);
+    setChatOpen(false);
   }
 
   async function choose(generationId: string) {
@@ -122,7 +155,7 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
   return (
     <div className="flex flex-col gap-5">
       <div className="relative aspect-[488/680] w-40 overflow-hidden rounded-[18px] bg-surface">
-        <RenderImage deckId={deckId} cardId={cardId} cardName={cardName} cardImage={cardImage} />
+        <RenderImage cardName={cardName} cardImage={cardImage} />
       </div>
       <h2 className="font-display text-[44px] leading-none">{current?.nickname ?? cardName}</h2>
       {current?.nickname && <p className="-mt-3 text-sm text-muted">Proxy for {cardName}</p>}
@@ -144,20 +177,93 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
         ))}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="flex items-center gap-2.5 text-sm text-muted">
-          <input type="checkbox" checked={ignoreType} onChange={(event) => setIgnoreType(event.target.checked)} className="size-4 accent-accent-text" />
-          Ignore this card&rsquo;s printed type — let the lore decide what it is
+      {tiers.length > 0 && (
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-muted">Tier</span>
+          <select
+            value={tier}
+            onChange={(event) => setTier(event.target.value)}
+            className="min-h-9 rounded-xl border border-line bg-surface px-3 text-[13px] text-ink [@media(pointer:coarse)]:min-h-11"
+          >
+            <option value="">Let the lore decide</option>
+            {tiers.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
-        <label className="flex items-center gap-2.5 text-sm text-muted">
-          <input
-            type="checkbox"
-            checked={ignoreRulesText}
-            onChange={(event) => setIgnoreRulesText(event.target.checked)}
-            className="size-4 accent-accent-text"
-          />
-          Ignore this card&rsquo;s rules text — focus entirely on the lore and the type
-        </label>
+      )}
+
+      <div className="flex flex-col gap-2.5">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={ignoreLore}
+          onClick={() =>
+            setIgnoreLore((on) => {
+              const next = !on;
+              if (next) setLoreOnly(false);
+              return next;
+            })
+          }
+          className="flex items-center justify-between gap-4 rounded-2xl border border-line px-4 py-3 text-left [@media(pointer:coarse)]:min-h-11"
+        >
+          <span className="flex flex-col">
+            <span className="text-sm">No lore</span>
+            <span className="text-xs text-muted">The deck's lore is not sent at all — the card stands alone, no deck characters or places in the art.</span>
+          </span>
+          <span className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${ignoreLore ? "border-accent-text bg-accent" : "border-line bg-surface"}`}>
+            <span className={`absolute top-0.5 size-3.5 rounded-full bg-ink transition-all ${ignoreLore ? "left-[18px]" : "left-0.5"}`} />
+          </span>
+        </button>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={loreOnly}
+          disabled={ignoreLore}
+          onClick={() =>
+            setLoreOnly((on) => {
+              const next = !on;
+              if (next) setIgnoreLore(false);
+              return next;
+            })
+          }
+          className={`flex items-center justify-between gap-4 rounded-2xl border border-line px-4 py-3 text-left [@media(pointer:coarse)]:min-h-11 ${ignoreLore ? "opacity-50" : ""}`}
+        >
+          <span className="flex flex-col">
+            <span className="text-sm">Lore and type only</span>
+            <span className="text-xs text-muted">
+              The model sees nothing of the card but its type — creature type for a creature, card type for anything else: no name, rules text, cost or
+              colors.
+            </span>
+          </span>
+          <span className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${loreOnly ? "border-accent-text bg-accent" : "border-line bg-surface"}`}>
+            <span className={`absolute top-0.5 size-3.5 rounded-full bg-ink transition-all ${loreOnly ? "left-[18px]" : "left-0.5"}`} />
+          </span>
+        </button>
+        <div className={`flex flex-col gap-1.5 ${loreOnly || ignoreLore ? "opacity-50" : ""}`}>
+          <label className="flex items-center gap-2.5 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={loreOnly || ignoreType}
+              disabled={loreOnly}
+              onChange={(event) => setIgnoreType(event.target.checked)}
+              className="size-4 accent-accent-text"
+            />
+            Ignore this card&rsquo;s printed type — let the lore decide what it is
+          </label>
+          <label className="flex items-center gap-2.5 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={loreOnly || ignoreRulesText}
+              disabled={loreOnly}
+              onChange={(event) => setIgnoreRulesText(event.target.checked)}
+              className="size-4 accent-accent-text"
+            />
+            Ignore this card&rsquo;s rules text — focus entirely on the lore and the type
+          </label>
+        </div>
       </div>
 
       {current ? (
@@ -175,19 +281,70 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
               {busy ? "Working…" : "Generate again"}
             </button>
           </div>
-          <div className="flex gap-2.5">
-            <input
-              value={instruction}
-              onChange={(event) => setInstruction(event.target.value)}
-              maxLength={1000}
-              placeholder="Refine: make the armor darker"
-              aria-label="Refine instruction"
-              className="min-h-9 w-full rounded-full border border-line bg-surface px-4 text-[13px] text-ink placeholder:text-muted focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11"
-            />
-            <button type="button" className={btn.secondary} disabled={busy || !instruction.trim()} onClick={() => run(true)}>
-              Refine
-            </button>
-          </div>
+          {chatOpen ? (
+            <div className="flex flex-col gap-2.5 rounded-3xl border border-line bg-surface p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Discuss before committing</h3>
+                <button type="button" className={btn.quiet} onClick={() => setChatOpen(false)}>
+                  Close
+                </button>
+              </div>
+              {chatMessages.length > 0 && (
+                <ul className="flex max-h-64 flex-col gap-2 overflow-auto">
+                  {chatMessages.map((message, index) => (
+                    <li
+                      key={index}
+                      className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${message.role === "user" ? "bg-ink text-bg" : "border border-line bg-bg"}`}
+                    >
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.role === "assistant" && (
+                        <button type="button" className="mt-1.5 text-xs text-muted underline hover:text-ink" onClick={() => useAsInstruction(message.content)}>
+                          Use as refine instruction
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {chatError && <p className="text-xs text-danger">{chatError}</p>}
+              <div className="flex gap-2.5">
+                <input
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !chatBusy) {
+                      event.preventDefault();
+                      void sendChat();
+                    }
+                  }}
+                  maxLength={2000}
+                  placeholder="Ask about ideas before committing to a change…"
+                  aria-label="Chat message"
+                  className="min-h-9 w-full rounded-full border border-line bg-bg px-4 text-[13px] text-ink placeholder:text-muted focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11"
+                />
+                <button type="button" className={btn.secondary} disabled={chatBusy || !chatInput.trim()} onClick={() => void sendChat()}>
+                  {chatBusy ? "…" : "Send"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2.5">
+              <input
+                value={instruction}
+                onChange={(event) => setInstruction(event.target.value)}
+                maxLength={1000}
+                placeholder="Refine: make the armor darker"
+                aria-label="Refine instruction"
+                className="min-h-9 w-full rounded-full border border-line bg-surface px-4 text-[13px] text-ink placeholder:text-muted focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11"
+              />
+              <button type="button" className={btn.secondary} disabled={busy || !instruction.trim()} onClick={() => run(true)}>
+                Refine
+              </button>
+              <button type="button" className={btn.quiet} onClick={() => setChatOpen(true)} title="Discuss ideas with the AI before committing a refinement">
+                Discuss first
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <button type="button" className={btn.large.primary} disabled={busy} onClick={() => run(false)}>

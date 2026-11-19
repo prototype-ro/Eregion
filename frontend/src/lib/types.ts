@@ -537,17 +537,14 @@ export interface ProxyTreatment {
   current: ProxyGeneration | null;
 }
 
+export interface ProxyChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface DeckLore {
   lore: string | null;
   mjParams: string | null;
-}
-
-/** The artist, collection/set code and frame family used when compositing a deck's proxies. */
-export interface FrameSettings {
-  deckId: string;
-  artistName: string | null;
-  collectionCode: string | null;
-  frameFamily: string;
 }
 
 /** ADDITION mutates the subject but keeps its personhood; ERASURE subtracts until it keeps only a title or function. */
@@ -613,3 +610,4 @@ export interface LoreTurnReply {
   reply: string;
   doc: LoreDoc;
 }
+

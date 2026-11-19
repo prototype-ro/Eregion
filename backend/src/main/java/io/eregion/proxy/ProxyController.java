@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.eregion.auth.CurrentUser;
+import io.eregion.proxy.ProxyDtos.ChatReply;
+import io.eregion.proxy.ProxyDtos.ChatRequest;
 import io.eregion.proxy.ProxyDtos.CurrentRequest;
 import io.eregion.proxy.ProxyDtos.GenerateRequest;
 import io.eregion.proxy.ProxyDtos.Generation;
@@ -62,7 +64,14 @@ public class ProxyController {
 			@Valid @RequestBody GenerateRequest request) {
 		UUID userId = CurrentUser.id(jwt);
 		limits.proxy(userId);
-		return service.generate(userId, deckId, cardId, request.mode(), request.instruction(), request.ignoreType(), request.ignoreRulesText());
+		return service.generate(userId, deckId, cardId, request.mode(), request.instruction(), request.ignoreType(), request.ignoreRulesText(), request.loreOnly(), request.tier(), request.ignoreLore());
+	}
+
+	@PostMapping("/proxies/{cardId}/chat")
+	public ChatReply chat(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID cardId, @Valid @RequestBody ChatRequest request) {
+		UUID userId = CurrentUser.id(jwt);
+		limits.proxy(userId);
+		return service.chat(userId, deckId, cardId, request.mode(), request.ignoreType(), request.ignoreRulesText(), request.loreOnly(), request.messages(), request.ignoreLore());
 	}
 
 	@GetMapping("/proxies/{cardId}/history")

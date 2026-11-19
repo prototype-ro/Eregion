@@ -145,7 +145,10 @@ public class ProxyRepository {
 				 ORDER BY t.created_at
 				""")
 				.param("deck", deckId).param("card", exceptCardId)
-				.query((rs, n) -> new Pick(rs.getString("name"), rs.getString("nickname"), readCharacter(rs.getString("character_json")).tier()))
+				.query((rs, n) -> {
+					Character character = readCharacter(rs.getString("character_json"));
+					return new Pick(rs.getString("name"), rs.getString("nickname"), character.tier(), character.signature());
+				})
 				.list();
 	}
 

@@ -33,7 +33,7 @@ public final class DeckDtos {
 			@NotBlank @Size(max = 80) String name,
 			@Size(max = 40) String format,
 			@Size(max = 200) String note,
-			@Size(max = 400) List<@Valid DeckCardInput> cards) {
+			@Size(max = 1000) List<@Valid DeckCardInput> cards) {
 	}
 
 	/**
@@ -42,7 +42,7 @@ public final class DeckDtos {
 	 */
 	public record SaveVersionRequest(
 			@Size(max = 200) String note,
-			@NotNull @Size(min = 1, max = 400, message = "a version needs at least one card") List<@Valid DeckCardInput> cards,
+			@NotNull @Size(min = 1, max = 1000, message = "a version needs at least one card") List<@Valid DeckCardInput> cards,
 			Integer fromVersion,
 			@Size(max = 40) String branchName) {
 	}
@@ -247,7 +247,7 @@ public final class DeckDtos {
 	/** The cards of an existing version, replaced in place. A note is changed only when one is given. */
 	public record ApplyChangesRequest(
 			@Size(max = 200) String note,
-			@NotNull @Size(min = 1, max = 400, message = "a version needs at least one card") List<@Valid DeckCardInput> cards) {
+			@NotNull @Size(min = 1, max = 1000, message = "a version needs at least one card") List<@Valid DeckCardInput> cards) {
 	}
 
 	public record NoteRequest(@Size(max = 200) String note) {

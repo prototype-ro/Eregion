@@ -23,6 +23,8 @@ export interface ViewProps {
   readOnly?: boolean;
   /** Shows a small badge for each of a card's other roles. */
   showRoles?: boolean;
+  /** Skips each group's heading and share bar, for a board too small to benefit from them. */
+  hideGroupHeaders?: boolean;
 }
 
 /**
@@ -110,7 +112,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
   );
 }
 
-export function CardList({ groups, selectedKey, newKeys, checkCollection, readOnly = false, showRoles = false, onSelect, onMenu }: ViewProps) {
+export function CardList({ groups, selectedKey, newKeys, checkCollection, readOnly = false, showRoles = false, hideGroupHeaders = false, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) {
     return <p className="max-w-[420px] py-6 text-lg leading-normal text-muted">Nothing here yet. Search above to add cards.</p>;
   }
@@ -119,17 +121,19 @@ export function CardList({ groups, selectedKey, newKeys, checkCollection, readOn
   return (
     <div className="group-columns group-flow">
       {groups.map((group, index) => (
-        <section key={group.title} aria-label={group.title} className="mb-7">
-          <header className="px-2.5 pb-2">
-            <div className="flex items-baseline gap-2.5">
-              <h3 className="text-[17px] font-medium">{group.title}</h3>
-              <span className="font-mono text-[13px] text-muted">{counts[index]}</span>
-            </div>
-            {/* How much of the whole this group is, on the dot grid. */}
-            <div aria-hidden="true" className="dotted mt-2 h-2 rounded-full">
-              <div className="h-full rounded-full bg-accent-text/70" style={{ width: `${Math.max(4, (counts[index] / total) * 100)}%` }} />
-            </div>
-          </header>
+        <section key={group.title || index} aria-label={group.title || undefined} className="mb-7">
+          {!hideGroupHeaders && (
+            <header className="px-2.5 pb-2">
+              <div className="flex items-baseline gap-2.5">
+                <h3 className="text-[17px] font-medium">{group.title}</h3>
+                <span className="font-mono text-[13px] text-muted">{counts[index]}</span>
+              </div>
+              {/* How much of the whole this group is, on the dot grid. */}
+              <div aria-hidden="true" className="dotted mt-2 h-2 rounded-full">
+                <div className="h-full rounded-full bg-accent-text/70" style={{ width: `${Math.max(4, (counts[index] / total) * 100)}%` }} />
+              </div>
+            </header>
+          )}
           <ul>
             {group.lines.map((line) => (
               <Row

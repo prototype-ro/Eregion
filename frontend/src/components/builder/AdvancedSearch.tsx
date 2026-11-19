@@ -1,15 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { Plus } from "@phosphor-icons/react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ManaCost } from "@/components/Mana";
 import { api } from "@/lib/api";
+import { toOklch } from "@/lib/artColor";
 import { formatPrice } from "@/lib/links";
 import { buildQuery, COLORS, COMPARES, emptyForm, identityPicks, RARITIES, type Color, type Compare, type Numeric, type SearchForm } from "@/lib/searchQuery";
 import type { Board, Card } from "@/lib/types";
 import { btn, field } from "@/lib/ui";
 import { useAdvancedSearch } from "@/lib/useAdvancedSearch";
+import { useStrandColor } from "@/lib/useStrandColor";
+import { glowOf, type Glow } from "./stats/screen";
 
 interface Props {
   open: boolean;
@@ -18,10 +22,23 @@ interface Props {
   inDeck: Set<string>;
   /** The commander's color identity ("WUB"), so one click can search inside it. Null when there is no commander. */
   commanderIdentity: string | null;
+  /** The commander's art, so Add can glow in the same colour as the version timeline's strands. Null when there is no commander. */
+  commanderArtUrl: string | null;
   onAdd: (card: Card, board?: Board) => void;
   onSetCommander: (card: Card) => void;
   /** Opens the deck as editable text, on top of this window. */
   onEditList: () => void;
+}
+
+/** Add, in the version timeline's own strand colour (the commander's art, or the person's pick), the same glow used by the statistics graphs. */
+function addButtonStyle(glow: Glow): CSSProperties {
+  const light = toOklch(glow.color).l > 0.62;
+  return {
+    backgroundColor: glow.lit(1),
+    borderColor: glow.hot,
+    color: light ? "#0a0a0c" : "#fff",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,.22), 0 1px 2px var(--key-shadow)",
+  };
 }
 
 const SORTS: Array<[string, string]> = [
@@ -94,7 +111,7 @@ function Row({ name, htmlFor, children }: { name: string; htmlFor?: string; chil
  * Search every card in Scryfall by what is on it: type, colors, mana value, rules text and more, plus Eregion's own role.
  * The form writes the search in Scryfall's syntax, which is shown and can be edited before searching.
  */
-export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, onAdd, onSetCommander, onEditList }: Props) {
+export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, commanderArtUrl, onAdd, onSetCommander, onEditList }: Props) {
   const [form, setForm] = useState<SearchForm>(emptyForm);
   const [edited, setEdited] = useState<string | null>(null);
   const [legal, setLegal] = useState(true);
@@ -105,6 +122,8 @@ export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, onAdd
   const [roles, setRoles] = useState<string[]>([]);
   const [view, setView] = useState<View>("list");
   const found = useAdvancedSearch();
+  const { color: strand } = useStrandColor(commanderArtUrl);
+  const addStyle = useMemo(() => addButtonStyle(glowOf(strand)), [strand]);
 
   useEffect(() => {
     try {
@@ -302,13 +321,13 @@ export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, onAdd
               {view === "list" ? (
                 <ul className="divide-y divide-line">
                   {visible.map((card) => (
-                    <Result key={card.id} card={card} already={inDeck.has(card.id)} onAdd={onAdd} onSetCommander={onSetCommander} />
+                    <Result key={card.id} card={card} already={inDeck.has(card.id)} addStyle={addStyle} onAdd={onAdd} onSetCommander={onSetCommander} />
                   ))}
                 </ul>
               ) : (
                 <ul className="grid grid-cols-2 gap-x-4 gap-y-6 pb-2 sm:grid-cols-3">
                   {visible.map((card) => (
-                    <Tile key={card.id} card={card} already={inDeck.has(card.id)} onAdd={onAdd} onSetCommander={onSetCommander} />
+                    <Tile key={card.id} card={card} already={inDeck.has(card.id)} addStyle={addStyle} onAdd={onAdd} onSetCommander={onSetCommander} />
                   ))}
                 </ul>
               )}
@@ -327,7 +346,7 @@ export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, onAdd
   );
 }
 
-function Result({ card, already, onAdd, onSetCommander }: { card: Card; already: boolean; onAdd: Props["onAdd"]; onSetCommander: Props["onSetCommander"] }) {
+function Result({ card, already, addStyle, onAdd, onSetCommander }: { card: Card; already: boolean; addStyle: CSSProperties; onAdd: Props["onAdd"]; onSetCommander: Props["onSetCommander"] }) {
   const legendary = card.typeLine.includes("Legendary") && card.typeLine.includes("Creature");
   return (
     <li className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-4 gap-y-2 py-3 sm:grid-cols-[72px_minmax(0,1fr)_auto]">
@@ -348,7 +367,7 @@ function Result({ card, already, onAdd, onSetCommander }: { card: Card; already:
         {card.oracleText && <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted">{card.oracleText}</p>}
       </div>
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:flex-col sm:items-stretch">
-        <button type="button" onClick={() => onAdd(card)} className={btn.primary}>
+        <button type="button" onClick={() => onAdd(card)} style={addStyle} className={btn.primary}>
           {already ? "Add another" : "Add"}
         </button>
         <button type="button" onClick={() => onAdd(card, "maybe")} className={btn.secondary}>
@@ -364,11 +383,14 @@ function Result({ card, already, onAdd, onSetCommander }: { card: Card; already:
   );
 }
 
-/** One result as a card picture, with its price and the buttons under it, for browsing by how the cards look. */
-function Tile({ card, already, onAdd, onSetCommander }: { card: Card; already: boolean; onAdd: Props["onAdd"]; onSetCommander: Props["onSetCommander"] }) {
+/**
+ * One result as a card picture, with its price and the buttons under it, for browsing by how the cards look. The actions stay
+ * out of the way until the tile is hovered or focused, chosen on /dev/search-actions-lab along with their icon and size.
+ */
+function Tile({ card, already, addStyle, onAdd, onSetCommander }: { card: Card; already: boolean; addStyle: CSSProperties; onAdd: Props["onAdd"]; onSetCommander: Props["onSetCommander"] }) {
   const legendary = card.typeLine.includes("Legendary") && card.typeLine.includes("Creature");
   return (
-    <li className="flex min-w-0 flex-col gap-2">
+    <li className="group/tile flex min-w-0 flex-col gap-2">
       <div className="relative aspect-[488/680] overflow-hidden rounded-[14px] bg-surface-2">
         {card.imageNormal ? (
           <Image src={card.imageNormal} alt={card.name} fill sizes="(min-width: 1024px) 200px, 45vw" className="object-cover" />
@@ -383,15 +405,20 @@ function Tile({ card, already, onAdd, onSetCommander }: { card: Card; already: b
         </span>
         <span className="shrink-0 font-mono text-xs text-muted">{card.priceUsd !== null ? formatPrice(card.priceUsd) : ""}</span>
       </p>
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => onAdd(card)} className={btn.primary}>
+      <div
+        // Hover has no meaning on a touch screen, so a tap target that is only revealed by it would be unreachable there: always
+        // shown under a coarse pointer, hidden until hover or keyboard focus otherwise.
+        className="grid grid-cols-2 gap-1 opacity-0 transition-opacity duration-150 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(pointer:coarse)]:opacity-100"
+      >
+        <button type="button" onClick={() => onAdd(card)} style={{ minHeight: 28, ...addStyle }} className={`${btn.primary} gap-1.5`}>
+          <Plus size={14} weight="bold" aria-hidden />
           {already ? "Another" : "Add"}
         </button>
-        <button type="button" onClick={() => onAdd(card, "maybe")} className={btn.secondary}>
+        <button type="button" onClick={() => onAdd(card, "maybe")} style={{ minHeight: 28 }} className={btn.secondary}>
           Maybe
         </button>
         {legendary && (
-          <button type="button" onClick={() => onSetCommander(card)} className={`${btn.quiet} col-span-2`}>
+          <button type="button" onClick={() => onSetCommander(card)} style={{ minHeight: 28 }} className={`${btn.quiet} col-span-2`}>
             Commander
           </button>
         )}

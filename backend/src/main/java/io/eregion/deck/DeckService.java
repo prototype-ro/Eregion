@@ -612,6 +612,7 @@ public class DeckService {
 		}
 		Map<UUID, UUID> owners = decks.printingOwners(printingIds);
 		Map<UUID, DeckRepository.CustomOwner> customOwners = decks.customPrintingOwners(customIds);
+		Map<UUID, String> names = decks.cardNames(cardIds);
 
 		List<DeckCardInput> prepared = new ArrayList<>(cards.size());
 		for (DeckCardInput card : cards) {
@@ -621,7 +622,7 @@ public class DeckService {
 				// Custom art is private to its owner and for one card. It replaces any Scryfall printing.
 				DeckRepository.CustomOwner owner = customOwners.get(custom);
 				if (owner == null || !owner.userId().equals(userId) || !owner.cardId().equals(card.cardId())) {
-					throw ApiException.badRequest("That custom art is not yours or is for a different card");
+					throw ApiException.badRequest("That custom art is not yours or is for a different card: " + cardLabel(names, card.cardId()));
 				}
 				printing = null;
 			}
@@ -629,11 +630,17 @@ public class DeckService {
 				printing = null;
 			}
 			else if (printing != null && !card.cardId().equals(owners.get(printing))) {
-				throw ApiException.badRequest("That printing is not one of this card's printings");
+				throw ApiException.badRequest("That printing is not one of this card's printings: " + cardLabel(names, card.cardId()));
 			}
 			prepared.add(new DeckCardInput(card.cardId(), card.quantity(), card.board(), printing, cleanTags(card.tags()), custom));
 		}
 		return prepared;
+	}
+
+	/** The card's name where known, falling back to its id so the error is never silent about which card it is. */
+	private static String cardLabel(Map<UUID, String> names, UUID cardId) {
+		String name = names.get(cardId);
+		return name != null ? name : cardId.toString();
 	}
 
 	/** Tags are trimmed, single-spaced and unique ignoring case. The first spelling wins. */

@@ -759,6 +759,22 @@ public class DeckRepository {
 		return result;
 	}
 
+	/** Each of these cards' name, for an error message that needs to name the card, not just its id. Unknown ids are left out. */
+	public Map<UUID, String> cardNames(Collection<UUID> cardIds) {
+		if (cardIds.isEmpty()) {
+			return Map.of();
+		}
+		Map<UUID, String> result = new HashMap<>();
+		jdbc.sql("SELECT id, name FROM cards WHERE id IN (:ids)")
+				.param("ids", cardIds)
+				.query((rs, n) -> {
+					result.put(rs.getObject("id", UUID.class), rs.getString("name"));
+					return null;
+				})
+				.list();
+		return result;
+	}
+
 	/** Which card each of these printing ids belongs to. Unknown printings are left out. */
 	public Map<UUID, UUID> printingOwners(Collection<UUID> printingIds) {
 		if (printingIds.isEmpty()) {

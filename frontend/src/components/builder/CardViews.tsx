@@ -69,7 +69,7 @@ function ShareHeader({ group, share }: { group: LineGroup; share: number }) {
  * last one shows in full. Clicking a card that is buried under others brings it to the front and floats it over its
  * neighbors without moving anything. Clicking it again puts it back.
  */
-export function CardStacks({ groups, selectedKey, newKeys, checkCollection, cardSize, readOnly = false, onSelect, onMenu }: ViewProps) {
+export function CardStacks({ groups, selectedKey, newKeys, checkCollection, cardSize, readOnly = false, hideGroupHeaders = false, onSelect, onMenu }: ViewProps) {
   const [raised, setRaised] = useState<string | null>(null);
   if (groups.length === 0) return <Empty />;
   const strip = Math.round(cardSize * STRIP_RATIO);
@@ -80,9 +80,9 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
 
   return (
     <div style={{ columnWidth: cardSize, columnGap: 32 }}>
-      {groups.map((group) => (
-        <section key={group.title} aria-label={group.title} className="mb-8 break-inside-avoid">
-          <ShareHeader group={group} share={group.lines.reduce((n, line) => n + line.quantity, 0) / Math.max(1, total)} />
+      {groups.map((group, index) => (
+        <section key={group.title || index} aria-label={group.title || undefined} className="mb-8 break-inside-avoid">
+          {!hideGroupHeaders && <ShareHeader group={group} share={group.lines.reduce((n, line) => n + line.quantity, 0) / Math.max(1, total)} />}
           <ul className="flex flex-col">
             {group.lines.map((line, index) => {
               const last = index === group.lines.length - 1;
@@ -141,14 +141,14 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
 }
 
 /** Every card as a full image. The image already shows the title, so the name is only in the accessible label. */
-export function CardGallery({ groups, selectedKey, newKeys, checkCollection, cardSize, readOnly = false, onSelect, onMenu }: ViewProps) {
+export function CardGallery({ groups, selectedKey, newKeys, checkCollection, cardSize, readOnly = false, hideGroupHeaders = false, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) return <Empty />;
 
   return (
     <div className="flex flex-col gap-12">
-      {groups.map((group) => (
-        <section key={group.title} aria-label={group.title}>
-          <GroupHeader group={group} />
+      {groups.map((group, index) => (
+        <section key={group.title || index} aria-label={group.title || undefined}>
+          {!hideGroupHeaders && <GroupHeader group={group} />}
           <ul className="grid gap-5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize}px, 1fr))` }}>
             {group.lines.map((line) => {
               const key = lineKey(line);

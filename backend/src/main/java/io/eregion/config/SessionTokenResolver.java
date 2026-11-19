@@ -50,7 +50,6 @@ final class SessionTokenResolver implements BearerTokenResolver {
 			return false;
 		}
 		return path.equals("/api/explore") || path.startsWith("/api/explore/")
-				|| (path.startsWith("/api/custom-printings/") && path.endsWith("/image"))
-				|| (path.startsWith("/api/decks/") && path.contains("/cards/") && path.endsWith("/render/image"));
+				|| (path.startsWith("/api/custom-printings/") && path.endsWith("/image"));
 	}
 }

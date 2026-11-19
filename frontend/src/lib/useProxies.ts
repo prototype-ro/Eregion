@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
-import type { DeckLore, ProxyGeneration, ProxyMode, ProxyTreatment } from "./types";
+import type { DeckLore, ProxyChatTurn, ProxyGeneration, ProxyMode, ProxyTreatment } from "./types";
 
 /** The proxy treatments and lore of one deck, with the calls that change them. */
 export function useProxies(deckId: string) {
@@ -37,10 +37,27 @@ export function useProxies(deckId: string) {
   }, []);
 
   const generate = useCallback(
-    async (cardId: string, mode: ProxyMode, instruction?: string, ignoreType?: boolean, ignoreRulesText?: boolean) => {
+    async (
+      cardId: string,
+      mode: ProxyMode,
+      instruction?: string,
+      ignoreType?: boolean,
+      ignoreRulesText?: boolean,
+      loreOnly?: boolean,
+      tier?: string,
+      ignoreLore?: boolean,
+    ) => {
       const next = await api<ProxyTreatment>(`/api/decks/${deckId}/proxies/${cardId}/generate`, {
         method: "POST",
-        body: { mode, instruction: instruction || null, ignoreType: ignoreType ?? false, ignoreRulesText: ignoreRulesText ?? false },
+        body: {
+          mode,
+          instruction: instruction || null,
+          ignoreType: ignoreType ?? false,
+          ignoreRulesText: ignoreRulesText ?? false,
+          loreOnly: loreOnly ?? false,
+          tier: tier || null,
+          ignoreLore: ignoreLore ?? false,
+        },
       });
       put(next);
       return next;
@@ -49,6 +66,26 @@ export function useProxies(deckId: string) {
   );
 
   const history = useCallback((cardId: string) => api<ProxyGeneration[]>(`/api/decks/${deckId}/proxies/${cardId}/history`), [deckId]);
+
+  /** A non-committing, free-form reply: discuss a direction before spending a generation on it. */
+  const chat = useCallback(
+    async (
+      cardId: string,
+      mode: ProxyMode,
+      ignoreType: boolean,
+      ignoreRulesText: boolean,
+      messages: ProxyChatTurn[],
+      loreOnly?: boolean,
+      ignoreLore?: boolean,
+    ) => {
+      const { reply } = await api<{ reply: string }>(`/api/decks/${deckId}/proxies/${cardId}/chat`, {
+        method: "POST",
+        body: { mode, ignoreType, ignoreRulesText, loreOnly: loreOnly ?? false, messages, ignoreLore: ignoreLore ?? false },
+      });
+      return reply;
+    },
+    [deckId],
+  );
 
   const choose = useCallback(
     async (cardId: string, generationId: string) => {
@@ -67,5 +104,5 @@ export function useProxies(deckId: string) {
     [deckId],
   );
 
-  return { treatments, lore, loaded, loadError, retry: reload, generate, history, choose, saveParams };
+  return { treatments, lore, loaded, loadError, retry: reload, generate, history, chat, choose, saveParams };
 }

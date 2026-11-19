@@ -125,8 +125,11 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       <button role="menuitem" className={item} onClick={act(() => onHistory(line))}>
         History in this deck
       </button>
-      <button role="menuitem" className={item} onClick={act(() => onProxy(line))}>
+      <button role="menuitem" className={`${item} justify-between`} onClick={act(() => onProxy(line))}>
         Proxy art prompt
+        <kbd className="rounded-md border border-line px-1.5 font-mono text-xs text-muted" aria-label="shortcut: Shift P">
+          ⇧P
+        </kbd>
       </button>
       <button role="menuitem" className={item} onClick={copyName}>
         Copy card name

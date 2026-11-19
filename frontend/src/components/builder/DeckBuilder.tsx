@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { api, ApiError } from "@/lib/api";
-import { allTags, GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
+import { allTags, flatGroup, GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
 import { customArtUrl } from "@/lib/links";
 import { computeStats } from "@/lib/stats";
@@ -20,9 +20,7 @@ import { btn, tag } from "@/lib/ui";
 import type { Board, Card, DeckCardLine, DeckDetail, Branch, CustomPrinting, Printing, Timeline, VersionDetail, Visibility } from "@/lib/types";
 import { CardList } from "./CardList";
 import { ProxyPanel } from "./ProxyPanel";
-import { ProxiesSection } from "./ProxiesSection";
 import { LoreDialog } from "./LoreDialog";
-import { FramePanel } from "./FramePanel";
 import { useProxies } from "@/lib/useProxies";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -216,9 +214,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [comparing, setComparing] = useState(false);
   // The timeline puts its branch and zoom controls in the panel's title row.
   const [controlsSlot, setControlsSlot] = useState<HTMLElement | null>(null);
-  // Whether the save controls under the timeline are on screen. When they are not, a copy floats at the bottom.
-  const footerRef = useRef<HTMLDivElement>(null);
-  const [footerSeen, setFooterSeen] = useState(true);
   // The dock belongs to the cards, so it stays away until the mainboard is about to come into view and stays once it has passed.
   const mainboardRef = useRef<HTMLDivElement>(null);
   const [dockShown, setDockShown] = useState(false);
@@ -246,13 +241,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     setVisibility(deck.visibility);
     setPublishedVersion(deck.publishedVersion);
   }
-  useEffect(() => {
-    const element = footerRef.current;
-    if (!element || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(([entry]) => setFooterSeen(entry.isIntersecting), { threshold: 0.4 });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => {
     const element = mainboardRef.current;
     if (!element || typeof IntersectionObserver === "undefined") return;
@@ -396,7 +384,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     ] as const
   ).map(([board, title, hint]) => {
     const boardLines = withOwned.filter((line) => line.board === board);
-    return { board, title, hint, count: boardLines.reduce((sum, line) => sum + line.quantity, 0), groups: groupLines(boardLines, "type", sort, sortDirection) };
+    return { board, title, hint, count: boardLines.reduce((sum, line) => sum + line.quantity, 0), groups: flatGroup(boardLines, sort, sortDirection) };
   });
   const lineByKey = (key: string | null) => withOwned.find((line) => lineKey(line) === key) ?? null;
   const selected = lineByKey(selectedKey) ?? withOwned.find((line) => line.board === "commander") ?? null;
@@ -724,32 +712,37 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     showRoles: group === "role",
   };
 
-  // [ and ] step to the previous and next saved version, unless you are typing.
+  // [ and ] step to the previous and next saved version, and Shift+P opens the proxy prompt for the
+  // selected card, unless you are typing.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.key !== "[" && event.key !== "]") || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if ((event.target as HTMLElement | null)?.closest("input, textarea, select, dialog, [contenteditable=true]")) return;
-      const numbers = timeline.branches.flatMap((branch) => branch.versions.map((v) => v.versionNumber)).sort((a, b) => a - b);
-      const at = numbers.indexOf(version?.versionNumber ?? -1);
-      const next = at < 0 ? undefined : numbers[at + (event.key === "]" ? 1 : -1)];
-      if (next === undefined) return;
-      event.preventDefault();
-      selectVersion(next);
+      if (event.key === "[" || event.key === "]") {
+        const numbers = timeline.branches.flatMap((branch) => branch.versions.map((v) => v.versionNumber)).sort((a, b) => a - b);
+        const at = numbers.indexOf(version?.versionNumber ?? -1);
+        const next = at < 0 ? undefined : numbers[at + (event.key === "]" ? 1 : -1)];
+        if (next === undefined) return;
+        event.preventDefault();
+        selectVersion(next);
+      } else if (event.shiftKey && event.key.toLowerCase() === "p" && selected) {
+        event.preventDefault();
+        setProxyCardId(selected.cardId);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  /** The controls for saving a draft. They sit under the timeline, and float at the bottom of the screen when that spot is out of view. */
-  /** The note, the new branch's name and Discard. They appear only while there is something to save. */
-  function renderFields(where: "bar" | "float") {
+  /** The note, the new branch's name and Discard, under the timeline. They appear only while there is something to save. */
+  function renderFields() {
     return (
       <div className="flex w-full flex-wrap items-center gap-2.5">
-        <label className="sr-only" htmlFor={`version-note-${where}`}>
+        <label className="sr-only" htmlFor="version-note">
           Version note
         </label>
         <input
-          id={`version-note-${where}`}
+          id="version-note"
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={200}
@@ -758,11 +751,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         />
         {needsBranch && (
           <>
-            <label className="sr-only" htmlFor={`branch-name-${where}`}>
+            <label className="sr-only" htmlFor="branch-name">
               New branch name
             </label>
             <input
-              id={`branch-name-${where}`}
+              id="branch-name"
               value={branchName}
               onChange={(event) => setBranchName(event.target.value)}
               maxLength={40}
@@ -777,7 +770,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           </button>
         )}
         {/* A deck with no version yet has no version actions row to hold Save, so the first save sits here beside the note. */}
-        {where === "bar" && version === null && (
+        {version === null && (
           <button type="button" disabled={!canSave} onClick={save} className={`${btn.primary} sm:ml-auto`}>
             {saveNewLabel}
           </button>
@@ -792,8 +785,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const onApply = () => (versionIsPublic ? setConfirmApply(true) : void applyChanges());
 
   /** The cards of some groups, drawn the way the deck is being viewed. Switching the view plays a short entrance for the new one. */
-  function renderCards(boardGroups: typeof groups) {
-    const props = { ...viewProps, groups: boardGroups };
+  function renderCards(boardGroups: typeof groups, hideGroupHeaders = false) {
+    const props = { ...viewProps, groups: boardGroups, hideGroupHeaders };
     return (
       <div key={view} className={animateView ? "view-enter" : undefined}>
         {view === "list" && <CardList {...props} />}
@@ -878,7 +871,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                       ))}
                     </ul>
                   )}
-                  <p className="mt-3 text-muted">The banned list is not checked.</p>
+                  <p className="mt-3 text-muted">Checked against the banned and not-legal-in-Commander list, as Scryfall reports it.</p>
                 </div>
               </details>
               {version && (
@@ -978,9 +971,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         <Presence show={timelineOpen} collapse id="timeline-body" className="pt-2">
           <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} controlsSlot={controlsSlot} deckId={deck.id} menuBranchId={branchMenu?.branchId ?? null} artUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} onBranchClick={(branchId, anchor) => setBranchMenu((open) => (open?.branchId === branchId ? null : { branchId, anchor }))} onCompare={(n) => router.push(`/decks/${deck.id}/diff?from=${Math.min(n, version?.versionNumber ?? n)}&to=${Math.max(n, version?.versionNumber ?? n)}`)} />
         </Presence>
-        <div ref={footerRef}>
+        <div>
           <Presence show={showDraft} collapse appear className="mt-4 border-t border-line pt-4 pb-1">
-            {renderFields("bar")}
+            {renderFields()}
           </Presence>
           <Presence show={timelineOpen && version !== null} collapse>
             {version && (
@@ -1040,14 +1033,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       {/* Cards */}
       <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[clamp(260px,18vw,380px)_minmax(0,1fr)]">
         <div className="hidden lg:sticky lg:top-6 lg:block">
-          <CardPreview line={selected} showCollection={checkCollection} deckId={deck.id} />
+          <CardPreview line={selected} showCollection={checkCollection} />
         </div>
         <div>{renderCards(viewProps.groups)}</div>
       </div>
 
       <SideBoards
         boards={sideBoards}
-        renderCards={renderCards}
+        renderCards={(groups) => renderCards(groups, true)}
         renderSearch={(board) => (
           <CardSearch
             compact
@@ -1074,8 +1067,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           showCollection={checkCollection}
         />
       </div>
-
-      {/* FramePanel and ProxiesSection are temporarily hidden, not removed. */}
 
       <CommandDock
         shown={dockShown}
@@ -1303,7 +1294,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       <CardPeek
         line={lineByKey(peekKey)}
         showCollection={checkCollection}
-        deckId={deck.id}
         onClose={() => setPeekKey(null)}
         onChangePrinting={(line) => {
           setPeekKey(null);
@@ -1349,18 +1339,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onClose={() => setAdvancedOpen(false)}
         inDeck={inDeck}
         commanderIdentity={lines.find((line) => line.board === "commander")?.colorIdentity ?? null}
+        commanderArtUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null}
         onAdd={addCard}
         onSetCommander={setCommander}
         onEditList={() => setEditListOpen(true)}
       />
 
-      <Presence
-        show={showDraft && !footerSeen}
-        y={18}
-        className={`fixed inset-x-4 ${dockShown ? "bottom-[76px]" : "bottom-4"} z-30 mx-auto flex max-w-[920px] rounded-[28px] border border-line bg-bg/95 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.5)] backdrop-blur`}
-      >
-        {renderFields("float")}
-      </Presence>
       <Presence show={undoDelete !== null} y={14} className={`fixed ${dockShown ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2`}>
         <div role="status" className="flex items-center gap-2 rounded-full border border-line bg-bg py-1.5 pr-1.5 pl-5 text-sm shadow-2xl">
           Deleted v{undoShown.current}

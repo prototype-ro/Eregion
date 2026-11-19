@@ -13,7 +13,7 @@ interface Props {
   owned: Map<string, number>;
   /** Show whether each result is in your collection. */
   showCollection: boolean;
-  onAdd: (card: Card) => void;
+  onAdd: (card: Card, board?: Board) => void;
   onSetCommander: (card: Card) => void;
   /** Where the cards found go. Tokens are searched for as tokens. The main search is for the deck itself. */
   board?: Board;
@@ -74,7 +74,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
         onClick={() => setOpen(true)}
         autoComplete="off"
         placeholder={placeholder}
-        className={dock ? "min-h-9 w-full rounded-full bg-transparent px-2 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none [@media(pointer:coarse)]:min-h-11" : compact ? field.md : "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"}
+        className={dock ? "dock-search-field min-h-9 w-full rounded-full bg-transparent px-2 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none [@media(pointer:coarse)]:min-h-11" : compact ? field.md : "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"}
       />
 
       {searchable && open && (
@@ -139,6 +139,15 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                         className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-4 text-sm font-medium"
                       >
                         Commander
+                      </button>
+                    )}
+                    {board === "main" && (
+                      <button
+                        type="button"
+                        onClick={() => onAdd(card, "maybe")}
+                        className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line px-4 text-sm font-medium"
+                      >
+                        Maybe
                       </button>
                     )}
                     <button
