@@ -3,8 +3,11 @@ package io.eregion.proxy;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 /** The structured lore document of a deck: its cosmology, groups, tales, colours, characters, naming and gaps. */
 public final class LoreDtos {
@@ -42,14 +45,14 @@ public final class LoreDtos {
 	}
 
 	/** What the Lore Creator is asked to draft. */
-	public record DraftRequest(@NotNull @NotBlank String instruction) {
+	public record DraftRequest(@NotNull @NotBlank @Size(max = 2000) String instruction) {
 	}
 
 	/**
 	 * A targeted edit to one part of the working lore. {@code doc} is the current document (including unsaved edits);
 	 * {@code target} names the part to change; {@code instruction} is the requested change.
 	 */
-	public record RefineRequest(@NotNull LoreDoc doc, @NotNull @NotBlank String target, @NotNull @NotBlank String instruction) {
+	public record RefineRequest(@NotNull LoreDoc doc, @NotNull @NotBlank @Size(max = 200) String target, @NotNull @NotBlank @Size(max = 2000) String instruction) {
 	}
 
 	/** Which card to check against the locked lore. The card and its current treatment are read server side. */
@@ -57,14 +60,14 @@ public final class LoreDtos {
 	}
 
 	/** One message in the conversation so far, oldest first. */
-	public record TurnMessage(String role, String text) {
+	public record TurnMessage(@Pattern(regexp = "user|assistant") String role, @Size(max = 4000) String text) {
 	}
 
 	/**
 	 * A conversational turn. {@code doc} is the client's working document (unsaved edits included) — the server
 	 * never reads the saved row to answer a turn. {@code history} is the last ~20 messages, newest last.
 	 */
-	public record TurnRequest(@NotNull LoreDoc doc, List<TurnMessage> history, @NotNull @NotBlank String message) {
+	public record TurnRequest(@NotNull LoreDoc doc, @Size(max = 40) List<@Valid TurnMessage> history, @NotNull @NotBlank @Size(max = 2000) String message) {
 	}
 
 	/** The model's one- or two-sentence summary of what it changed, plus the whole updated document. */

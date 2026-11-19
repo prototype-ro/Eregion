@@ -22,6 +22,7 @@ import { CardList } from "./CardList";
 import { ProxyPanel } from "./ProxyPanel";
 import { LoreDialog } from "./LoreDialog";
 import { useProxies } from "@/lib/useProxies";
+import { useFeatures } from "@/lib/features";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
@@ -188,6 +189,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [mergeInto, setMergeInto] = useState<Branch | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
   const proxies = useProxies(deck.id);
+  const { assistant } = useFeatures();
   const [proxyCardId, setProxyCardId] = useState<string | null>(null);
   const [loreOpen, setLoreOpen] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
@@ -725,7 +727,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         if (next === undefined) return;
         event.preventDefault();
         selectVersion(next);
-      } else if (event.shiftKey && event.key.toLowerCase() === "p" && selected) {
+      } else if (assistant && event.shiftKey && event.key.toLowerCase() === "p" && selected) {
         event.preventDefault();
         setProxyCardId(selected.cardId);
       }
@@ -1286,8 +1288,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onSetBackground={makeBackground}
         onSetPartner={makePartner}
         onHistory={(line) => setHistoryKey(lineKey(line))}
-        onProxy={(line) => setProxyCardId(line.cardId)}
-        onSetLore={() => setLoreOpen(true)}
+        onProxy={assistant ? (line) => setProxyCardId(line.cardId) : undefined}
+        onSetLore={assistant ? () => setLoreOpen(true) : undefined}
         onRemove={removeLine}
         onNotify={setToast}
       />
@@ -1302,6 +1304,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       />
       <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} onChooseCustom={chooseCustom} />
       <TagEditor line={lineByKey(tagKey)} suggestions={tagSuggestions} onClose={() => setTagKey(null)} onChange={setTags} />
+      {assistant && (
       <ProxyPanel
         open={proxyCardId !== null}
         onClose={() => setProxyCardId(null)}
@@ -1312,6 +1315,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         proxies={proxies}
         onNotify={setToast}
       />
+      )}
+      {assistant && (
       <LoreDialog
         open={loreOpen}
         onClose={() => {
@@ -1321,6 +1326,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         deckId={deck.id}
         commanderName={lines.find((line) => line.board === "commander")?.name ?? null}
       />
+      )}
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={(cards, replace) => importCards(cards, replace)} />
       <ImportDialog
         open={editListOpen}

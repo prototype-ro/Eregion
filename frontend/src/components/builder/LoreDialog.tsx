@@ -249,7 +249,7 @@ function Body({ deckId, commanderName }: { deckId: string; commanderName: string
               {draft.groups.map((g) => (
                 <div key={g.id} className="rounded-2xl border border-line bg-surface px-3.5 py-2.5 text-sm">
                   <span className="font-medium">{g.name}</span>
-                  {g.description && <span className="text-muted"> — {g.description}</span>}
+                  {g.description && <span className="text-muted">: {g.description}</span>}
                 </div>
               ))}
               {draft.groups.length === 0 && <p className="text-sm text-muted">Nothing drafted yet.</p>}
@@ -283,7 +283,7 @@ function Body({ deckId, commanderName }: { deckId: string; commanderName: string
             <div className="flex flex-col gap-2">
               {draft.characters.map((c) => (
                 <div key={c.id} className="rounded-2xl border border-line bg-surface px-3.5 py-2.5 text-sm">
-                  <span className="font-medium">{c.name}</span> <span className="text-muted">— {c.role}</span>
+                  <span className="font-medium">{c.name}</span> <span className="text-muted">({c.role})</span>
                 </div>
               ))}
               {draft.characters.length === 0 && <p className="text-sm text-muted">No named characters yet.</p>}

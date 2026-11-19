@@ -23,8 +23,9 @@ interface Props {
   onSetBackground: (line: DeckCardLine) => void;
   onSetPartner: (line: DeckCardLine) => void;
   onHistory: (line: DeckCardLine) => void;
-  onProxy: (line: DeckCardLine) => void;
-  onSetLore: (line: DeckCardLine) => void;
+  /** Left out when the server has the writing assistant turned off, which hides its menu items. */
+  onProxy?: (line: DeckCardLine) => void;
+  onSetLore?: (line: DeckCardLine) => void;
   onRemove: (line: DeckCardLine) => void;
   onNotify: (message: string) => void;
 }
@@ -125,19 +126,21 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       <button role="menuitem" className={item} onClick={act(() => onHistory(line))}>
         History in this deck
       </button>
-      <button role="menuitem" className={`${item} justify-between`} onClick={act(() => onProxy(line))}>
-        Proxy art prompt
-        <kbd className="rounded-md border border-line px-1.5 font-mono text-xs text-muted" aria-label="shortcut: Shift P">
-          ⇧P
-        </kbd>
-      </button>
+      {onProxy && (
+        <button role="menuitem" className={`${item} justify-between`} onClick={act(() => onProxy(line))}>
+          Proxy art prompt
+          <kbd className="rounded-md border border-line px-1.5 font-mono text-xs text-muted" aria-label="shortcut: Shift P">
+            ⇧P
+          </kbd>
+        </button>
+      )}
       <button role="menuitem" className={item} onClick={copyName}>
         Copy card name
       </button>
 
       <div className="my-1.5 border-t border-line" />
 
-      {isCommander && (
+      {isCommander && onSetLore && (
         <button role="menuitem" className={item} onClick={act(() => onSetLore(line))}>
           Set Lore
         </button>

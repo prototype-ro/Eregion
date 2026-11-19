@@ -20,7 +20,6 @@ import io.eregion.proxy.LoreDtos.RefineRequest;
 import io.eregion.proxy.LoreDtos.TurnReply;
 import io.eregion.proxy.LoreDtos.TurnRequest;
 import io.eregion.proxy.LoreDtos.Verdict;
-import io.eregion.ratelimit.RateLimits;
 import jakarta.validation.Valid;
 
 /** The structured lore of a deck, and the Lore Creator's draft and card-check calls. */
@@ -29,11 +28,11 @@ import jakarta.validation.Valid;
 public class LoreController {
 
 	private final LoreService service;
-	private final RateLimits limits;
+	private final PaidModelGate gate;
 
-	public LoreController(LoreService service, RateLimits limits) {
+	public LoreController(LoreService service, PaidModelGate gate) {
 		this.service = service;
-		this.limits = limits;
+		this.gate = gate;
 	}
 
 	@GetMapping
@@ -50,7 +49,7 @@ public class LoreController {
 	@PostMapping("/draft")
 	public LoreDoc draft(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody DraftRequest request) {
 		UUID userId = CurrentUser.id(jwt);
-		limits.lore(userId);
+		gate.lore(userId);
 		return service.draft(userId, deckId, request.instruction());
 	}
 
@@ -58,7 +57,7 @@ public class LoreController {
 	@PostMapping("/refine")
 	public LoreDoc refine(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody RefineRequest request) {
 		UUID userId = CurrentUser.id(jwt);
-		limits.lore(userId);
+		gate.lore(userId);
 		return service.refine(userId, deckId, request.doc(), request.target(), request.instruction());
 	}
 
@@ -66,7 +65,7 @@ public class LoreController {
 	@PostMapping("/check")
 	public Verdict check(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody CheckRequest request) {
 		UUID userId = CurrentUser.id(jwt);
-		limits.lore(userId);
+		gate.lore(userId);
 		return service.check(userId, deckId, request.cardId());
 	}
 
@@ -74,7 +73,7 @@ public class LoreController {
 	@PostMapping("/turn")
 	public TurnReply turn(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody TurnRequest request) {
 		UUID userId = CurrentUser.id(jwt);
-		limits.lore(userId);
+		gate.lore(userId);
 		return service.turn(userId, deckId, request.doc(), request.history(), request.message());
 	}
 }

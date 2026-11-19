@@ -47,10 +47,7 @@ public class LoreService {
 	/** Saves the document and renders the digest the proxy prompt reads, so the two never drift. */
 	public LoreDoc save(UUID userId, UUID deckId, LoreDoc doc) {
 		owned(deckId, userId);
-		String json = JSON.writeValueAsString(doc);
-		if (json.length() > MAX_DOC_CHARS) {
-			throw ApiException.badRequest("The lore is too large.");
-		}
+		String json = withinLimit(doc);
 		repository.saveLoreDoc(deckId, json, renderDigest(doc));
 		return doc;
 	}
@@ -63,6 +60,7 @@ public class LoreService {
 	/** Refines one part of the working document, which the client sends with its unsaved edits. */
 	public LoreDoc refine(UUID userId, UUID deckId, LoreDoc doc, String target, String instruction) {
 		owned(deckId, userId);
+		withinLimit(doc);
 		return prompts.refine(renderDigest(doc), target, instruction);
 	}
 
@@ -73,6 +71,7 @@ public class LoreService {
 	 */
 	public TurnReply turn(UUID userId, UUID deckId, LoreDoc doc, List<TurnMessage> history, String message) {
 		owned(deckId, userId);
+		withinLimit(doc);
 		List<TurnMessage> bounded = history == null ? List.of()
 				: history.size() > 20 ? history.subList(history.size() - 20, history.size()) : history;
 		return prompts.turn(renderDigest(doc), bounded, message);
@@ -83,6 +82,18 @@ public class LoreService {
 		Card card = cards.findById(cardId).orElseThrow(() -> ApiException.notFound("Card"));
 		Draft current = proxies.treatment(deckId, cardId).map(LoreService::draftOf).orElse(null);
 		return prompts.check(renderDigest(repository.loreDoc(deckId)), facts(card), current);
+	}
+
+	/**
+	 * The working document travels with every refine and turn and goes into a paid prompt, so it is held to the same
+	 * size as a saved one. Returns its JSON.
+	 */
+	private static String withinLimit(LoreDoc doc) {
+		String json = JSON.writeValueAsString(doc);
+		if (json.length() > MAX_DOC_CHARS) {
+			throw ApiException.badRequest("The lore is too large.");
+		}
+		return json;
 	}
 
 	/** The text digest of the structured document, read by the proxy prompt. */

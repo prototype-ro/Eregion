@@ -159,6 +159,10 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
       </div>
       <h2 className="font-display text-[44px] leading-none">{current?.nickname ?? cardName}</h2>
       {current?.nickname && <p className="-mt-3 text-sm text-muted">Proxy for {cardName}</p>}
+      <p className="text-xs text-muted">
+        Your instructions, the deck&rsquo;s lore and this card&rsquo;s details are sent to DeepSeek to write the prompt.
+        Do not include personal information. <a href="/privacy" className="underline underline-offset-2">Privacy</a>
+      </p>
 
       <div role="group" aria-label="Mode" className="grid grid-cols-2 rounded-full border border-line p-1">
         {(["NICKNAME", "RESKIN"] as const).map((m) => (
@@ -211,7 +215,7 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
         >
           <span className="flex flex-col">
             <span className="text-sm">No lore</span>
-            <span className="text-xs text-muted">The deck's lore is not sent at all — the card stands alone, no deck characters or places in the art.</span>
+            <span className="text-xs text-muted">The deck's lore is not sent at all. The card stands alone, with no deck characters or places in the art.</span>
           </span>
           <span className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${ignoreLore ? "border-accent-text bg-accent" : "border-line bg-surface"}`}>
             <span className={`absolute top-0.5 size-3.5 rounded-full bg-ink transition-all ${ignoreLore ? "left-[18px]" : "left-0.5"}`} />
@@ -234,7 +238,7 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
           <span className="flex flex-col">
             <span className="text-sm">Lore and type only</span>
             <span className="text-xs text-muted">
-              The model sees nothing of the card but its type — creature type for a creature, card type for anything else: no name, rules text, cost or
+              The model sees nothing of the card but its type (creature type for a creature, card type for anything else): no name, rules text, cost or
               colors.
             </span>
           </span>
@@ -251,7 +255,7 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
               onChange={(event) => setIgnoreType(event.target.checked)}
               className="size-4 accent-accent-text"
             />
-            Ignore this card&rsquo;s printed type — let the lore decide what it is
+            Ignore this card&rsquo;s printed type and let the lore decide what it is
           </label>
           <label className="flex items-center gap-2.5 text-sm text-muted">
             <input
@@ -261,7 +265,7 @@ function Body({ cardId, cardName, cardImage, deckId, proxies, onNotify }: Props 
               onChange={(event) => setIgnoreRulesText(event.target.checked)}
               className="size-4 accent-accent-text"
             />
-            Ignore this card&rsquo;s rules text — focus entirely on the lore and the type
+            Ignore this card&rsquo;s rules text and focus on the lore and the type
           </label>
         </div>
       </div>

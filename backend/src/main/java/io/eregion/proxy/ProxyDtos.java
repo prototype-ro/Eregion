@@ -8,6 +8,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public final class ProxyDtos {
@@ -82,11 +83,11 @@ public final class ProxyDtos {
 	}
 
 	/** One message of the advanced chat, before anything is committed. {@code role} is "user" or "assistant". */
-	public record ChatTurn(@NotNull String role, @NotBlank @Size(max = 2000) String content) {
+	public record ChatTurn(@NotNull @Pattern(regexp = "user|assistant") String role, @NotBlank @Size(max = 2000) String content) {
 	}
 
 	public record ChatRequest(@NotNull Mode mode, boolean ignoreType, boolean ignoreRulesText, boolean loreOnly,
-			@NotNull @Size(max = 40) List<@Valid ChatTurn> messages, boolean ignoreLore) {
+			@NotNull @Size(min = 1, max = 40) List<@Valid ChatTurn> messages, boolean ignoreLore) {
 
 		public ChatRequest(Mode mode, boolean ignoreType, boolean ignoreRulesText, boolean loreOnly, List<ChatTurn> messages) {
 			this(mode, ignoreType, ignoreRulesText, loreOnly, messages, false);

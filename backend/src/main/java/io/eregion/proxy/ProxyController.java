@@ -23,7 +23,6 @@ import io.eregion.proxy.ProxyDtos.Lore;
 import io.eregion.proxy.ProxyDtos.LoreRequest;
 import io.eregion.proxy.ProxyDtos.MjParamsRequest;
 import io.eregion.proxy.ProxyDtos.Treatment;
-import io.eregion.ratelimit.RateLimits;
 import jakarta.validation.Valid;
 
 /** Proxy art prompts for the cards of one of the player's decks. */
@@ -32,11 +31,11 @@ import jakarta.validation.Valid;
 public class ProxyController {
 
 	private final ProxyService service;
-	private final RateLimits limits;
+	private final PaidModelGate gate;
 
-	public ProxyController(ProxyService service, RateLimits limits) {
+	public ProxyController(ProxyService service, PaidModelGate gate) {
 		this.service = service;
-		this.limits = limits;
+		this.gate = gate;
 	}
 
 	@GetMapping("/lore")
@@ -63,14 +62,14 @@ public class ProxyController {
 	public Treatment generate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID cardId,
 			@Valid @RequestBody GenerateRequest request) {
 		UUID userId = CurrentUser.id(jwt);
-		limits.proxy(userId);
+		gate.proxy(userId);
 		return service.generate(userId, deckId, cardId, request.mode(), request.instruction(), request.ignoreType(), request.ignoreRulesText(), request.loreOnly(), request.tier(), request.ignoreLore());
 	}
 
 	@PostMapping("/proxies/{cardId}/chat")
 	public ChatReply chat(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @PathVariable UUID cardId, @Valid @RequestBody ChatRequest request) {
 		UUID userId = CurrentUser.id(jwt);
-		limits.proxy(userId);
+		gate.proxy(userId);
 		return service.chat(userId, deckId, cardId, request.mode(), request.ignoreType(), request.ignoreRulesText(), request.loreOnly(), request.messages(), request.ignoreLore());
 	}
 
