@@ -3,17 +3,29 @@ package io.eregion.common;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/** One error shape for the whole API: RFC 9457 problem details. */
+/**
+ * One error shape for the whole API: RFC 9457 problem details. Extending {@link ResponseEntityExceptionHandler}
+ * gives Spring's own errors (unreadable JSON, a wrong type in the path, unknown route, wrong method or media type)
+ * the same shape as ours, and the last handler keeps an unexpected failure from leaking anything but a status.
+ */
 @RestControllerAdvice
-public class ApiExceptionHandler {
+public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
 	@ExceptionHandler(TooManyRequestsException.class)
 	public ResponseEntity<ProblemDetail> handleTooMany(TooManyRequestsException ex) {
@@ -27,13 +39,35 @@ public class ApiExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
 	}
 
-	@ExceptionHandler(MethodArgumentNotValidException.class)
-	public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
-		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request validation failed");
+	@Override
+	protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Some fields need another look.");
 		Map<String, String> fields = new LinkedHashMap<>();
 		ex.getBindingResult().getFieldErrors()
 				.forEach(error -> fields.putIfAbsent(error.getField(), error.getDefaultMessage()));
 		problem.setProperty("fields", fields);
-		return problem;
+		return ResponseEntity.badRequest().body(problem);
+	}
+
+	/**
+	 * Postgres refuses text holding a NUL character, and a request can carry one in any field or search. That is
+	 * the caller's mistake, not a server failure. Any other integrity failure that reached here is a conflict
+	 * with data already stored.
+	 */
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ProblemDetail handleIntegrity(DataIntegrityViolationException ex) {
+		String message = String.valueOf(ex.getMostSpecificCause().getMessage());
+		if (message.contains("0x00")) {
+			return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Text cannot contain a null character.");
+		}
+		log.warn("Integrity violation reached the API boundary: {}", message);
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "That clashes with something already saved. Reload and try again.");
+	}
+
+	@ExceptionHandler(Exception.class)
+	public ProblemDetail handleUnexpected(Exception ex) {
+		log.error("Unhandled error", ex);
+		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong on our side. Try again in a moment.");
 	}
 }
