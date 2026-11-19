@@ -15,6 +15,9 @@ import { Composition } from "./stats/Composition";
 import { HalftoneCurve } from "./stats/HalftoneCurve";
 import { Caption, DotMeter, glowOf, GlowProvider, Panel } from "./stats/screen";
 
+/** Below this many cards in the commander and main boards, estimates that read a whole deck stay hidden. */
+const MIN_CARDS_FOR_ESTIMATES = 60;
+
 interface Props {
   deckId: string;
   stats: DeckStats;
@@ -43,6 +46,12 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
   const shift = saved ? Math.round((stats.averageManaValue - saved.averageManaValue) * 100) / 100 : 0;
   // Someone who is not signed in cannot ask, and a wall of errors would help nobody.
   const showAnalysis = analyse && !empty && !(failure?.status === 401 && !analysis);
+  // The bracket estimate, win turn, health and consistency read a finished deck. On a deck of a dozen cards they
+  // would state confident numbers about almost nothing, so they wait until the deck is most of the way there.
+  const deckSize = lines.filter((line) => line.board === "commander" || line.board === "main").reduce((sum, line) => sum + line.quantity, 0);
+  const tooSmall = deckSize < MIN_CARDS_FOR_ESTIMATES;
+  // A win turn read only from card quality and speed, with no combo that ends the game, should say so.
+  const noFinisher = analysis?.bracket?.signals.endingCombos === 0 && analysis?.winTurn?.basis !== "combo";
 
   const figures: Array<{ label: string; value: string; note?: string }> = [
     {
@@ -53,17 +62,17 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
         : "lands excluded",
     },
   ];
-  if (analysis?.bracket)
+  if (analysis?.bracket && !tooSmall)
     figures.push({
       label: "Bracket",
       value: analysis.bracket.bracket === 5 ? "cEDH" : String(analysis.bracket.bracket),
       note: analysis.bracket.name,
     });
-  if (analysis?.winTurn)
+  if (analysis?.winTurn && !tooSmall)
     figures.push({
       label: "Win turn",
       value: turnLabel(analysis.winTurn.turn),
-      note: "estimated",
+      note: noFinisher ? "estimated, no combo found" : "estimated",
     });
   figures.push({
     label: "Deck value",
@@ -131,9 +140,16 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
 
         {showAnalysis && !analysis && !failure && <p className="py-6 text-muted">Reading the deck.</p>}
 
-        {showAnalysis && analysis && (
+        {showAnalysis && analysis && tooSmall && (
+          <p className="max-w-[640px] text-muted">
+            The bracket, win turn, health and consistency appear once the deck has {MIN_CARDS_FOR_ESTIMATES} cards. With {deckSize} so far they
+            would only be guesses.
+          </p>
+        )}
+
+        {showAnalysis && analysis && !tooSmall && (
           <>
-            {analysis.winTurn && analysis.bracket && <WinTurnBlock winTurn={analysis.winTurn} rulesBracket={analysis.bracket.bracket} />}
+            {analysis.winTurn && analysis.bracket && <WinTurnBlock winTurn={analysis.winTurn} rulesBracket={analysis.bracket.bracket} noFinisher={noFinisher} />}
 
             <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
               {analysis.health && <HealthBlock health={analysis.health} />}
@@ -158,7 +174,7 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
         )}
 
         <div className="grid items-start gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {showAnalysis && analysis?.speed && <SpeedBlock speed={analysis.speed} />}
+          {showAnalysis && !tooSmall && analysis?.speed && <SpeedBlock speed={analysis.speed} />}
           {showAnalysis && analysis?.combos && <CombosBlock combos={analysis.combos} />}
           <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
             <Panel title="Card types" right={<Caption>{stats.totalCards} cards</Caption>}>

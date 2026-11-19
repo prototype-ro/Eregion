@@ -291,6 +291,9 @@ textarea:focus-visible {
 .group-flow li {
   break-inside: avoid;
 }
+.group-flow .group-start {
+  break-inside: avoid;
+}
 
 /* The entrance of a view the person has just switched to: it rises a few pixels into place while fading in. Opacity and transform only. */
 @keyframes view-enter {

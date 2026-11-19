@@ -374,6 +374,14 @@ export interface AnalysisSignals {
   twoCardCombos: number | null;
   earlyTwoCardCombos: number | null;
   winCombos: number | null;
+  /** Combos that end the game by themselves; null when combo data was unavailable. */
+  endingCombos: number | null;
+  endingTwoCardCombos: number | null;
+  earlyEndingTwoCardCombos: number | null;
+  /** Tutors weighted by how freely they find a card. */
+  weightedTutors: number | null;
+  /** Spells that put a creature into play from a graveyard. */
+  reanimation: number | null;
 }
 
 export interface AnalysisReason {

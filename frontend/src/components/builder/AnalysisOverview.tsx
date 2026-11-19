@@ -27,7 +27,7 @@ const halftone = (color: string, radius: number, pitch = 6) => ({
 });
 
 /** Where in its bracket's range the deck's estimated turn falls, in words a player would say. */
-export function WinTurnBlock({ winTurn, rulesBracket }: { winTurn: AnalysisWinTurn; rulesBracket: number }) {
+export function WinTurnBlock({ winTurn, rulesBracket, noFinisher = false }: { winTurn: AnalysisWinTurn; rulesBracket: number; noFinisher?: boolean }) {
   const position = turnPosition(winTurn.turn);
   // Near either end the label hangs inward from the pin, so it never leaves the panel.
   const labelShift = position < 12 ? "0%" : position > 88 ? "-100%" : "-50%";
@@ -41,6 +41,7 @@ export function WinTurnBlock({ winTurn, rulesBracket }: { winTurn: AnalysisWinTu
           The brackets are turn ranges, and the pin is where this deck lands.{" "}
           {winTurn.basis === "combo" ? "A combo in the deck can be run sooner than the rest of its signals suggest. " : ""}
           {rulesBracket > winTurn.bracket ? `The bracket rules still put it in bracket ${rulesBracket}. ` : ""}
+          {noFinisher ? "No combo that ends the game was found, so this reads how fast the deck gets going, not a way to win. " : ""}
           It is an estimate from the cards and simulated games of the deck, not a model trained on played games.
         </>
       }

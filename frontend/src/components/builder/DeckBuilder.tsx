@@ -803,8 +803,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     return (
       <>
         {version && (
-          <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} className={btn.secondary}>
-            Save
+          // Says which version it changes: a plain "Save" next to "Save new version" read as the normal way to save,
+          // and quietly replaced the version instead of adding one to the history.
+          <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} aria-label={applyHint ? `Update version ${version.versionNumber}. ${applyHint}` : undefined} className={btn.secondary}>
+            Update v{version.versionNumber}
           </button>
         )}
         <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>

@@ -164,8 +164,16 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           </Presence>
         ) : (
           <Presence key="normal" show appear={swapped.current} y={6} exit={false} className="flex flex-wrap items-center gap-2.5">
-            <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} className={button}>
-              Save
+            {/* Names the version it changes, so it is never mistaken for the normal way to save (which adds a version). */}
+            <button
+              type="button"
+              disabled={!canApply}
+              onClick={onApply}
+              title={applyHint}
+              aria-label={applyHint ? `Update version ${version.versionNumber}. ${applyHint}` : undefined}
+              className={button}
+            >
+              Update v{version.versionNumber}
             </button>
             <button type="button" disabled={!canSaveNew} onClick={onSaveNew} className={`${btn.primary} !min-h-9 [@media(pointer:coarse)]:min-h-11`}>
               {saveNewLabel}

@@ -112,43 +112,52 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
   );
 }
 
+/** How many rows a group title keeps with it at the top of a column. */
+const KEEP_WITH_TITLE = 2;
+
 export function CardList({ groups, selectedKey, newKeys, checkCollection, readOnly = false, showRoles = false, hideGroupHeaders = false, onSelect, onMenu }: ViewProps) {
   if (groups.length === 0) {
     return <p className="max-w-[420px] py-6 text-lg leading-normal text-muted">Nothing here yet. Search above to add cards.</p>;
   }
   const counts = groups.map((group) => group.lines.reduce((sum, line) => sum + line.quantity, 0));
   const total = counts.reduce((sum, count) => sum + count, 0);
+  const renderRow = (line: (typeof groups)[number]["lines"][number]) => (
+    <Row
+      key={lineKey(line)}
+      line={line}
+      selected={selectedKey === lineKey(line)}
+      isNew={newKeys.has(lineKey(line))}
+      checkCollection={checkCollection}
+      readOnly={readOnly}
+      showRoles={showRoles}
+      onSelect={onSelect}
+      onMenu={onMenu}
+    />
+  );
   return (
     <div className="group-columns group-flow">
       {groups.map((group, index) => (
         <section key={group.title || index} aria-label={group.title || undefined} className="mb-7">
-          {!hideGroupHeaders && (
-            <header className="px-2.5 pb-2">
-              <div className="flex items-baseline gap-2.5">
-                <h3 className="text-[17px] font-medium">{group.title}</h3>
-                <span className="font-mono text-[13px] text-muted">{counts[index]}</span>
-              </div>
-              {/* How much of the whole this group is, on the dot grid. */}
-              <div aria-hidden="true" className="dotted mt-2 h-2 rounded-full">
-                <div className="h-full rounded-full bg-accent-text/70" style={{ width: `${Math.max(4, (counts[index] / total) * 100)}%` }} />
-              </div>
-            </header>
-          )}
-          <ul>
-            {group.lines.map((line) => (
-              <Row
-                key={lineKey(line)}
-                line={line}
-                selected={selectedKey === lineKey(line)}
-                isNew={newKeys.has(lineKey(line))}
-                checkCollection={checkCollection}
-                readOnly={readOnly}
-                showRoles={showRoles}
-                onSelect={onSelect}
-                onMenu={onMenu}
-              />
-            ))}
-          </ul>
+          {/*
+            The title and its first rows travel as one block. Chrome ignores break-after on a title in columns, so
+            without this a title could sit alone at the foot of one column with its cards at the top of the next.
+          */}
+          <div className="group-start">
+            {!hideGroupHeaders && (
+              <header className="px-2.5 pb-2">
+                <div className="flex items-baseline gap-2.5">
+                  <h3 className="text-[17px] font-medium">{group.title}</h3>
+                  <span className="font-mono text-[13px] text-muted">{counts[index]}</span>
+                </div>
+                {/* How much of the whole this group is, on the dot grid. */}
+                <div aria-hidden="true" className="dotted mt-2 h-2 rounded-full">
+                  <div className="h-full rounded-full bg-accent-text/70" style={{ width: `${Math.max(4, (counts[index] / total) * 100)}%` }} />
+                </div>
+              </header>
+            )}
+            <ul>{group.lines.slice(0, KEEP_WITH_TITLE).map(renderRow)}</ul>
+          </div>
+          {group.lines.length > KEEP_WITH_TITLE && <ul>{group.lines.slice(KEEP_WITH_TITLE).map(renderRow)}</ul>}
         </section>
       ))}
     </div>
