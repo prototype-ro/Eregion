@@ -94,7 +94,7 @@ function Explore() {
   return (
     <div className="shell">
       <Nav active="explore" />
-      <main className="pb-24">
+      <main id="main" tabIndex={-1} className="pb-24">
         <h1 className="pt-16 pb-4 font-display text-[clamp(72px,13vw,200px)] leading-[0.9]">Explore</h1>
         <p className="max-w-[560px] pb-8 text-lg leading-normal text-muted">Decks other players chose to share. Each one shows the version its owner picked.</p>
 

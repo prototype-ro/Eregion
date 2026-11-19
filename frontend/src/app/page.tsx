@@ -26,7 +26,7 @@ export default function Home() {
     <div className="shell">
       <Nav />
 
-      <main>
+      <main id="main" tabIndex={-1}>
       {/* Hero */}
       <section className="grid items-stretch gap-10 pt-14 md:grid-cols-2">
         <div className="flex flex-col justify-center gap-7">

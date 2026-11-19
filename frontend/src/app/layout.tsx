@@ -28,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-screen flex-col font-sans">
+        <a href="#main" className="skip-link">Skip to content</a>
         {children}
         <SiteFooter />
         <DevTools />

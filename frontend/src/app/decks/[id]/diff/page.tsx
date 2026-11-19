@@ -107,7 +107,7 @@ function Diff() {
     <div className="shell">
       <Nav active="decks" />
 
-      <main className="pb-24">
+      <main id="main" tabIndex={-1} className="pb-24">
         <div className="flex flex-wrap items-end justify-between gap-6 pt-10 pb-10">
           <div>
             <Link href={`/decks/${id}`} className="text-sm text-muted">

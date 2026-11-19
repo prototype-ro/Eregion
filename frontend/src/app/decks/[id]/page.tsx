@@ -69,7 +69,7 @@ export default function DeckPage() {
   return (
     <div className="shell">
       <Nav active="decks" />
-      <main>
+      <main id="main" tabIndex={-1}>
       {error && (
         <div className="py-16">
           <p role="alert" className="max-w-[560px] rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">

@@ -37,7 +37,7 @@ export default function AccountPage() {
   return (
     <div className="shell">
       <Nav />
-      <main className="pb-24">
+      <main id="main" tabIndex={-1} className="pb-24">
         <h1 className="pt-14 pb-10 font-display text-[clamp(64px,10vw,144px)] leading-[0.92]">Account</h1>
         <Profile user={user} />
         <Password />

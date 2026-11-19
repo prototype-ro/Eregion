@@ -163,7 +163,7 @@ export default function CollectionPage() {
     <div className="shell">
       <Nav active="collection" />
 
-      <main className="pb-24">
+      <main id="main" tabIndex={-1} className="pb-24">
         <h1 className="pt-14 pb-8 font-display text-[clamp(72px,12vw,190px)] leading-[0.9]">Your collection</h1>
 
         {error && (

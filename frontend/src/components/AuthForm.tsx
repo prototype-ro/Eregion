@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import { refreshMe } from "@/lib/me";
 import type { User } from "@/lib/types";
 import { field } from "@/lib/ui";
+import { SITE } from "@/lib/site";
 
 const input = field.lg;
 
@@ -42,8 +43,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       router.push(safeNext(params.get("next")));
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
-        setFields(err.fields ?? {});
+        const problems = err.fields ?? {};
+        setFields(problems);
+        // Field problems are shown under their fields, so the general message only appears when there are none.
+        setError(Object.keys(problems).length ? null : err.message);
+        const first = ["displayName", "email", "password"].find((name) => problems[name]);
+        if (first) requestAnimationFrame(() => document.getElementById(first)?.focus());
       } else {
         setError("Something went wrong. Try again.");
       }
@@ -59,16 +64,33 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <label htmlFor="displayName" className="text-sm text-muted">
             Display name
           </label>
-          <input id="displayName" name="displayName" autoComplete="nickname" required className={input} />
-          {fields.displayName && <p className="text-sm text-add-text">{fields.displayName}</p>}
+          <input
+            id="displayName"
+            name="displayName"
+            autoComplete="nickname"
+            required
+            aria-invalid={fields.displayName ? true : undefined}
+            aria-describedby={fields.displayName ? "displayName-error" : undefined}
+            className={input}
+          />
+          {fields.displayName && <p id="displayName-error" className="text-sm text-danger">{fields.displayName}</p>}
         </div>
       )}
       <div className="flex flex-col gap-2">
         <label htmlFor="email" className="text-sm text-muted">
           Email
         </label>
-        <input id="email" name="email" type="email" autoComplete="email" required className={input} />
-        {fields.email && <p className="text-sm text-add-text">{fields.email}</p>}
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          aria-invalid={fields.email ? true : undefined}
+          aria-describedby={fields.email ? "email-error" : undefined}
+          className={input}
+        />
+        {fields.email && <p id="email-error" className="text-sm text-danger">{fields.email}</p>}
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor="password" className="text-sm text-muted">
@@ -80,20 +102,31 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           type="password"
           autoComplete={isRegister ? "new-password" : "current-password"}
           required
+          aria-invalid={fields.password ? true : undefined}
+          aria-describedby={fields.password ? "password-error" : isRegister ? "password-hint" : undefined}
           className={input}
         />
-        {isRegister && !fields.password && <p className="text-sm text-muted">At least 10 characters, and not a common password.</p>}
+        {isRegister && !fields.password && <p id="password-hint" className="text-sm text-muted">At least 10 characters, and not a common password.</p>}
         {!isRegister && (
           <Link href="/forgot-password" className="inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center self-start text-sm text-muted underline underline-offset-4 hover:text-ink">
             Forgot your password?
           </Link>
         )}
-        {fields.password && <p className="text-sm text-add-text">{fields.password}</p>}
+        {fields.password && <p id="password-error" className="text-sm text-danger">{fields.password}</p>}
       </div>
 
       {error && (
         <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">
           {error}
+        </p>
+      )}
+
+      {isRegister && (
+        <p className="text-sm text-muted">
+          By creating an account you agree to the{" "}
+          <Link href="/terms" className="text-ink underline underline-offset-4">Terms</Link> and confirm you are{" "}
+          {SITE.minimumAge} or older. How your data is used:{" "}
+          <Link href="/privacy" className="text-ink underline underline-offset-4">Privacy</Link>.
         </p>
       )}
 

@@ -262,7 +262,7 @@ export default function DecksPage() {
     <div className="shell">
       <Nav active="decks" />
 
-      <main className="pb-24">
+      <main id="main" tabIndex={-1} className="pb-24">
         <h1 className="pt-16 pb-8 font-display text-[clamp(72px,13vw,200px)] leading-[0.9]">Your decks</h1>
 
         <div className="mb-10 flex flex-wrap items-center gap-3">

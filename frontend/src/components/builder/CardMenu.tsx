@@ -44,6 +44,8 @@ const MOVES: Array<[Board, string]> = [
 /** The quick menu for a card, opened from its three dots or by right-clicking it. */
 export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuantity, onMove, onSetCommander, onSetBackground, onSetPartner, onHistory, onProxy, onSetLore, onRemove, onNotify }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  /** The control that opened the menu, so Escape can hand focus back to it instead of dropping it on the page. */
+  const opener = useRef<HTMLElement | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [amount, setAmount] = useState(1);
 
@@ -56,6 +58,7 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       top: Math.max(8, Math.min(target.y, window.innerHeight - height - 8)),
     });
     setAmount(1);
+    if (!ref.current.contains(document.activeElement)) opener.current = document.activeElement as HTMLElement | null;
     ref.current.querySelector<HTMLElement>("[role=menuitem]")?.focus();
   }, [target]);
 
@@ -65,6 +68,7 @@ export function CardMenu({ target, onClose, onPeek, onPrinting, onTags, onQuanti
       if (event instanceof KeyboardEvent && event.key !== "Escape") return;
       if (event instanceof PointerEvent && ref.current?.contains(event.target as Node)) return;
       onClose();
+      if (event instanceof KeyboardEvent) opener.current?.focus();
     };
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", close);

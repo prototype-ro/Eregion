@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="shell">
       <Nav />
-      <main className="flex flex-col gap-10 py-16">
+      <main id="main" tabIndex={-1} className="flex flex-col gap-10 py-16">
         <h1 className="font-display text-[clamp(56px,8vw,112px)] leading-[0.92]">Reset your password</h1>
         {sent ? (
           <div role="status" className="max-w-[520px]">

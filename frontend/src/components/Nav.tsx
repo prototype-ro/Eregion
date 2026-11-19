@@ -23,18 +23,21 @@ export function Nav({ active }: { active?: "decks" | "explore" | "collection" })
       <nav className="order-last -mb-px flex w-full gap-7 text-[15px] font-medium sm:order-none sm:mb-0 sm:w-auto sm:gap-8" aria-label="Main">
         <Link
           href="/decks"
+          aria-current={active === "decks" ? "page" : undefined}
           className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 min-w-11 items-center border-b-2 ${active === "decks" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Decks
         </Link>
         <Link
           href="/explore"
+          aria-current={active === "explore" ? "page" : undefined}
           className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 min-w-11 items-center border-b-2 ${active === "explore" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Explore
         </Link>
         <Link
           href="/collection"
+          aria-current={active === "collection" ? "page" : undefined}
           className={`inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 min-w-11 items-center border-b-2 ${active === "collection" ? "border-accent-text" : "border-transparent text-muted"}`}
         >
           Collection

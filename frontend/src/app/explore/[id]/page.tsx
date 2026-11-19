@@ -124,7 +124,7 @@ export default function PublicDeckPage() {
       )}
       {!error && !detail && <p className="py-16 text-muted">Loading the deck.</p>}
       {detail && (
-        <main className="pb-24">
+        <main id="main" tabIndex={-1} className="pb-24">
           <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-8">
             <div className="min-w-0">
               <Link href="/explore" className="text-sm text-muted">

@@ -48,7 +48,18 @@ export function Dialog({ open, onClose, label, size = "md", children }: Props) {
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // showModal() focuses the first control, but a screen reader is only told a dialog opened if focus really
+      // lands inside it. Children mount in the same commit, so check once they are there.
+      requestAnimationFrame(() => {
+        if (!dialog.open || dialog.contains(document.activeElement)) return;
+        const first = dialog.querySelector<HTMLElement>(
+          "[autofocus], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+        );
+        (first ?? dialog).focus();
+      });
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -63,7 +74,8 @@ export function Dialog({ open, onClose, label, size = "md", children }: Props) {
     () => {
       if (!open || !body.current) return;
       whenMotionAllowed(() => {
-        gsap.from(ref.current, { autoAlpha: 0, y: 14, scale: 0.985, duration: MOTION.enter, ease: MOTION.ease, clearProps: "all" });
+        // Opacity, not autoAlpha: autoAlpha hides the dialog with visibility, and a hidden dialog cannot take focus.
+        gsap.from(ref.current, { opacity: 0, y: 14, scale: 0.985, duration: MOTION.enter, ease: MOTION.ease, clearProps: "all" });
       });
     },
     { dependencies: [open] },
@@ -78,6 +90,7 @@ export function Dialog({ open, onClose, label, size = "md", children }: Props) {
         // A click on the dialog element itself is a click on the backdrop.
         if (event.target === ref.current) onClose();
       }}
+      tabIndex={-1}
       className={`m-auto max-h-[90vh] ${WIDTH[size]} overflow-auto rounded-card border border-line bg-bg p-0 text-ink backdrop:bg-black/70`}
     >
       {open && <div ref={body} className="p-6 sm:p-8">{children}</div>}

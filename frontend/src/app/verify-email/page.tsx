@@ -45,7 +45,7 @@ function Verify() {
   return (
     <div className="shell">
       <Nav />
-      <main className="flex flex-col gap-8 py-16">
+      <main id="main" tabIndex={-1} className="flex flex-col gap-8 py-16">
         <h1 className="font-display text-[clamp(56px,8vw,112px)] leading-[0.92]">{state === "done" ? "Email confirmed" : "Confirming your email"}</h1>
         {state === "working" && <p className="text-lg text-muted">One moment.</p>}
         {state === "done" && (
