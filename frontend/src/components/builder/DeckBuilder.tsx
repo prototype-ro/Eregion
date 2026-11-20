@@ -169,6 +169,9 @@ interface Props {
   onUndoDeleteChange: (versionNumber: number | null) => void;
 }
 
+/** How many changes to the draft Undo can step back through. */
+const UNDO_STEPS = 50;
+
 export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectVersion, onReload, undoDelete, onUndoDeleteChange: setUndoDelete }: Props) {
   const baseLines = useMemo(() => version?.cards ?? [], [version]);
 
@@ -379,6 +382,34 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
   // Keep the edits on this device a moment after each change, so a refresh or an ended session loses nothing.
   // While a recovered draft is waiting for an answer it is left alone.
+  // Every change to the draft goes on a short history, so Edit list, Import replace, Remove or Discard can be undone
+  // (Ctrl or Cmd+Z, or Undo in the dock). Opening another version starts a new history.
+  const history = useRef<DeckCardLine[][]>([]);
+  const previousLines = useRef(lines);
+  const undoing = useRef(false);
+  const [canUndo, setCanUndo] = useState(false);
+  useEffect(() => {
+    if (undoing.current) {
+      undoing.current = false;
+    } else if (previousLines.current !== lines) {
+      history.current = [...history.current.slice(-(UNDO_STEPS - 1)), previousLines.current];
+      setCanUndo(true);
+    }
+    previousLines.current = lines;
+  }, [lines]);
+  useEffect(() => {
+    history.current = [];
+    setCanUndo(false);
+  }, [versionNumber]);
+  const undo = useCallback(() => {
+    const last = history.current.pop();
+    if (!last) return;
+    undoing.current = true;
+    setLines(last);
+    setCanUndo(history.current.length > 0);
+    setToast("Undone");
+  }, []);
+
   // The pending save, so leaving the page can write it at once instead of losing the last 600 ms of edits.
   const pendingDraft = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -773,8 +804,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   // selected card, unless you are typing.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if ((event.target as HTMLElement | null)?.closest("input, textarea, select, dialog, [contenteditable=true]")) return;
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "z") {
+        if (history.current.length === 0) return;
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "[" || event.key === "]") {
         const numbers = timeline.branches.flatMap((branch) => branch.versions.map((v) => v.versionNumber)).sort((a, b) => a - b);
         const at = numbers.indexOf(version?.versionNumber ?? -1);
@@ -1262,11 +1299,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           </>
         }
         save={
-          showDraft ? (
-            renderSaveButtons()
-          ) : (
-            <span className="hidden px-3 text-xs text-muted sm:inline">{version ? "All changes saved" : "No cards yet"}</span>
-          )
+          <>
+            {canUndo && (
+              <button type="button" onClick={undo} title="Undo the last change to the list (Ctrl or Cmd+Z)" className={btn.quiet}>
+                Undo
+              </button>
+            )}
+            {showDraft ? (
+              renderSaveButtons()
+            ) : (
+              <span className="hidden px-3 text-xs text-muted sm:inline">{version ? "All changes saved" : "No cards yet"}</span>
+            )}
+          </>
         }
       />
 
