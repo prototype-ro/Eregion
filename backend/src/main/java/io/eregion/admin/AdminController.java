@@ -38,10 +38,19 @@ public class AdminController {
 
 	private final AdminAccess access;
 	private final AdminRepository admin;
+	private final SystemWatch watch;
 
-	public AdminController(AdminAccess access, AdminRepository admin) {
+	public AdminController(AdminAccess access, AdminRepository admin, SystemWatch watch) {
 		this.access = access;
 		this.admin = admin;
+		this.watch = watch;
+	}
+
+	/** Background jobs, database and art size, and what needs attention. */
+	@GetMapping("/system")
+	public SystemWatch.Status system(@AuthenticationPrincipal Jwt jwt) {
+		access.require(CurrentUser.id(jwt));
+		return watch.status();
 	}
 
 	@GetMapping("/reports")

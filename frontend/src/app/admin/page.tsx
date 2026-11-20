@@ -34,6 +34,20 @@ interface UserSummary {
   artBytes: number;
 }
 
+interface SystemStatus {
+  jobs: Array<{ name: string; lastRun: string | null; staleAfterHours: number; stale: boolean }>;
+  databaseBytes: number;
+  artBytes: number;
+  artBudgetBytes: number;
+  users: number;
+  publicDecks: number;
+  openReports: number;
+  bracketBacklog: number;
+  problems: string[];
+}
+
+const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 /**
@@ -48,6 +62,7 @@ export default function AdminPage() {
   const [found, setFound] = useState<UserSummary | null>(null);
   const [artId, setArtId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [system, setSystem] = useState<SystemStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,6 +80,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (me?.admin) void loadReports();
   }, [me, loadReports]);
+
+  useEffect(() => {
+    if (me?.admin) void api<SystemStatus>("/api/admin/system").then(setSystem).catch(() => setSystem(null));
+  }, [me]);
 
   async function run(work: () => Promise<unknown>, done: string) {
     setError(null);
@@ -104,6 +123,56 @@ export default function AdminPage() {
           <p role={error ? "alert" : "status"} className={`max-w-[640px] rounded-2xl border px-4 py-3 text-sm ${error ? "border-danger-line bg-danger/10" : "border-line"}`}>
             {error ?? message}
           </p>
+        )}
+
+        {system && (
+          <section aria-labelledby="system-heading" className="flex flex-col gap-4">
+            <h2 id="system-heading" className="text-2xl font-semibold">
+              System
+            </h2>
+            {system.problems.length > 0 ? (
+              <ul role="alert" className="flex max-w-[720px] flex-col gap-1 rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm">
+                {system.problems.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">Nothing needs a look.</p>
+            )}
+            <dl className="grid max-w-[880px] grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-muted">Database</dt>
+                <dd className="font-mono">{mb(system.databaseBytes)}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Uploaded art</dt>
+                <dd className="font-mono">
+                  {mb(system.artBytes)} of {mb(system.artBudgetBytes)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Accounts</dt>
+                <dd className="font-mono">{system.users}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Public decks</dt>
+                <dd className="font-mono">
+                  {system.publicDecks} ({system.bracketBacklog} awaiting a bracket)
+                </dd>
+              </div>
+            </dl>
+            <ul className="flex max-w-[880px] flex-col divide-y divide-line border-y border-line text-sm">
+              {system.jobs.map((job) => (
+                <li key={job.name} className="flex flex-wrap justify-between gap-2 py-2">
+                  <span>{job.name}</span>
+                  <span className={job.stale ? "text-danger" : "text-muted"}>
+                    {job.lastRun ? `last ran ${when(job.lastRun)}` : "has not run yet"}
+                    {job.stale ? `, expected every ${job.staleAfterHours} h` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         <section aria-labelledby="reports-heading" className="flex flex-col gap-4">
