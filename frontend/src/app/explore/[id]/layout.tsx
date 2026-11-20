@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-
-const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
+import { backendFetch } from "@/lib/backend";
 
 interface PublicDeck {
   deck: {
@@ -24,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { title: "Deck" };
   try {
-    const response = await fetch(`${backend}/api/explore/${id}`, { next: { revalidate: 60 } });
+    const response = await backendFetch(`/api/explore/${id}`, { next: { revalidate: 60 } });
     if (!response.ok) return { title: "Deck" };
     const { deck } = (await response.json()) as PublicDeck;
     const title = `${deck.name} by ${deck.ownerName}`;
@@ -51,7 +50,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function Layout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const status = await fetch(`${backend}/api/explore/${id}`, { cache: "no-store" }).then(
+  const status = await backendFetch(`/api/explore/${id}`, { cache: "no-store" }).then(
     (response) => response.status,
     () => null,
   );

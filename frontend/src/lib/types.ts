@@ -264,6 +264,10 @@ export interface PublicDeck {
   bracketName?: string | null;
   /** The bracket the owner says the deck is, or null. */
   declaredBracket?: number | null;
+  /** For the author's page. */
+  ownerId?: string;
+  /** The first commander, for its page. */
+  commanderId?: string | null;
 }
 
 export interface PublicDeckDetail {

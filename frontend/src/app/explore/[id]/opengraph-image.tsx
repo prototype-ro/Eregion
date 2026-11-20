@@ -1,11 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
+import { backendFetch } from "@/lib/backend";
 
 export const alt = "A Commander deck on Eregion";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-
-const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
 
 interface PublicDeck {
   name: string;
@@ -27,7 +26,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const { id } = await params;
   let deck: PublicDeck | null = null;
   try {
-    const response = await fetch(`${backend}/api/explore/${id}`, { next: { revalidate: 300 } });
+    const response = await backendFetch(`/api/explore/${id}`, { next: { revalidate: 300 } });
     if (response.ok) deck = ((await response.json()) as { deck: PublicDeck }).deck;
   } catch {
     deck = null;

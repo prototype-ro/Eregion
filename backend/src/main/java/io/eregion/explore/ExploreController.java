@@ -62,6 +62,7 @@ public class ExploreController {
 
 	@GetMapping
 	public List<PublicDeck> search(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) UUID commander,
+			@RequestParam(required = false) UUID owner,
 			@RequestParam(required = false) String q, @RequestParam(required = false) String colors, @RequestParam(required = false) Integer bracket,
 			@RequestParam(required = false) Double maxPrice, @RequestParam(defaultValue = "newest") String sort,
 			@RequestParam(defaultValue = "24") int limit, @RequestParam(defaultValue = "0") int offset) {
@@ -74,7 +75,7 @@ public class ExploreController {
 			case "price-high" -> ExploreRepository.Sort.PRICE_HIGH;
 			default -> ExploreRepository.Sort.NEWEST;
 		};
-		return explore.search(CurrentUser.idOrNull(jwt), commander, text, identity == null || identity.isEmpty() ? null : identity,
+		return explore.search(CurrentUser.idOrNull(jwt), commander, owner, text, identity == null || identity.isEmpty() ? null : identity,
 				bracket == null || bracket < 1 || bracket > 5 ? null : bracket, maxPrice == null || maxPrice <= 0 ? null : maxPrice, order,
 				Math.max(1, Math.min(limit, MAX_PAGE)), Math.max(0, offset));
 	}
@@ -111,6 +112,14 @@ public class ExploreController {
 				.map(line -> new io.eregion.analysis.AnalysisDtos.CardInput(line.cardId(), line.board(), line.quantity()))
 				.toList();
 		return analysis.analyze(cards);
+	}
+
+	/** Commanders with public decks, for their pages and the sitemap. minDecks keeps thin pages out. */
+	@GetMapping("/commanders")
+	public List<ExploreRepository.CommanderCount> commanders(HttpServletRequest http, @RequestParam(defaultValue = "1") int minDecks,
+			@RequestParam(defaultValue = "500") int limit) {
+		limits.publicRead(http);
+		return explore.commanders(Math.max(1, minDecks), Math.max(1, Math.min(limit, 2000)));
 	}
 
 	/** One step of a public deck's history: the version, and what changed from the step before it. */

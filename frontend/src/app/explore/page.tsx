@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BracketPill } from "@/components/BracketPill";
+import { PublicDeckCard } from "@/components/PublicDeckCard";
 import { ManaCost } from "@/components/Mana";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -235,28 +235,7 @@ function Explore() {
         {decks !== null && decks.length > 0 && (
           <ul className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
             {decks.map((deck) => (
-              <li key={deck.id} className="group relative">
-                {deck.artUrl ? (
-                  <CardArt src={deck.artUrl} alt={`${deck.commanderName ?? deck.name} card art`} sizes="(min-width: 1024px) 25vw, 50vw" className="aspect-[4/5] rounded-card" />
-                ) : (
-                  <div className="aspect-[4/5] rounded-card border border-line bg-surface" aria-hidden="true" />
-                )}
-                <div className="px-1 pt-4">
-                  <h2 className="text-xl font-medium tracking-[-0.02em]">
-                    <Link href={`/explore/${deck.id}`} className="after:absolute after:inset-0">
-                      {deck.name}
-                    </Link>
-                  </h2>
-                  <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
-                    {deck.commanderName ?? "No commander"}
-                    <BracketPill bracket={deck.bracket} name={deck.bracketName} />
-                  </p>
-                  <p className="mt-1 font-mono text-[13px] text-muted">
-                    by {deck.mine ? "you" : deck.ownerName}, v{deck.versionNumber}, {deck.cardCount} cards, {formatPrice(deck.priceUsd)}
-                    {deck.colorIdentity ? `, ${sortColors(deck.colorIdentity)}` : ""}
-                  </p>
-                </div>
-              </li>
+              <PublicDeckCard key={deck.id} deck={deck} />
             ))}
           </ul>
         )}

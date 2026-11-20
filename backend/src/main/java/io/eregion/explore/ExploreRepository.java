@@ -29,7 +29,15 @@ public class ExploreRepository {
 			Integer bracket,
 			String bracketName,
 			/** The bracket the owner says the deck is, or null. */
-			Integer declaredBracket) {
+			Integer declaredBracket,
+			/** For the author's page. */
+			UUID ownerId,
+			/** The first commander, for its page; null without one. */
+			UUID commanderId) {
+	}
+
+	/** A commander with public decks, for its page and the sitemap. */
+	public record CommanderCount(UUID cardId, String name, int decks) {
 	}
 
 	/** A public deck's published version id, for loading its cards. */
@@ -38,6 +46,9 @@ public class ExploreRepository {
 
 	private static final String SELECT = """
 			SELECT d.id, d.name, d.description, u.display_name AS owner_name, d.published_at, d.owner_id = :viewer AS mine, d.declared_bracket,
+			       d.owner_id,
+			       (SELECT dc.card_id FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
+			         WHERE dc.version_id = v.id AND dc.board = 'commander' ORDER BY c.name LIMIT 1) AS commander_id,
 			       v.id AS version_id, v.version_number,
 			       (SELECT string_agg(c.name, ' + ' ORDER BY c.name) FROM deck_version_cards dc
 			          JOIN cards c ON c.id = dc.card_id WHERE dc.version_id = v.id AND dc.board = 'commander') AS commander_name,
@@ -83,14 +94,15 @@ public class ExploreRepository {
 	 * colour identity lies within those colours (letters of WUBRG); bracket and maxPrice filter on the published
 	 * version's bracket (once worked out) and price.
 	 */
-	public List<PublicDeck> search(UUID viewerId, UUID commanderId, String text, String colors, Integer bracket, Double maxPrice, Sort sort,
-			int limit, int offset) {
+	public List<PublicDeck> search(UUID viewerId, UUID commanderId, UUID ownerId, String text, String colors, Integer bracket, Double maxPrice,
+			Sort sort, int limit, int offset) {
 		String order = switch (sort) {
 			case PRICE_LOW -> "q.price ASC, q.published_at DESC";
 			case PRICE_HIGH -> "q.price DESC, q.published_at DESC";
 			case NEWEST -> "q.published_at DESC";
 		};
 		return jdbc.sql("SELECT * FROM (" + SELECT + """
+				   AND (CAST(:owner AS uuid) IS NULL OR d.owner_id = CAST(:owner AS uuid))
 				   AND (CAST(:commander AS uuid) IS NULL OR EXISTS (
 				        SELECT 1 FROM deck_version_cards dc
 				         WHERE dc.version_id = v.id AND dc.board = 'commander' AND dc.card_id = CAST(:commander AS uuid)))
@@ -107,6 +119,7 @@ public class ExploreRepository {
 				""")
 				.param("viewer", viewerId)
 				.param("commander", commanderId)
+				.param("owner", ownerId)
 				.param("text", text == null ? null : "%" + escape(text) + "%")
 				.param("colors", colors)
 				.param("bracket", bracket)
@@ -157,7 +170,9 @@ public class ExploreRepository {
 				rs.getString("description"),
 				(Integer) rs.getObject("bracket"),
 				rs.getString("bracket_name"),
-				(Integer) rs.getObject("declared_bracket"));
+				(Integer) rs.getObject("declared_bracket"),
+				rs.getObject("owner_id", UUID.class),
+				rs.getObject("commander_id", UUID.class));
 	}
 
 	/**
@@ -184,6 +199,23 @@ public class ExploreRepository {
 				.param("deck", deckId)
 				.query((rs, n) -> new HistoryStep(rs.getObject("id", UUID.class), rs.getInt("version_number"), rs.getString("note"),
 						rs.getTimestamp("created_at").toInstant(), rs.getInt("card_count")))
+				.list();
+	}
+
+	/** Commanders that lead at least minDecks public decks, most decks first. */
+	public List<CommanderCount> commanders(int minDecks, int limit) {
+		return jdbc.sql("""
+				SELECT c.id, c.name, COUNT(DISTINCT d.id) AS decks
+				  FROM decks d
+				  JOIN deck_version_cards dc ON dc.version_id = d.published_version_id AND dc.board = 'commander'
+				  JOIN cards c ON c.id = dc.card_id
+				 WHERE d.visibility = 'public' AND d.deleted_at IS NULL
+				 GROUP BY c.id, c.name
+				HAVING COUNT(DISTINCT d.id) >= :min
+				 ORDER BY decks DESC, c.name
+				 LIMIT :limit
+				""").param("min", minDecks).param("limit", limit)
+				.query((rs, n) -> new CommanderCount(rs.getObject("id", UUID.class), rs.getString("name"), rs.getInt("decks")))
 				.list();
 	}
 }

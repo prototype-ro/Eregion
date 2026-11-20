@@ -21,7 +21,7 @@ import { loginUrl } from "@/lib/auth";
 import { getMe } from "@/lib/me";
 import { GROUP_MODES, groupLines, lineKey, SORT_MODES, type GroupMode, type SortDirection, type SortMode } from "@/lib/groups";
 import { checkLegality } from "@/lib/legality";
-import { exploreCommanderUrl, formatPrice, sortColors } from "@/lib/links";
+import { formatPrice, sortColors } from "@/lib/links";
 import type { DeckDetail, PublicDeckDetail, User } from "@/lib/types";
 import { btn } from "@/lib/ui";
 
@@ -137,7 +137,13 @@ export default function PublicDeckPage() {
                 Back to Explore
               </Link>
               <div className="mt-4 mb-5 flex flex-wrap gap-2 text-sm text-muted">
-                <span className="rounded-full border border-line px-3.5 py-1.5">by {detail.deck.mine ? "you" : detail.deck.ownerName}</span>
+                {detail.deck.ownerId ? (
+                  <Link href={`/players/${detail.deck.ownerId}`} className="rounded-full border border-line px-3.5 py-1.5 hover:text-ink">
+                    by {detail.deck.mine ? "you" : detail.deck.ownerName}
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-line px-3.5 py-1.5">by {detail.deck.mine ? "you" : detail.deck.ownerName}</span>
+                )}
                 <span className="rounded-full border border-line px-3.5 py-1.5">Version {detail.deck.versionNumber}</span>
                 {detail.deck.colorIdentity && <span className="rounded-full border border-line px-3.5 py-1.5">{sortColors(detail.deck.colorIdentity)}</span>}
                 <span className="rounded-full border border-line px-3.5 py-1.5">{formatPrice(detail.deck.priceUsd)}</span>
@@ -155,7 +161,7 @@ export default function PublicDeckPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               {commander && (
-                <Link href={exploreCommanderUrl(commander.cardId)} className={btn.large.secondary}>
+                <Link href={`/commanders/${commander.cardId}`} className={btn.large.secondary}>
                   More decks with this commander
                 </Link>
               )}
