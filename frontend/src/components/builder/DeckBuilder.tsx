@@ -252,10 +252,16 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [dockShown, setDockShown] = useState(false);
   // Opening another version starts a fresh draft from it. The builder itself stays mounted, so the view, the timeline
   // and everything on screen carry on instead of resetting and flashing back to defaults.
+  // A save refused because someone saved this deck first (another tab or device) can be moved onto the newest version.
+  const [stale, setStale] = useState(false);
+  const carryDraft = useRef<DeckCardLine[] | null>(null);
+
   const [shownVersion, setShownVersion] = useState(versionNumber);
   if (shownVersion !== versionNumber) {
     setShownVersion(versionNumber);
-    setLines(baseLines);
+    // Moving to the newest version after a clash keeps the draft; any other move starts from the version opened.
+    setLines(carryDraft.current ?? baseLines);
+    carryDraft.current = null;
     setRecovered(recoveredFor(versionNumber, baseLines));
     setNote("");
     setBranching(false);
@@ -735,7 +741,27 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       return;
     }
     setSessionEnded(false);
+    // Only the two saves report through here, so a conflict always means the version moved on under this draft.
+    setStale(err instanceof ApiError && err.status === 409);
     setError(err instanceof ApiError ? err.message : fallback);
+  }
+
+  /** Opens the newest version of this branch with the draft carried over, ready to save on top of it. */
+  async function keepOnNewest() {
+    try {
+      const fresh = await api<Timeline>(`/api/decks/${deck.id}/timeline`);
+      const branch = fresh.branches.find((b) => b.id === version?.branchId) ?? fresh.branches.find((b) => b.main);
+      const head = branch?.versions.at(-1)?.versionNumber;
+      if (!head) return;
+      carryDraft.current = lines;
+      setStale(false);
+      setError(null);
+      onReload();
+      onSelectVersion(head);
+      setToast(`Your changes are on v${head} now. Save when ready.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not open the newest version.");
+    }
   }
 
   /** Saves the draft over the open version. It keeps its number and place, and no new version appears. */
@@ -1024,6 +1050,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 Sign in again
               </Link>
               , then pick up where you left off.
+            </>
+          )}
+          {stale && (
+            <>
+              {" "}
+              <button type="button" onClick={() => void keepOnNewest()} className="font-medium underline underline-offset-4">
+                Keep my changes on the newest version
+              </button>
             </>
           )}
         </p>
