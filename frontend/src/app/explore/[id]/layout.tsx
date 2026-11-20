@@ -4,7 +4,16 @@ import { notFound } from "next/navigation";
 const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
 
 interface PublicDeck {
-  deck: { name: string; ownerName: string; commanderName: string | null; artUrl: string | null; description: string; versionNumber: number };
+  deck: {
+    name: string;
+    ownerName: string;
+    commanderName: string | null;
+    artUrl: string | null;
+    description: string;
+    versionNumber: number;
+    cardCount: number;
+    bracket?: number | null;
+  };
 }
 
 /**
@@ -19,12 +28,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     if (!response.ok) return { title: "Deck" };
     const { deck } = (await response.json()) as PublicDeck;
     const title = `${deck.name} by ${deck.ownerName}`;
-    const description = deck.description ? deck.description.slice(0, 200) : `A Commander deck${deck.commanderName ? ` led by ${deck.commanderName}` : ""}, version ${deck.versionNumber}, on Eregion.`;
+    // Facts first, so every preview says something that sets this deck apart; the owner's own words follow.
+    const bracket = deck.bracket ? (deck.bracket === 5 ? ", cEDH" : `, bracket ${deck.bracket}`) : "";
+    const facts = `${deck.commanderName ?? "Commander deck"}, version ${deck.versionNumber}, ${deck.cardCount} cards${bracket}.`;
+    const description = deck.description ? `${facts} ${deck.description}`.slice(0, 200) : `${facts} See how it got here on Eregion.`;
+    // The picture comes from opengraph-image.tsx next to this file.
     return {
       title,
       description,
-      openGraph: { title, description, type: "website", images: deck.artUrl ? [{ url: deck.artUrl }] : undefined },
-      twitter: { card: deck.artUrl ? "summary_large_image" : "summary", title, description },
+      openGraph: { title, description, type: "website" },
+      twitter: { card: "summary_large_image", title, description },
     };
   } catch {
     return { title: "Deck" };
