@@ -6,6 +6,8 @@ on:
   pull_request:
 
 jobs:
+  # Unit tests, and the database tests on a real Postgres (Testcontainers), which also run every migration on an
+  # empty database.
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -33,6 +35,34 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # A known high or critical hole in what ships to visitors fails the build (Next 16.4.0 had a critical one).
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The images that get deployed: they must build, and the API image must start against a fresh database and
+  # answer its health check, which is what Docker and the deploy wait on.
+  images:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t eregion-api ./backend
+      - run: docker build -t eregion-web ./frontend
+      - name: The API starts on an empty database and turns healthy
+        run: |
+          docker network create ci
+          docker run -d --name db --network ci -e POSTGRES_DB=eregion -e POSTGRES_USER=eregion -e POSTGRES_PASSWORD=eregion postgres:17-alpine
+          for i in $(seq 1 30); do docker exec db pg_isready -U eregion -d eregion && break; sleep 2; done
+          docker run -d --name api --network ci \
+            -e EREGION_DB_URL=jdbc:postgresql://db:5432/eregion -e EREGION_DB_USER=eregion -e EREGION_DB_PASSWORD=eregion \
+            -e EREGION_JWT_SECRET="$(openssl rand -base64 48)" -e SPRING_MAIL_HOST=localhost \
+            eregion-api
+          for i in $(seq 1 45); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' api)
+            [ "$status" = healthy ] && echo "API is healthy" && exit 0
+            sleep 4
+          done
+          docker logs api | tail -60
+          exit 1
