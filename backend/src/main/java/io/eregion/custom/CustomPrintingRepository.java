@@ -53,6 +53,11 @@ public class CustomPrintingRepository {
 		return jdbc.sql("SELECT COALESCE(SUM(size_bytes), 0) FROM custom_printings WHERE user_id = :user").param("user", userId).query(Long.class).single();
 	}
 
+	/** Every player's art together, for the site-wide budget. */
+	public long siteBytes() {
+		return jdbc.sql("SELECT COALESCE(SUM(size_bytes), 0) FROM custom_printings").query(Long.class).single();
+	}
+
 	/** All of a player's custom art, or only the art for one card. */
 	public List<CustomPrinting> list(UUID userId, UUID cardId) {
 		return jdbc.sql(LIST + " WHERE cp.user_id = :user AND (CAST(:card AS uuid) IS NULL OR cp.card_id = CAST(:card AS uuid)) ORDER BY cp.created_at")

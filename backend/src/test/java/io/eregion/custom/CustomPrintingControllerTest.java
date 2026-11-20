@@ -31,7 +31,7 @@ class CustomPrintingControllerTest extends PostgresTest {
 	void upload_storesTheCustomPrinting() throws Exception {
 		CustomPrintingRepository repository = new CustomPrintingRepository(jdbc);
 		CardRepository cards = new CardRepository(jdbc);
-		CustomPrintingController controller = new CustomPrintingController(repository, cards, noLimits());
+		CustomPrintingController controller = new CustomPrintingController(repository, cards, noLimits(), 100, 20480);
 
 		UUID userId = newUser("custom-upload@example.com");
 		Card card = cards.upsert(card("Upload Test Card"));

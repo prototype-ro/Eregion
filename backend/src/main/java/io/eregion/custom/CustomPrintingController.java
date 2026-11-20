@@ -26,6 +26,9 @@ import io.eregion.card.CardRepository;
 import io.eregion.common.ApiException;
 import io.eregion.custom.CustomPrintingRepository.CustomPrinting;
 import io.eregion.ratelimit.RateLimits;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import io.eregion.custom.CustomPrintingRepository.Image;
 
 /** A player's own card art, such as proxies, that can be used in place of a Scryfall printing. */
@@ -34,19 +37,31 @@ import io.eregion.custom.CustomPrintingRepository.Image;
 public class CustomPrintingController {
 
 	static final int MAX_BYTES = 10 * 1024 * 1024;
-	/** All of one player's images together, so many large files cannot fill the database. */
-	static final long MAX_TOTAL_BYTES = 500L * 1024 * 1024;
 	static final int MAX_PER_USER = 300;
 	static final int MAX_LABEL = 60;
+	/**
+	 * A card scan is about 750 x 1050 pixels; a print-quality one about 2500 x 3500. Anything far past that is no card art,
+	 * and a tiny file can declare a huge size that stalls whoever opens it.
+	 */
+	static final int MAX_SIDE = 8000;
+	static final long MAX_PIXELS = 25_000_000L;
+	private static final Logger log = LoggerFactory.getLogger(CustomPrintingController.class);
 
 	private final CustomPrintingRepository repository;
 	private final CardRepository cards;
 	private final RateLimits limits;
+	/** All of one player's images together, so many large files cannot fill the database. */
+	private final long maxPerUserBytes;
+	/** All art on the site. Uploads pause when it is reached, so a wave of sign-ups cannot fill the disk. */
+	private final long maxSiteBytes;
 
-	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits) {
+	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits,
+			@Value("${eregion.art.per-user-mb:100}") long perUserMb, @Value("${eregion.art.site-mb:20480}") long siteMb) {
 		this.repository = repository;
 		this.cards = cards;
 		this.limits = limits;
+		this.maxPerUserBytes = perUserMb * 1024 * 1024;
+		this.maxSiteBytes = siteMb * 1024 * 1024;
 	}
 
 	/** All of the player's custom art, so a page can show which cards have some. */
@@ -78,8 +93,20 @@ public class CustomPrintingController {
 		if (repository.count(userId) >= MAX_PER_USER) {
 			throw ApiException.conflict("You can keep up to " + MAX_PER_USER + " custom arts. Delete some first");
 		}
-		if (repository.totalBytes(userId) + data.length > MAX_TOTAL_BYTES) {
-			throw ApiException.conflict("Your custom art takes up the 500 MB you can use. Delete some first");
+		int[] size = ImageSniffer.dimensions(data, type).orElseThrow(() -> ApiException.badRequest("That image could not be read. Save it again as PNG, JPEG or WebP"));
+		if (size[0] < 1 || size[1] < 1 || size[0] > MAX_SIDE || size[1] > MAX_SIDE || (long) size[0] * size[1] > MAX_PIXELS) {
+			throw ApiException.badRequest("Images can be at most " + MAX_SIDE + " pixels on a side and 25 megapixels. This one is " + size[0] + " x " + size[1]);
+		}
+		if (repository.totalBytes(userId) + data.length > maxPerUserBytes) {
+			throw ApiException.conflict("Your custom art takes up the " + maxPerUserBytes / (1024 * 1024) + " MB you can use. Delete some first");
+		}
+		long site = repository.siteBytes();
+		if (site + data.length > maxSiteBytes) {
+			log.warn("Custom art upload refused: the site holds {} MB of art, the limit is {} MB", site / (1024 * 1024), maxSiteBytes / (1024 * 1024));
+			throw ApiException.unavailable("Art uploads are paused while we make room. Try again in a few days");
+		}
+		if (site + data.length > maxSiteBytes * 8 / 10) {
+			log.warn("Custom art is at {} MB of the {} MB the site allows", (site + data.length) / (1024 * 1024), maxSiteBytes / (1024 * 1024));
 		}
 		UUID id = repository.insert(userId, cardId, cleanLabel(label), type, data);
 		return repository.findOwned(id, userId).orElseThrow();
