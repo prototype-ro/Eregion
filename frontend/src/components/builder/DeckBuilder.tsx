@@ -23,6 +23,7 @@ import { ProxyPanel } from "./ProxyPanel";
 import { LoreDialog } from "./LoreDialog";
 import { useProxies } from "@/lib/useProxies";
 import { useFeatures } from "@/lib/features";
+import { ownedCopies } from "@/lib/collection";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
 import { CardMenu, type MenuTarget } from "./CardMenu";
@@ -250,6 +251,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  // On a new or nearly empty deck the dock's search is the main thing to do, so it is there from the start instead of
+  // waiting for a mainboard that has nothing in it yet to scroll into view.
+  const dockVisible = dockShown || lines.filter((line) => line.board === "commander" || line.board === "main").length < 15;
   const [toast, setToast] = useState<string | null>(null);
   // A deleted version can be brought back for a few seconds right here, and for 30 days on the server.
   // The version shown in the undo pill, kept while the pill animates away.
@@ -298,9 +302,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     }
   }
 
-  const withOwned = useMemo(() => lines.map((line) => ({ ...line, owned: owned.get(line.cardId) ?? 0 })), [lines, owned]);
+  const withOwned = useMemo(() => lines.map((line) => ({ ...line, owned: ownedCopies(line, owned) })), [lines, owned]);
   const baseWithOwned = useMemo(
-    () => baseLines.map((line) => ({ ...line, owned: owned.get(line.cardId) ?? 0 })),
+    () => baseLines.map((line) => ({ ...line, owned: ownedCopies(line, owned) })),
     [baseLines, owned],
   );
 
@@ -1073,7 +1077,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       </div>
 
       <CommandDock
-        shown={dockShown}
+        shown={dockVisible}
         search={<CardSearch dock inDeck={inDeck} owned={owned} showCollection={checkCollection} onAdd={addCard} onSetCommander={setCommander} />}
         views={<div role="group" aria-label="View" className="relative grid grid-cols-3 rounded-full border border-line p-1 bg-transparent">
               {/* The highlight slides between the three equal cells, moving only by transform. */}
@@ -1353,7 +1357,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onEditList={() => setEditListOpen(true)}
       />
 
-      <Presence show={undoDelete !== null} y={14} className={`fixed ${dockShown ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2`}>
+      <Presence show={undoDelete !== null} y={14} className={`fixed ${dockVisible ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2`}>
         <div role="status" className="flex items-center gap-2 rounded-full border border-line bg-bg py-1.5 pr-1.5 pl-5 text-sm shadow-2xl">
           Deleted v{undoShown.current}
           <button type="button" onClick={() => void undoDeleteVersion(undoShown.current)} className={`${btn.secondary} !min-h-9 px-4 text-sm`}>
@@ -1362,7 +1366,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         </div>
       </Presence>
       {toast && undoDelete === null && (
-        <p role="status" className={`fixed ${dockShown ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl`}>
+        <p role="status" className={`fixed ${dockVisible ? "bottom-[84px]" : "bottom-6"} left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-bg px-5 py-3 text-sm shadow-2xl`}>
           {toast}
         </p>
       )}

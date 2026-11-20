@@ -708,7 +708,10 @@ public class DeckRepository {
 				       CASE WHEN cp.id IS NOT NULL THEN cp.label ELSE COALESCE(p.set_name, c.set_name) END AS set_name,
 				       CASE WHEN cp.id IS NOT NULL THEN '' ELSE COALESCE(p.collector_number, c.collector_number) END AS collector_number,
 				       COALESCE(dc.price_usd, CASE WHEN p.scryfall_id IS NOT NULL THEN p.price_usd ELSE c.price_usd END) AS price_usd,
-				       dc.board, dc.quantity, COALESCE(e.quantity, 0) AS owned, dc.tags,
+				       dc.board, dc.quantity,
+				       -- Basic lands are never something to buy, so they always count as owned.
+				       CASE WHEN c.type_line LIKE 'Basic %' THEN GREATEST(dc.quantity, COALESCE(e.quantity, 0)) ELSE COALESCE(e.quantity, 0) END AS owned,
+				       dc.tags,
 				       """ + io.eregion.card.FunctionalTagSql.columns("c.id") + """
 				       
 				  FROM deck_version_cards dc
