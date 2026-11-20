@@ -199,6 +199,8 @@ export interface DeckDetail {
   description: string;
   /** Whether the public page shows the versions that led to the published one. */
   publicHistory: boolean;
+  /** The bracket the owner says the deck is, or null. */
+  declaredBracket?: number | null;
 }
 
 export interface CardChange {
@@ -260,6 +262,8 @@ export interface PublicDeck {
   /** The published version's bracket, once worked out. */
   bracket?: number | null;
   bracketName?: string | null;
+  /** The bracket the owner says the deck is, or null. */
+  declaredBracket?: number | null;
 }
 
 export interface PublicDeckDetail {

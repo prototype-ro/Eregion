@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { bracketSummary } from "@/lib/share";
 import { useMemo } from "react";
 import { turnLabel, turnRange } from "@/lib/analysis";
 import { formatPrice } from "@/lib/links";
@@ -34,13 +35,16 @@ interface Props {
   analyse?: boolean;
   /** Where a ready analysis of these cards can be read without signing in, such as a public deck's own address. */
   analysisSource?: string;
+  /** For the bracket summary a player copies for the table. */
+  deckName?: string;
+  declaredBracket?: number | null;
 }
 
 /**
  * The deck's numbers and its analysis in one section under the cards: a readout of the headline figures, the composition and the
  * curve as halftone screens, then what the deck is, how fast it is and how reliably it runs.
  */
-export function StatsSection({ deckId, stats, lines, saved, savedVersion, removed, showCollection, readOnly = false, analyse = true, analysisSource }: Props) {
+export function StatsSection({ deckId, stats, lines, saved, savedVersion, removed, showCollection, readOnly = false, analyse = true, analysisSource, deckName, declaredBracket }: Props) {
   const { analysis, updating, failure, empty, retry } = useAnalysis(lines, analyse, analysisSource);
   // The graphs glow in the version timeline's strand colour: the person's pick, or the commander's art.
   const { color: strand } = useStrandColor(lines.find((line) => line.board === "commander")?.imageArtCrop ?? null);
@@ -160,7 +164,12 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
             </div>
 
             <div className="grid items-start gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {analysis.bracket && <BracketBlock bracket={analysis.bracket} />}
+              {analysis.bracket && (
+                <BracketBlock
+                  bracket={analysis.bracket}
+                  summary={deckName ? () => bracketSummary(deckName, analysis.bracket!, analysis.combos, declaredBracket) : undefined}
+                />
+              )}
               {analysis.engine ? (
                 <EngineBlock engine={analysis.engine} />
               ) : (

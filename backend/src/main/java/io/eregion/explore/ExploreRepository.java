@@ -27,7 +27,9 @@ public class ExploreRepository {
 			String description,
 			/** The published version's bracket, once worked out. */
 			Integer bracket,
-			String bracketName) {
+			String bracketName,
+			/** The bracket the owner says the deck is, or null. */
+			Integer declaredBracket) {
 	}
 
 	/** A public deck's published version id, for loading its cards. */
@@ -35,7 +37,7 @@ public class ExploreRepository {
 	}
 
 	private static final String SELECT = """
-			SELECT d.id, d.name, d.description, u.display_name AS owner_name, d.published_at, d.owner_id = :viewer AS mine,
+			SELECT d.id, d.name, d.description, u.display_name AS owner_name, d.published_at, d.owner_id = :viewer AS mine, d.declared_bracket,
 			       v.id AS version_id, v.version_number,
 			       (SELECT string_agg(c.name, ' + ' ORDER BY c.name) FROM deck_version_cards dc
 			          JOIN cards c ON c.id = dc.card_id WHERE dc.version_id = v.id AND dc.board = 'commander') AS commander_name,
@@ -154,7 +156,8 @@ public class ExploreRepository {
 				rs.getBoolean("mine"),
 				rs.getString("description"),
 				(Integer) rs.getObject("bracket"),
-				rs.getString("bracket_name"));
+				rs.getString("bracket_name"),
+				(Integer) rs.getObject("declared_bracket"));
 	}
 
 	/**

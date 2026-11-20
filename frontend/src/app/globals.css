@@ -193,6 +193,25 @@ body {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
+/* Printing a deck shows only its checklist (components/PrintChecklist.tsx), in black on white. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible;
+    color: #000 !important;
+  }
+  .print-sheet {
+    display: block !important;
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    background: #fff;
+  }
+}
+
 /* The skip link moves focus to <main>, which needs no ring of its own. */
 main:focus {
   outline: none;

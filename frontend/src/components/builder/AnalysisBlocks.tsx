@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CopyButton } from "@/components/CopyButton";
 import { ManaCost } from "@/components/Mana";
 import { basisLabel, chanceWord, percent } from "@/lib/analysis";
 import type { AnalysisBracket, AnalysisCombo, AnalysisCombos, AnalysisConsistency, AnalysisEngine, AnalysisSpeed } from "@/lib/types";
@@ -41,7 +42,7 @@ function Chance({ label, value, hint }: { label: string; value: number; hint?: s
   return <MeterRow label={label} value={value} shown={percent(value)} hint={hint} ariaValue={`${percent(value)}, ${chanceWord(value)}`} />;
 }
 
-export function BracketBlock({ bracket }: { bracket: AnalysisBracket }) {
+export function BracketBlock({ bracket, summary }: { bracket: AnalysisBracket; summary?: () => string }) {
   const s = bracket.signals;
   const rows: Array<[string, string, string[]]> = [
     ["Game Changers", String(s.gameChangers), s.gameChangerCards],
@@ -89,6 +90,11 @@ export function BracketBlock({ bracket }: { bracket: AnalysisBracket }) {
             </li>
           ))}
         </ul>
+      )}
+      {summary && (
+        <div className="mt-4">
+          <CopyButton label="Copy for the table" text={summary} className="glass inline-flex min-h-9 items-center rounded-full px-4 text-[13px] font-medium" />
+        </div>
       )}
       {bracket.whatWouldChange.length > 0 && (
         <ul className="mt-4 flex flex-col gap-1.5 text-[13px] text-muted">

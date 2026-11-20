@@ -24,7 +24,7 @@ import io.eregion.deck.DeckDtos.VersionSummary;
 public class DeckRepository {
 
 	public record DeckRow(UUID id, UUID ownerId, String name, String format, Instant createdAt, Instant updatedAt,
-			String visibility, Integer publishedVersion, String description, boolean publicHistory) {
+			String visibility, Integer publishedVersion, String description, boolean publicHistory, Integer declaredBracket) {
 	}
 
 	/** A version plus where it sits in the branch graph. head is true when nothing newer is on its branch. */
@@ -79,7 +79,7 @@ public class DeckRepository {
 	/** Only returns the deck when it belongs to the user, so a stranger's id looks like a missing one. */
 	public Optional<DeckRow> findOwned(UUID deckId, UUID ownerId) {
 		return jdbc.sql("""
-				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility, d.description, d.public_history,
+				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility, d.description, d.public_history, d.declared_bracket,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version
 				  FROM decks d WHERE d.id = :id AND d.owner_id = :owner AND d.deleted_at IS NULL
 				""")
@@ -95,7 +95,8 @@ public class DeckRepository {
 						rs.getString("visibility"),
 						(Integer) rs.getObject("published_version"),
 						rs.getString("description"),
-						rs.getBoolean("public_history")))
+						rs.getBoolean("public_history"),
+						(Integer) rs.getObject("declared_bracket")))
 				.optional();
 	}
 
@@ -221,6 +222,10 @@ public class DeckRepository {
 				.param("id", deckId)
 				.param("version", versionId)
 				.update();
+	}
+
+	public void setDeclaredBracket(UUID deckId, Integer bracket) {
+		jdbc.sql("UPDATE decks SET declared_bracket = :b WHERE id = :id").param("id", deckId).param("b", bracket).update();
 	}
 
 	/** Whether a public deck shows the versions that led to its published one. */

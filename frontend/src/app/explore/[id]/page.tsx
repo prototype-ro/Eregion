@@ -9,6 +9,9 @@ import { ExportDialog } from "@/components/ExportDialog";
 import { ReportDialog } from "@/components/ReportDialog";
 import { PublicHistory } from "@/components/PublicHistory";
 import { SampleHand } from "@/components/SampleHand";
+import { CopyButton } from "@/components/CopyButton";
+import { PrintChecklist } from "@/components/PrintChecklist";
+import { discordText } from "@/lib/share";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
@@ -138,6 +141,11 @@ export default function PublicDeckPage() {
                 <span className="rounded-full border border-line px-3.5 py-1.5">Version {detail.deck.versionNumber}</span>
                 {detail.deck.colorIdentity && <span className="rounded-full border border-line px-3.5 py-1.5">{sortColors(detail.deck.colorIdentity)}</span>}
                 <span className="rounded-full border border-line px-3.5 py-1.5">{formatPrice(detail.deck.priceUsd)}</span>
+                {detail.deck.declaredBracket && (
+                  <span className="rounded-full border border-line px-3.5 py-1.5">
+                    Owner says {detail.deck.declaredBracket === 5 ? "cEDH" : `bracket ${detail.deck.declaredBracket}`}
+                  </span>
+                )}
                 <span className={`rounded-full border px-3.5 py-1.5 ${legality.legal ? "border-accent-text text-accent-text" : "border-line"}`}>
                   {legality.legal ? "Legal in Commander" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"} for Commander`}
                 </span>
@@ -159,6 +167,10 @@ export default function PublicDeckPage() {
               </button>
               <button type="button" onClick={() => setHandOpen(true)} className={btn.large.secondary}>
                 Sample hand
+              </button>
+              <CopyButton label="Copy for Discord" text={() => discordText(detail.deck, window.location.href)} className={btn.large.secondary} />
+              <button type="button" onClick={() => window.print()} className={btn.large.secondary}>
+                Print checklist
               </button>
               <button type="button" onClick={() => void copy()} disabled={copying} className={btn.large.primary}>
                 {copying ? "Copying" : me === null ? "Sign in to copy" : "Copy to my decks"}
@@ -233,11 +245,12 @@ export default function PublicDeckPage() {
           )}
 
           <div className="mt-16">
-            <StatsSection deckId={id} stats={detail.stats} lines={detail.cards} saved={null} savedVersion={detail.deck.versionNumber} removed={[]} showCollection={false} readOnly analysisSource={`/api/explore/${id}/analysis`} />
+            <StatsSection deckId={id} stats={detail.stats} lines={detail.cards} saved={null} savedVersion={detail.deck.versionNumber} removed={[]} showCollection={false} readOnly analysisSource={`/api/explore/${id}/analysis`} deckName={detail.deck.name} declaredBracket={detail.deck.declaredBracket} />
           </div>
         </main>
       )}
       {detail && <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} deckId={id} />}
+      {detail && <PrintChecklist name={detail.deck.name} subtitle={`by ${detail.deck.ownerName}, version ${detail.deck.versionNumber}`} lines={detail.cards} />}
       {detail && <SampleHand open={handOpen} onClose={() => setHandOpen(false)} lines={detail.cards} />}
       {detail && <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={detail.deck.name} lines={counted} />}
     </div>

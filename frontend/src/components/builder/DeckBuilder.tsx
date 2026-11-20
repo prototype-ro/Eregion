@@ -24,6 +24,7 @@ import { LoreDialog } from "./LoreDialog";
 import { useProxies } from "@/lib/useProxies";
 import { useFeatures } from "@/lib/features";
 import { SampleHand } from "@/components/SampleHand";
+import { PrintChecklist } from "@/components/PrintChecklist";
 import { ownedCopies } from "@/lib/collection";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -139,7 +140,16 @@ function remember(key: string, value: string) {
 }
 
 interface Props {
-  deck: { id: string; name: string; format: string; visibility: Visibility; publishedVersion: number | null; description: string; publicHistory: boolean };
+  deck: {
+    id: string;
+    name: string;
+    format: string;
+    visibility: Visibility;
+    publishedVersion: number | null;
+    description: string;
+    publicHistory: boolean;
+    declaredBracket?: number | null;
+  };
   /** The version opened in the builder. Null for a deck with no saved version yet. */
   version: VersionDetail | null;
   timeline: Timeline;
@@ -181,6 +191,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [visibility, setVisibility] = useState<Visibility>(deck.visibility);
   const [publicHistory, setPublicHistory] = useState(deck.publicHistory);
+  const [declaredBracket, setDeclaredBracket] = useState<number | null>(deck.declaredBracket ?? null);
+  async function declareBracket(value: number) {
+    const before = declaredBracket;
+    setDeclaredBracket(value || null);
+    try {
+      await api(`/api/decks/${deck.id}`, { method: "PATCH", body: { declaredBracket: value } });
+      setToast(value ? `You call it ${value === 5 ? "cEDH" : `bracket ${value}`}` : "Your bracket is cleared");
+    } catch (err) {
+      setDeclaredBracket(before);
+      setToast(err instanceof ApiError ? err.message : "Could not save your bracket.");
+    }
+  }
   const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
@@ -877,6 +899,21 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               {visibility === "public" ? <GlobeSimple size={15} aria-hidden /> : <LockSimple size={15} aria-hidden />}
               {visibility === "public" ? `Public, v${publishedVersion}` : "Private"}
             </button>
+            <label className="glass inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11">
+              <span className="sr-only">The bracket you call this deck, for the table</span>
+              <select
+                value={declaredBracket ?? 0}
+                onChange={(event) => void declareBracket(Number(event.target.value))}
+                title="The bracket you call this deck. Shown on its public page next to the worked-out one."
+                className="bg-transparent text-[13px] font-medium focus:outline-none"
+              >
+                <option value={0}>Your bracket: not set</option>
+                {[1, 2, 3, 4].map((n) => (
+                  <option key={n} value={n}>{`Your bracket: ${n}`}</option>
+                ))}
+                <option value={5}>Your bracket: cEDH</option>
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => setDescriptionOpen(true)}
@@ -1068,6 +1105,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           <button type="button" onClick={() => setHandOpen(true)} disabled={mainCount < 7} className={`${btn.quiet} text-sm`}>
             Sample hand
           </button>
+          <button type="button" onClick={() => window.print()} disabled={lines.length === 0} className={`${btn.quiet} text-sm`}>
+            Print checklist
+          </button>
         </div>
       </div>
       <div className="h-7" />
@@ -1107,6 +1147,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           lines={withOwned}
           removed={removed}
           showCollection={checkCollection}
+          deckName={deck.name}
+          declaredBracket={declaredBracket}
         />
       </div>
 
@@ -1214,6 +1256,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       {/* Overlays */}
       <DescriptionDialog open={descriptionOpen} onClose={() => setDescriptionOpen(false)} deckId={deck.id} description={deck.description} onSaved={onReload} />
       <SampleHand open={handOpen} onClose={() => setHandOpen(false)} lines={lines} />
+      <PrintChecklist name={deck.name} subtitle={version ? `version ${version.versionNumber}${dirty ? ", with unsaved changes" : ""}` : "draft"} lines={withOwned} showOwned={checkCollection} />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={deck.name} lines={lines} />
       <Dialog open={confirmApply} onClose={() => setConfirmApply(false)} label="Update the public version" size="sm">
         <div className="flex flex-col gap-5">

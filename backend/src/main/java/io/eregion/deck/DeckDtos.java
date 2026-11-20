@@ -152,7 +152,9 @@ public final class DeckDtos {
 			Integer publishedVersion,
 			String description,
 			/** Whether the public page shows the versions that led to the published one. */
-			boolean publicHistory) {
+			boolean publicHistory,
+			/** The bracket the owner says the deck is, or null. */
+			Integer declaredBracket) {
 	}
 
 	/** Makes a deck public, showing one chosen version, or private again. versionNumber is required for public. */
@@ -204,7 +206,9 @@ public final class DeckDtos {
 	}
 
 	/** Changes only what is given: the name, the description, or both. */
-	public record UpdateDeckRequest(@Size(max = 80) String name, @Size(max = 2000) String description) {
+	/** declaredBracket sets the bracket the owner says the deck is; 0 clears it. Fields left out stay as they are. */
+	public record UpdateDeckRequest(@Size(max = 80) String name, @Size(max = 2000) String description,
+			@jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(5) Integer declaredBracket) {
 	}
 
 	// ---- diff ----

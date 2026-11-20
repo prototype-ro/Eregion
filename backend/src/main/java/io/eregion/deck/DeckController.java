@@ -66,7 +66,7 @@ public class DeckController {
 
 	@PatchMapping("/{deckId}")
 	public DeckDetail update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId, @Valid @RequestBody DeckDtos.UpdateDeckRequest request) {
-		return service.update(deckId, CurrentUser.id(jwt), request.name(), request.description());
+		return service.update(deckId, CurrentUser.id(jwt), request.name(), request.description(), request.declaredBracket());
 	}
 
 	/** Pin a deck to the top of the list or archive it. Send only the flag that changes. */

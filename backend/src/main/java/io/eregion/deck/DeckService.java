@@ -79,8 +79,14 @@ public class DeckService {
 	}
 
 	@Transactional
-	public DeckDetail update(UUID deckId, UUID userId, String name, String description) {
+	public DeckDetail update(UUID deckId, UUID userId, String name, String description, Integer declaredBracket) {
 		owned(deckId, userId);
+		if (declaredBracket != null) {
+			decks.setDeclaredBracket(deckId, declaredBracket == 0 ? null : declaredBracket);
+			if (name == null && description == null) {
+				return get(deckId, userId);
+			}
+		}
 		String cleanName = name == null || name.isBlank() ? null : name.trim().replaceAll("\\s+", " ");
 		// The description keeps its line breaks. Trailing space is trimmed and a blank one clears it.
 		String cleanDescription = description == null ? null : description.strip().replace("\r\n", "\n");
@@ -131,7 +137,7 @@ public class DeckService {
 				.map(version -> detail(version, userId))
 				.orElse(null);
 		return new DeckDetail(deck.id(), deck.name(), deck.format(), deck.createdAt(), deck.updatedAt(), latest,
-				deck.visibility(), deck.publishedVersion(), deck.description(), deck.publicHistory());
+				deck.visibility(), deck.publishedVersion(), deck.description(), deck.publicHistory(), deck.declaredBracket());
 	}
 
 	@Transactional
