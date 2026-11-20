@@ -15,7 +15,8 @@ public class CustomPrintingRepository {
 	public record CustomPrinting(UUID id, UUID cardId, String label, Instant createdAt, int usedIn) {
 	}
 
-	public record Image(String contentType, byte[] data) {
+	/** storedIn is "database" (data holds the bytes) or "s3" (data is null; the bytes are in the bucket). */
+	public record Image(UUID id, String contentType, byte[] data, String storedIn) {
 	}
 
 	private static final String LIST = """
@@ -30,17 +31,19 @@ public class CustomPrintingRepository {
 		this.jdbc = jdbc;
 	}
 
-	public UUID insert(UUID userId, UUID cardId, String label, String contentType, byte[] data) {
+	/** inDatabase false leaves data empty and marks the row as stored in the bucket; the caller puts the bytes there. */
+	public UUID insert(UUID userId, UUID cardId, String label, String contentType, byte[] data, boolean inDatabase) {
 		return jdbc.sql("""
-				INSERT INTO custom_printings (user_id, card_id, label, content_type, data, size_bytes)
-				VALUES (:user, :card, :label, :type, :data, :size) RETURNING id
+				INSERT INTO custom_printings (user_id, card_id, label, content_type, data, size_bytes, stored_in)
+				VALUES (:user, :card, :label, :type, :data, :size, :storedIn) RETURNING id
 				""")
 				.param("user", userId)
 				.param("card", cardId)
 				.param("label", label)
 				.param("type", contentType)
-				.param("data", data)
+				.param("data", inDatabase ? data : null)
 				.param("size", data.length)
+				.param("storedIn", inDatabase ? "database" : "s3")
 				.query(UUID.class)
 				.single();
 	}
@@ -75,19 +78,6 @@ public class CustomPrintingRepository {
 				.optional();
 	}
 
-	/**
-	 * The most recently uploaded custom art for a card, of any owner. A card can have several custom printings
-	 * (this table isn't deck-scoped), and nothing on CustomPrinting itself marks one as "current" the way a deck
-	 * line can pin a specific printing via deck_version_cards.custom_printing_id; for a card-only lookup (no deck
-	 * in scope) this is the documented fallback: most-recently-uploaded wins.
-	 */
-	public Optional<byte[]> latestImageForCard(UUID cardId) {
-		return jdbc.sql("SELECT data FROM custom_printings WHERE card_id = :card ORDER BY created_at DESC LIMIT 1")
-				.param("card", cardId)
-				.query(byte[].class)
-				.optional();
-	}
-
 	public void delete(UUID id) {
 		jdbc.sql("DELETE FROM custom_printings WHERE id = :id").param("id", id).update();
 	}
@@ -98,7 +88,7 @@ public class CustomPrintingRepository {
 	 */
 	public Optional<Image> imageFor(UUID id, UUID viewerId) {
 		return jdbc.sql("""
-				SELECT cp.content_type, cp.data FROM custom_printings cp
+				SELECT cp.id, cp.content_type, cp.data, cp.stored_in FROM custom_printings cp
 				 WHERE cp.id = :id
 				   AND (cp.user_id = :viewer OR EXISTS (
 				        SELECT 1 FROM decks d JOIN deck_version_cards dc ON dc.version_id = d.published_version_id AND d.deleted_at IS NULL
@@ -106,7 +96,7 @@ public class CustomPrintingRepository {
 				""")
 				.param("id", id)
 				.param("viewer", viewerId)
-				.query((rs, n) -> new Image(rs.getString("content_type"), rs.getBytes("data")))
+				.query((rs, n) -> new Image(rs.getObject("id", UUID.class), rs.getString("content_type"), rs.getBytes("data"), rs.getString("stored_in")))
 				.optional();
 	}
 

@@ -50,16 +50,18 @@ public class CustomPrintingController {
 	private final CustomPrintingRepository repository;
 	private final CardRepository cards;
 	private final RateLimits limits;
+	private final ArtStorage storage;
 	/** All of one player's images together, so many large files cannot fill the database. */
 	private final long maxPerUserBytes;
 	/** All art on the site. Uploads pause when it is reached, so a wave of sign-ups cannot fill the disk. */
 	private final long maxSiteBytes;
 
-	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits,
+	public CustomPrintingController(CustomPrintingRepository repository, CardRepository cards, RateLimits limits, ArtStorage storage,
 			@Value("${eregion.art.per-user-mb:100}") long perUserMb, @Value("${eregion.art.site-mb:20480}") long siteMb) {
 		this.repository = repository;
 		this.cards = cards;
 		this.limits = limits;
+		this.storage = storage;
 		this.maxPerUserBytes = perUserMb * 1024 * 1024;
 		this.maxSiteBytes = siteMb * 1024 * 1024;
 	}
@@ -108,7 +110,18 @@ public class CustomPrintingController {
 		if (site + data.length > maxSiteBytes * 8 / 10) {
 			log.warn("Custom art is at {} MB of the {} MB the site allows", (site + data.length) / (1024 * 1024), maxSiteBytes / (1024 * 1024));
 		}
-		UUID id = repository.insert(userId, cardId, cleanLabel(label), type, data);
+		UUID id = repository.insert(userId, cardId, cleanLabel(label), type, data, !storage.usesBucket());
+		if (storage.usesBucket()) {
+			try {
+				storage.putInBucket(id, data, type);
+			}
+			catch (RuntimeException ex) {
+				// The row must not point at bytes that never arrived.
+				repository.delete(id);
+				log.warn("Could not store art {} in the bucket", id, ex);
+				throw ApiException.unavailable("Could not store the image right now. Try again in a moment");
+			}
+		}
 		return repository.findOwned(id, userId).orElseThrow();
 	}
 
@@ -131,7 +144,7 @@ public class CustomPrintingController {
 				.cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePrivate().immutable())
 				.header("X-Content-Type-Options", "nosniff")
 				.header("Content-Security-Policy", "default-src 'none'; sandbox")
-				.body(image.data());
+				.body(storage.read(image.id(), image.storedIn(), image.data()));
 	}
 
 	static String cleanLabel(String label) {

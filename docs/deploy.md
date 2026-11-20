@@ -62,6 +62,19 @@ docker compose exec -T db dropdb -U eregion restore_check
 
 Flyway has no down migrations: rolling back a release that changed the schema means restoring the dump taken before it.
 
+### Uploaded art
+
+Art lives in the database unless `EREGION_ART_STORE=s3` points it at a private bucket (see `.env.example`). Use the
+bucket: art is most of the database today, so moving it makes every dump smaller and faster to restore. After
+switching, a job moves the existing art 25 images a minute; `/admin` shows the database shrink as it goes (the dump
+shrinks at once, the files on disk after `VACUUM FULL custom_printings`).
+
+The dump no longer holds the art once it is in the bucket, so back the bucket up on its own, somewhere else: turn on
+object versioning (or the provider's equivalent) and copy it to a second provider nightly, for example
+`rclone sync r2:eregion-art b2:eregion-art-backup`. Expire old object versions after 30 days, as the privacy policy
+promises for deleted data. A restored database points at objects by id (`art/<id>`), so a
+restore needs the bucket copy from the same night or later.
+
 ## Watching it
 
 - An outside uptime check (UptimeRobot, Better Stack...) on `https://<domain>/api/health` and `https://<domain>/`
