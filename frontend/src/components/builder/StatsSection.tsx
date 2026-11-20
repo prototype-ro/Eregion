@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { bracketSummary } from "@/lib/share";
+import { tokensNeeded } from "@/lib/tokens";
 import { useMemo } from "react";
 import { turnLabel, turnRange } from "@/lib/analysis";
 import { formatPrice } from "@/lib/links";
@@ -93,6 +94,8 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
     });
 
   const typeTop = Math.max(1, ...Object.values(stats.types));
+  // The tokens to bring to the table, read from the cards' rules text.
+  const tokens = useMemo(() => tokensNeeded(lines), [lines]);
 
   return (
     <section aria-labelledby="stats-heading" className="border-t border-line pt-14 pb-24">
@@ -203,6 +206,19 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
                 ))}
               </ul>
             </Panel>
+
+            {tokens.length > 0 && (
+              <Panel title="Tokens" right={<Caption>{tokens.length} kinds</Caption>}>
+                <ul className="flex flex-col gap-2.5">
+                  {tokens.map((need) => (
+                    <li key={need.token} className="text-[14px]">
+                      {need.token}
+                      <span className="block text-[12px] text-muted">{need.makers.join(", ")}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
 
             {!readOnly && (
               <Panel
