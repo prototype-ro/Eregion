@@ -22,6 +22,11 @@ class CardResolveServiceTest {
 		public List<Card> findByNames(Collection<String> names) {
 			return List.of();
 		}
+
+		@Override
+		public List<Card> findByLooseNames(Collection<String> looseNames) {
+			return List.of();
+		}
 	}
 
 	/** Scryfall while it is rate limiting us: every call is refused, and the calls are counted. */

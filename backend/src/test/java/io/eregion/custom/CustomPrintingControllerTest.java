@@ -24,8 +24,19 @@ import io.eregion.support.PostgresTest;
  */
 class CustomPrintingControllerTest extends PostgresTest {
 
-	private static final byte[] FAKE_PNG = new byte[] {
-			(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0 };
+	/** A real 488 x 680 PNG: uploads are checked for a readable size, so a bare signature is refused. */
+	private static final byte[] PNG = png(488, 680);
+
+	private static byte[] png(int width, int height) {
+		try {
+			var out = new java.io.ByteArrayOutputStream();
+			javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", out);
+			return out.toByteArray();
+		}
+		catch (java.io.IOException ex) {
+			throw new IllegalStateException(ex);
+		}
+	}
 
 	@Test
 	void upload_storesTheCustomPrinting() throws Exception {
@@ -36,7 +47,7 @@ class CustomPrintingControllerTest extends PostgresTest {
 		UUID userId = newUser("custom-upload@example.com");
 		Card card = cards.upsert(card("Upload Test Card"));
 		Jwt jwt = jwtFor(userId);
-		MockMultipartFile file = new MockMultipartFile("file", "art.png", "image/png", FAKE_PNG);
+		MockMultipartFile file = new MockMultipartFile("file", "art.png", "image/png", PNG);
 
 		CustomPrinting created = controller.upload(jwt, card.id(), file, "My Art");
 
@@ -53,7 +64,7 @@ class CustomPrintingControllerTest extends PostgresTest {
 	private static Card card(String name) {
 		return new Card(
 				UUID.randomUUID(), UUID.randomUUID(), name, "{1}{G}", 2.0, "Creature — Bear", "Creature",
-				"G", "G", "", "2", "2", "set", "Test Set", "1", "common", "Test Artist", null, null, null, null,
+				"G", "G", "", "2", "2", "set", "Test Set", "1", "common", "Test Artist", null, "", "", "",
 				"legal", null, null, List.of());
 	}
 
