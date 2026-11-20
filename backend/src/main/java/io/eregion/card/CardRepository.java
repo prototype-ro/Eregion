@@ -18,6 +18,9 @@ public class CardRepository {
 			image_small, image_normal, image_art_crop, commander_legality,
 			""" + FunctionalTagSql.columns("cards.id") + "\n";
 
+	/** The card's name without apostrophes, straight or curly, for matching what people type. */
+	private static final String LOOSE_NAME = "replace(replace(name, '''', ''), '\u2019', '')";
+
 	private final JdbcClient jdbc;
 
 	public CardRepository(JdbcClient jdbc) {
@@ -38,14 +41,15 @@ public class CardRepository {
 	 */
 	public List<Card> search(String query, int limit, boolean commandersOnly, boolean tokens) {
 		String trimmed = query.trim();
-		String escapedWhole = escape(trimmed);
 		// One ILIKE per word, all required, rather than one substring match on the whole phrase: a split or
 		// adventure card's real name ("Fire // Ice", "Bonecrusher Giant // Stomp") has punctuation between the
 		// words that a typed query never includes, so a single whole-phrase match would never find it.
-		String[] words = trimmed.split("\\s+");
+		// Apostrophes are ignored on both sides: people type "kodamas reach" for Kodama's Reach.
+		String unquoted = stripApostrophes(trimmed);
+		String[] words = unquoted.split("\\s+");
 		var where = new StringBuilder();
 		for (int i = 0; i < words.length; i++) {
-			where.append(i == 0 ? "" : " AND ").append("name ILIKE :w").append(i);
+			where.append(i == 0 ? "" : " AND ").append(LOOSE_NAME).append(" ILIKE :w").append(i);
 		}
 		var spec = jdbc.sql("SELECT " + COLUMNS + """
 				 FROM cards
@@ -55,18 +59,23 @@ public class CardRepository {
 				  AND type_line <> 'Card // Card'
 				  AND (:commandersOnly = false OR (type_line ILIKE '%legendary%'
 				       AND (type_line ILIKE '%creature%' OR oracle_text ILIKE '%can be your commander%')))
-				ORDER BY (name ILIKE :prefix) DESC, name
+				ORDER BY (""" + LOOSE_NAME + """
+				 ILIKE :prefix) DESC, name
 				LIMIT :limit
 				""");
 		for (int i = 0; i < words.length; i++) {
 			spec = spec.param("w" + i, "%" + escape(words[i]) + "%");
 		}
-		return spec.param("prefix", escapedWhole + "%")
+		return spec.param("prefix", escape(unquoted) + "%")
 				.param("limit", limit)
 				.param("commandersOnly", commandersOnly)
 				.param("tokens", tokens)
 				.query(CardRepository::map)
 				.list();
+	}
+
+	private static String stripApostrophes(String s) {
+		return s.replace("'", "").replace("\u2019", "");
 	}
 
 	private static String escape(String s) {
@@ -114,6 +123,22 @@ public class CardRepository {
 		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE type_line <> 'Card // Card'"
 				+ " AND (eregion_norm(name) IN (:names) OR eregion_norm(split_part(name, ' // ', 1)) IN (:names))")
 				.param("names", names.stream().map(NameNormalizer::normalize).distinct().toList())
+				.query(CardRepository::map)
+				.list();
+	}
+
+	/**
+	 * Like {@link #findByNames} but with apostrophes ignored, for names typed without one ("Kodamas Reach"). The names
+	 * must already be normalized and stripped with {@link NameNormalizer#loose}.
+	 */
+	public List<Card> findByLooseNames(java.util.Collection<String> looseNames) {
+		if (looseNames.isEmpty()) {
+			return List.of();
+		}
+		return jdbc.sql("SELECT " + COLUMNS + " FROM cards WHERE type_line <> 'Card // Card'"
+				+ " AND (replace(eregion_norm(name), '''', '') IN (:names)"
+				+ " OR replace(eregion_norm(split_part(name, ' // ', 1)), '''', '') IN (:names))")
+				.param("names", List.copyOf(looseNames))
 				.query(CardRepository::map)
 				.list();
 	}

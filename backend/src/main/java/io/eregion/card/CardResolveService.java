@@ -54,8 +54,10 @@ public class CardResolveService {
 		spellings.values().forEach(spelling -> byKey.putIfAbsent(NameNormalizer.normalize(spelling), NameNormalizer.forSearch(spelling)));
 
 		Set<String> known = knownKeys(byKey.keySet());
+		// Names typed without an apostrophe ("Kodamas Reach") are found in the catalog before asking Scryfall.
+		Map<String, Card> loose = looseMatches(byKey.keySet().stream().filter(key -> !known.contains(key)).toList());
 		List<String> missing = byKey.entrySet().stream()
-				.filter(entry -> !known.contains(entry.getKey()))
+				.filter(entry -> !known.contains(entry.getKey()) && !loose.containsKey(entry.getKey()))
 				.map(Map.Entry::getValue)
 				.toList();
 
@@ -114,7 +116,7 @@ public class CardResolveService {
 		List<String> notChecked = new ArrayList<>();
 		for (String spelling : spellings.values()) {
 			String key = NameNormalizer.normalize(spelling);
-			Card card = catalog.getOrDefault(key, fuzzy.get(key));
+			Card card = catalog.getOrDefault(key, fuzzy.getOrDefault(key, loose.get(key)));
 			if (card == null && unchecked.contains(key)) {
 				notChecked.add(spelling);
 			}
@@ -126,6 +128,25 @@ public class CardResolveService {
 			}
 		}
 		return new Result(List.copyOf(matches), List.copyOf(notFound), List.copyOf(notChecked));
+	}
+
+	/** For each normalized key, the catalog card whose name matches it once apostrophes are dropped from both. */
+	private Map<String, Card> looseMatches(List<String> keys) {
+		if (keys.isEmpty()) {
+			return Map.of();
+		}
+		Map<String, Card> byLoose = new LinkedHashMap<>();
+		for (Card card : cards.findByLooseNames(keys.stream().map(key -> key.replace("'", "")).distinct().toList())) {
+			keysOf(card.name()).forEach(key -> byLoose.putIfAbsent(key.replace("'", ""), card));
+		}
+		Map<String, Card> found = new LinkedHashMap<>();
+		for (String key : keys) {
+			Card card = byLoose.get(key.replace("'", ""));
+			if (card != null) {
+				found.put(key, card);
+			}
+		}
+		return found;
 	}
 
 	private Set<String> knownKeys(java.util.Collection<String> keys) {

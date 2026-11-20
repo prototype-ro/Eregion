@@ -32,4 +32,9 @@ public final class NameNormalizer {
 		return name == null ? "" : name.replace('‘', '\'').replace('’', '\'').replace('ʼ', '\'').replace('`', '\'')
 				.replace('“', '"').replace('”', '"').replaceAll("\\s+", " ").trim();
 	}
+
+	/** {@link #normalize} without apostrophes, so "Kodamas Reach" and "Kodama's Reach" meet. */
+	public static String loose(String name) {
+		return normalize(name).replace("'", "");
+	}
 }
