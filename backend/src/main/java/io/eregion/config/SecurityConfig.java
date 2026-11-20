@@ -115,7 +115,7 @@ public class SecurityConfig {
 				.cors(c -> c.configurationSource(corsSource(corsProperties)))
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/auth/**", "/api/health", "/error").permitAll()
+						.requestMatchers("/api/auth/**", "/api/health", "/error", "/api/digest/unsubscribe").permitAll()
 						// Public decks and the art in them can be read without an account.
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/explore", "/api/explore/*", "/api/explore/*/analysis", "/api/explore/commanders", "/api/explore/*/history", "/api/explore/*/diff", "/api/custom-printings/*/image").permitAll()
 						.anyRequest().authenticated())

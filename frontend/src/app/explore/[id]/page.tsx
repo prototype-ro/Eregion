@@ -11,6 +11,7 @@ import { PublicHistory } from "@/components/PublicHistory";
 import { SampleHand } from "@/components/SampleHand";
 import { DisplayName } from "@/components/DisplayName";
 import { CopyButton } from "@/components/CopyButton";
+import { FollowButton } from "@/components/FollowButton";
 import { PrintChecklist } from "@/components/PrintChecklist";
 import { discordText } from "@/lib/share";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
@@ -177,6 +178,7 @@ export default function PublicDeckPage() {
               <button type="button" onClick={() => setHandOpen(true)} className={btn.large.secondary}>
                 Sample hand
               </button>
+              {me && !detail.deck.mine && <FollowButton deckId={id} onMessage={(text) => { setShared(text); setTimeout(() => setShared(null), 4000); }} />}
               <CopyButton label="Copy for Discord" text={() => discordText(detail.deck, window.location.href)} className={btn.large.secondary} />
               <button type="button" onClick={() => window.print()} className={btn.large.secondary}>
                 Print checklist

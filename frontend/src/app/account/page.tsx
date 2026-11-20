@@ -42,6 +42,7 @@ export default function AccountPage() {
         <Profile user={user} />
         <Password />
         <Sessions />
+        <Following />
         <YourData />
         <DeleteAccount />
       </main>
@@ -159,6 +160,65 @@ function Sessions() {
         <button type="button" onClick={() => void endAll()} disabled={busy} className={btn.large.secondary}>
           Sign out everywhere
         </button>
+      </div>
+    </section>
+  );
+}
+
+interface FollowedDeck {
+  deckId: string;
+  name: string;
+  ownerName: string;
+  publishedVersion: number | null;
+}
+
+/** The decks the player follows, and the weekly email about their new versions. */
+function Following() {
+  const [state, setState] = useState<{ digestEnabled: boolean; decks: FollowedDeck[] } | null>(null);
+  const load = () => api<{ digestEnabled: boolean; decks: FollowedDeck[] }>("/api/account/following").then(setState).catch(() => setState(null));
+  useEffect(() => {
+    void load();
+  }, []);
+  if (!state) return null;
+  return (
+    <section className={section} aria-labelledby="following-heading">
+      <h2 id="following-heading" className="text-[28px] leading-tight font-medium tracking-[-0.02em]">Following</h2>
+      <div className="flex max-w-[560px] flex-col items-start gap-4">
+        <label className="flex items-start gap-3 text-[15px]">
+          <input
+            type="checkbox"
+            checked={state.digestEnabled}
+            onChange={(event) => void api("/api/account/digest", { method: "PUT", body: { enabled: event.target.checked } }).then(load)}
+            className="mt-1 h-5 w-5 accent-[var(--accent-text)]"
+          />
+          <span>
+            Weekly email
+            <span className="block text-sm text-muted">On Mondays, the decks you follow that published a new version. Nothing is sent when nothing changed.</span>
+          </span>
+        </label>
+        {state.decks.length === 0 ? (
+          <p className="text-[15px] text-muted">You follow no decks yet. Follow one from its public page.</p>
+        ) : (
+          <ul className="flex w-full flex-col divide-y divide-line border-y border-line">
+            {state.decks.map((deck) => (
+              <li key={deck.deckId} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                <Link href={`/explore/${deck.deckId}`} className="underline underline-offset-4">
+                  {deck.name}
+                </Link>
+                <span className="flex items-center gap-3 text-sm text-muted">
+                  by {deck.ownerName}
+                  <button
+                    type="button"
+                    onClick={() => void api(`/api/explore/${deck.deckId}/follow`, { method: "DELETE" }).then(load)}
+                    className={btn.quiet}
+                  >
+                    Unfollow
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

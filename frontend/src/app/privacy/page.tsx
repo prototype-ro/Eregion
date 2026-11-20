@@ -16,6 +16,7 @@ export default function PrivacyPage() {
           <li>Your account: email address, display name, and a one-way hash of your password (never the password itself).</li>
           <li>What you make: decks, every saved version with its notes, tags and descriptions, your collection, art you upload, and reports you send.</li>
           <li>One cookie, <code>eregion_session</code>, which keeps you signed in. It is not readable by page scripts and is not used for anything else. Visitors who are not signed in get no cookies.</li>
+          <li>The decks you follow, if you follow any. Following sends you a weekly email of their new versions; the link at its bottom, or the Account page, stops it.</li>
           <li>Server logs with requests and errors, kept for up to 30 days to fix problems and stop abuse. Your network address is also counted in memory for rate limits and is not stored.</li>
         </ul>
         <p>There is no advertising, no analytics service and no tracking across sites.</p>

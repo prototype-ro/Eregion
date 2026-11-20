@@ -87,6 +87,10 @@ public class DataExportController {
 				       '/api/custom-printings/' || cp.id || '/image' AS image
 				  FROM custom_printings cp JOIN cards c ON c.id = cp.card_id WHERE cp.user_id = :u ORDER BY cp.created_at
 				""").param("u", user).query().listOfRows());
+		out.put("following", jdbc.sql("""
+				SELECT d.name AS deck, f.created_at::text AS "since" FROM deck_follows f JOIN decks d ON d.id = f.deck_id
+				 WHERE f.user_id = :u ORDER BY f.created_at
+				""").param("u", user).query().listOfRows());
 		out.put("reportsMade", jdbc.sql("""
 				SELECT d.name AS deck, r.reason, r.created_at::text AS "createdAt" FROM deck_reports r JOIN decks d ON d.id = r.deck_id
 				 WHERE r.reporter_id = :u ORDER BY r.created_at
