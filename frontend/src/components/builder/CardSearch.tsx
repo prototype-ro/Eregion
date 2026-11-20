@@ -27,6 +27,7 @@ interface Props {
 
 export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommander, board = "main", compact = false, dock = false, label = "Add a card", placeholder = "Search by card name" }: Props) {
   const inputId = board === "main" ? "card-search" : `card-search-${board}`;
+  const resultsId = `${inputId}-results`;
   const [query, setQuery] = useState("");
   // Whether the list of results is showing. Typing or clicking into the box opens it, and Escape or a click anywhere else closes it
   // without throwing away what was typed.
@@ -72,13 +73,27 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
         }}
         onFocus={() => setOpen(true)}
         onClick={() => setOpen(true)}
+        onKeyDown={(event) => {
+          // Arrow down moves from the box into the results, to their first Add button.
+          if (event.key === "ArrowDown" && open && results.length > 0) {
+            event.preventDefault();
+            document.getElementById(resultsId)?.querySelector<HTMLElement>("button")?.focus();
+          }
+        }}
+        aria-expanded={searchable && open}
+        aria-controls={resultsId}
+        aria-describedby={`${inputId}-status`}
         autoComplete="off"
         placeholder={placeholder}
         className={dock ? "dock-search-field min-h-9 w-full rounded-full bg-transparent px-2 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none [@media(pointer:coarse)]:min-h-11" : compact ? field.md : "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"}
       />
 
+      {/* Read out when results arrive, since the list itself is not announced. */}
+      <p id={`${inputId}-status`} role="status" aria-live="polite" className="sr-only">
+        {!searchable ? "" : loading && results.length === 0 ? "Searching" : error ? "" : results.length === 0 ? "No matches" : `${results.length} ${results.length === 1 ? "result" : "results"}, arrow down to reach them`}
+      </p>
       {searchable && open && (
-        <div className={`absolute z-10 overflow-auto rounded-3xl border border-line bg-bg p-2 shadow-2xl ${dock ? "bottom-full left-0 mb-4 max-h-[min(520px,60vh)] w-[min(620px,100%)]" : `top-full right-0 mt-2 max-h-[520px] ${compact ? "w-[min(460px,92vw)]" : "left-0"}`}`}>
+        <div id={resultsId} role="region" aria-label="Search results" className={`absolute z-10 overflow-auto rounded-3xl border border-line bg-bg p-2 shadow-2xl ${dock ? "bottom-full left-0 mb-4 max-h-[min(520px,60vh)] w-[min(620px,100%)]" : `top-full right-0 mt-2 max-h-[520px] ${compact ? "w-[min(460px,92vw)]" : "left-0"}`}`}>
           {error && (
             <p role="alert" className="px-4 py-3 text-sm text-add-text">
               {error}
@@ -136,6 +151,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                       <button
                         type="button"
                         onClick={() => onSetCommander(card)}
+                        aria-label={`Make ${card.name} the commander`}
                         className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-4 text-sm font-medium"
                       >
                         Commander
@@ -145,6 +161,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                       <button
                         type="button"
                         onClick={() => onAdd(card, "maybe")}
+                        aria-label={`Add ${card.name} to the maybeboard`}
                         className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-line px-4 text-sm font-medium"
                       >
                         Maybe
@@ -153,6 +170,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                     <button
                       type="button"
                       onClick={() => onAdd(card)}
+                      aria-label={already ? `Add another ${card.name}` : `Add ${card.name}`}
                       className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-5 text-sm font-bold text-on-accent"
                     >
                       {already ? "Add another" : "Add"}

@@ -9,6 +9,7 @@ import { ExportDialog } from "@/components/ExportDialog";
 import { ReportDialog } from "@/components/ReportDialog";
 import { PublicHistory } from "@/components/PublicHistory";
 import { SampleHand } from "@/components/SampleHand";
+import { DisplayName } from "@/components/DisplayName";
 import { CopyButton } from "@/components/CopyButton";
 import { PrintChecklist } from "@/components/PrintChecklist";
 import { discordText } from "@/lib/share";
@@ -133,7 +134,7 @@ export default function PublicDeckPage() {
         <main id="main" tabIndex={-1} className="pb-24">
           <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-8">
             <div className="min-w-0">
-              <Link href="/explore" className="text-sm text-muted">
+              <Link href="/explore" className="inline-flex min-h-9 items-center text-sm text-muted [@media(pointer:coarse)]:min-h-11">
                 Back to Explore
               </Link>
               <div className="mt-4 mb-5 flex flex-wrap gap-2 text-sm text-muted">
@@ -156,7 +157,9 @@ export default function PublicDeckPage() {
                   {legality.legal ? "Legal in Commander" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"} for Commander`}
                 </span>
               </div>
-              <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">{detail.deck.name}</h1>
+              <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">
+                <DisplayName name={detail.deck.name} />
+              </h1>
               {detail.deck.description && <p className="mt-6 max-w-[68ch] whitespace-pre-line text-[17px] leading-relaxed text-muted">{detail.deck.description}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
@@ -185,6 +188,7 @@ export default function PublicDeckPage() {
           </div>
 
           <PublicHistory deckId={id} />
+          <h2 className="sr-only">Cards</h2>
 
           <div className="mt-14 flex flex-wrap items-center justify-end gap-x-6 gap-y-3 border-b border-line pb-4">
             <div className="flex items-center gap-3">
@@ -244,7 +248,7 @@ export default function PublicDeckPage() {
           {me && !detail.deck.mine && (
             <p className="mt-16 text-sm text-muted">
               Something wrong with this deck?{" "}
-              <button type="button" onClick={() => setReportOpen(true)} className="text-accent-text underline underline-offset-4">
+              <button type="button" onClick={() => setReportOpen(true)} className="inline-flex min-h-9 items-center text-accent-text underline underline-offset-4 [@media(pointer:coarse)]:min-h-11">
                 Report it
               </button>
             </p>

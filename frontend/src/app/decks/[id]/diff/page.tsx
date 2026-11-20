@@ -111,7 +111,7 @@ function Diff() {
       <main id="main" tabIndex={-1} className="pb-24">
         <div className="flex flex-wrap items-end justify-between gap-6 pt-10 pb-10">
           <div>
-            <Link href={`/decks/${id}`} className="text-sm text-muted">
+            <Link href={`/decks/${id}`} className="inline-flex min-h-9 items-center text-sm text-muted [@media(pointer:coarse)]:min-h-11">
               Back to {deckName || "the deck"}
             </Link>
             <h1 className="mt-3 font-display text-[clamp(56px,9vw,128px)] leading-[0.92]">

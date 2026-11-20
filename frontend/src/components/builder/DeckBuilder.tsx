@@ -25,6 +25,7 @@ import { useProxies } from "@/lib/useProxies";
 import { useFeatures } from "@/lib/features";
 import { SampleHand } from "@/components/SampleHand";
 import { PrintChecklist } from "@/components/PrintChecklist";
+import { DisplayName } from "@/components/DisplayName";
 import { ShoppingList } from "@/components/ShoppingList";
 import { ownedCopies } from "@/lib/collection";
 import { DescriptionDialog } from "./DescriptionDialog";
@@ -989,7 +990,13 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               {deck.description ? "Edit description" : "Add description"}
             </button>
           </div>
-          <h1 className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]">{deck.name}</h1>
+          {/* The title sits over the commander art; a halo in the page colour keeps it readable whatever the art. */}
+          <h1
+            className="font-display text-[clamp(56px,8vw,128px)] leading-[0.92]"
+            style={{ textShadow: "0 0 2px var(--bg), 0 0 8px var(--bg), 0 0 20px var(--bg), 0 0 36px var(--bg)" }}
+          >
+            <DisplayName name={deck.name} />
+          </h1>
           <div className="mt-2.5 space-y-1 text-[13px] leading-snug text-muted">
             <div className="flex flex-wrap items-center gap-x-2">
               <span className="capitalize">{deck.format}</span>
@@ -998,7 +1005,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 <summary className={`cursor-pointer list-none underline-offset-4 hover:underline ${legality.legal ? "" : "text-add-text"}`}>
                   {legality.legal ? "Legal" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"}`}
                 </summary>
-                <div className="absolute left-0 z-30 mt-2 w-[min(360px,90vw)] rounded-2xl border border-line bg-bg p-4 text-sm text-ink shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                <div className="absolute left-0 z-30 mt-2 w-[min(360px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-bg p-4 text-sm text-ink shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
                   {legality.legal ? (
                     <p>100 cards, one commander, one copy of each card, all inside the commander&apos;s colors.</p>
                   ) : (

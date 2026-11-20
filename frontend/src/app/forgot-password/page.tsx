@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
             <button type="submit" disabled={busy || email.trim() === ""} className="press min-h-14 rounded-full bg-accent px-8 text-base font-bold text-on-accent disabled:opacity-60">
               {busy ? "Sending" : "Send the link"}
             </button>
-            <Link href="/login" className="text-sm text-muted underline underline-offset-4 hover:text-ink">
+            <Link href="/login" className="inline-flex min-h-9 items-center text-sm text-muted underline underline-offset-4 hover:text-ink [@media(pointer:coarse)]:min-h-11">
               Back to sign in
             </Link>
           </form>
