@@ -27,6 +27,8 @@ public class TokenService {
 		Instant now = Instant.now();
 		JwtClaimsSet claims = JwtClaimsSet.builder()
 				.issuer("eregion")
+				// An id per token, so signing out can end this one session (see RevokedSessions).
+				.id(java.util.UUID.randomUUID().toString())
 				.subject(user.id().toString())
 				.issuedAt(now)
 				.expiresAt(now.plus(Duration.ofMinutes(properties.ttlMinutes())))

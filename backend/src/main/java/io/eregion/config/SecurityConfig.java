@@ -68,7 +68,7 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtSecretKey, io.eregion.auth.UserRepository users) {
+	JwtDecoder jwtDecoder(SecretKey jwtSecretKey, io.eregion.auth.UserRepository users, io.eregion.auth.RevokedSessions revoked) {
 		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(MacAlgorithm.HS256).build();
 		// A session is only good while its token version is the account's current one. Changing the password or
 		// signing out everywhere moves the version on, and deleting the account removes it, so old tokens stop working at once.
@@ -76,6 +76,10 @@ public class SecurityConfig {
 			Long claimed = token.getClaim("tv");
 			Integer actual = users.tokenVersion(java.util.UUID.fromString(token.getSubject())).orElse(null);
 			if (claimed == null || actual == null || claimed.intValue() != actual) {
+				return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "The session has ended", null));
+			}
+			// Signed out: this one token was ended, the account's other sessions go on.
+			if (token.getId() != null && revoked.isRevoked(java.util.UUID.fromString(token.getId()))) {
 				return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "The session has ended", null));
 			}
 			return OAuth2TokenValidatorResult.success();

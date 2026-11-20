@@ -3,6 +3,8 @@ package io.eregion.auth;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import io.eregion.ratelimit.RateLimits;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,11 +30,17 @@ public class AuthController {
 	private final RateLimits limits;
 	private final AccountService accounts;
 
-	public AuthController(AuthService auth, SessionCookie cookie, RateLimits limits, AccountService accounts) {
+	private final JwtDecoder decoder;
+	private final RevokedSessions revoked;
+
+	public AuthController(AuthService auth, SessionCookie cookie, RateLimits limits, AccountService accounts, JwtDecoder decoder,
+			RevokedSessions revoked) {
 		this.auth = auth;
 		this.cookie = cookie;
 		this.limits = limits;
 		this.accounts = accounts;
+		this.decoder = decoder;
+		this.revoked = revoked;
 	}
 
 	/** Creates the account and signs in. The token goes out in an httpOnly cookie, never in the body. */
@@ -76,7 +84,21 @@ public class AuthController {
 
 	@PostMapping("/auth/logout")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void logout(HttpServletResponse response) {
+	public void logout(HttpServletRequest request, HttpServletResponse response) {
+		// The token itself stops working too, not only the cookie that holds it. A token that is already invalid has
+		// nothing left to end, and signing out must never fail because of it.
+		String token = SessionCookie.read(request);
+		if (token != null) {
+			try {
+				Jwt jwt = decoder.decode(token);
+				if (jwt.getId() != null && jwt.getExpiresAt() != null) {
+					revoked.revoke(java.util.UUID.fromString(jwt.getId()), jwt.getExpiresAt());
+				}
+			}
+			catch (JwtException | IllegalArgumentException ex) {
+				// Expired, forged or from before tokens had ids: nothing to revoke.
+			}
+		}
 		cookie.clear(response);
 	}
 
