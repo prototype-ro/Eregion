@@ -63,6 +63,11 @@ public class UserRepository {
 				.single();
 	}
 
+	/** True for an account a moderator has disabled. */
+	public boolean isDisabled(UUID id) {
+		return jdbc.sql("SELECT disabled_at IS NOT NULL FROM users WHERE id = :id").param("id", id).query(Boolean.class).optional().orElse(false);
+	}
+
 	public void markVerified(UUID id) {
 		jdbc.sql("UPDATE users SET email_verified = TRUE WHERE id = :id").param("id", id).update();
 	}

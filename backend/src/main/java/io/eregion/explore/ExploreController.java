@@ -95,8 +95,7 @@ public class ExploreController {
 		// A report nobody reads protects nobody: whoever runs the site hears about it straight away.
 		if (!moderationEmail.isBlank()) {
 			mail.send(moderationEmail, "A deck was reported", "A player reported this deck:\n" + publicUrl + "/explore/" + deckId
-					+ "\n\nTheir reason:\n" + reason + "\n\nTo take it off Explore, run:\nUPDATE decks SET visibility = 'private', published_version_id = NULL, published_at = NULL WHERE id = '"
-					+ deckId + "';\n\nEvery report is kept in the deck_reports table.");
+					+ "\n\nTheir reason:\n" + reason + "\n\nTake it off Explore or dismiss the report on " + publicUrl + "/admin (signed in with an account listed in EREGION_ADMIN_EMAILS).");
 		}
 	}
 

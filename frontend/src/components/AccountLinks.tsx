@@ -40,6 +40,11 @@ export function AccountLinks() {
   if (user) {
     return (
       <>
+        {user.admin && (
+          <Link href="/admin" className="hidden min-h-9 items-center text-sm text-muted hover:text-ink sm:inline-flex">
+            Moderation
+          </Link>
+        )}
         <Link href="/account" className="hidden min-h-9 [@media(pointer:coarse)]:min-h-11 min-w-11 max-w-[160px] items-center justify-center truncate text-sm text-muted hover:text-ink sm:inline-flex" title="Your account">
           {user.displayName}
         </Link>

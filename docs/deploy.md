@@ -72,5 +72,8 @@ Flyway has no down migrations: rolling back a release that changed the schema me
 
 ## Moderation
 
-Reports are emailed to `EREGION_MODERATION_EMAIL` with the deck link and the SQL that takes it off Explore. Every
-report also stays in the `deck_reports` table. Copyright claims arrive at the contact address in the footer.
+Reports are emailed to `EREGION_MODERATION_EMAIL` with the deck link. The accounts listed in `EREGION_ADMIN_EMAILS`
+see a Moderation link at the top of the site (`/admin`): open reports with Take off Explore and Dismiss, finding an
+account by email and disabling it (sign-in refused, sessions ended, public decks made private, nothing deleted), and
+deleting a piece of uploaded art for a copyright claim. Every action is logged with who did it. Copyright claims
+arrive at the contact address in the footer.

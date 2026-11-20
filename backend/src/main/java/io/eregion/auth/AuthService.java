@@ -23,7 +23,10 @@ public class AuthService {
 	/** Checked when the email is unknown, so a missing account takes as long to refuse as a wrong password does. */
 	private final String decoy;
 
-	public AuthService(UserRepository users, PasswordEncoder encoder, TokenService tokens, AccountService accounts) {
+	private final io.eregion.admin.AdminAccess admins;
+
+	public AuthService(UserRepository users, PasswordEncoder encoder, TokenService tokens, AccountService accounts, io.eregion.admin.AdminAccess admins) {
+		this.admins = admins;
 		this.users = users;
 		this.encoder = encoder;
 		this.tokens = tokens;
@@ -54,11 +57,15 @@ public class AuthService {
 		if (found == null || !match) {
 			throw ApiException.unauthorized("Wrong email or password");
 		}
+		// Checked only after the password, so a disabled address cannot be told apart from a wrong guess.
+		if (users.isDisabled(found.id())) {
+			throw ApiException.forbidden("This account has been disabled. If you think that is a mistake, write to the contact address in the footer.");
+		}
 		User user = found;
 		return new AuthResponse(tokens.issue(user), UserDto.from(user));
 	}
 
 	public UserDto me(UUID userId) {
-		return users.findById(userId).map(UserDto::from).orElseThrow(() -> ApiException.notFound("User"));
+		return users.findById(userId).map(user -> UserDto.from(user, admins.isAdmin(userId))).orElseThrow(() -> ApiException.notFound("User"));
 	}
 }

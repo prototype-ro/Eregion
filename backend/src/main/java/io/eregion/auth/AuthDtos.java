@@ -20,9 +20,14 @@ public final class AuthDtos {
 	public record LoginRequest(@NotBlank(message = "Enter your email.") String email, @NotBlank(message = "Enter your password.") String password) {
 	}
 
-	public record UserDto(UUID id, String email, String displayName, boolean emailVerified) {
+	/** admin is true for the accounts allowed to moderate, so the site can show them the admin page. */
+	public record UserDto(UUID id, String email, String displayName, boolean emailVerified, boolean admin) {
 		static UserDto from(User user) {
-			return new UserDto(user.id(), user.email(), user.displayName(), user.emailVerified());
+			return new UserDto(user.id(), user.email(), user.displayName(), user.emailVerified(), false);
+		}
+
+		static UserDto from(User user, boolean admin) {
+			return new UserDto(user.id(), user.email(), user.displayName(), user.emailVerified(), admin);
 		}
 	}
 

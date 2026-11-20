@@ -8,6 +8,8 @@ export interface User {
   displayName: string;
   /** Whether the player proved they own the address. Needed to make a deck public. */
   emailVerified: boolean;
+  /** True for the accounts allowed to moderate (EREGION_ADMIN_EMAILS). */
+  admin?: boolean;
 }
 
 export interface Card {
