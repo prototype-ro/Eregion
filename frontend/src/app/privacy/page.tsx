@@ -49,8 +49,8 @@ export default function PrivacyPage() {
 
       <LegalSection title="Your rights">
         <p>
-          You can see and correct your data in the app, export any deck from its page, and delete everything from the
-          Account page. For a copy of all your data, or any other request (access, correction, objection, portability),
+          You can see and correct your data in the app, download all of it as one file from the Account page (Your data),
+          and delete everything from the same page. For any other request (access, correction, objection, portability),
           write to <Contact />. You can also complain to your data protection authority: the ANPD in Brazil, or the
           authority where you live in the EU.
         </p>

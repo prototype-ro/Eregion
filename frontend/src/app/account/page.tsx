@@ -42,6 +42,7 @@ export default function AccountPage() {
         <Profile user={user} />
         <Password />
         <Sessions />
+        <YourData />
         <DeleteAccount />
       </main>
     </div>
@@ -158,6 +159,45 @@ function Sessions() {
         <button type="button" onClick={() => void endAll()} disabled={busy} className={btn.large.secondary}>
           Sign out everywhere
         </button>
+      </div>
+    </section>
+  );
+}
+
+/** Everything kept about the player as one JSON file: the right of access and portability, no email needed. */
+function YourData() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/export", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(response.status === 429 ? "Too many downloads in a short time. Try again in a minute." : "Could not prepare your data.");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "eregion-data.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not prepare your data.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className={section} aria-labelledby="data-heading">
+      <h2 id="data-heading" className="text-[28px] leading-tight font-medium tracking-[-0.02em]">Your data</h2>
+      <div className="flex max-w-[560px] flex-col items-start gap-4">
+        <p className="text-[15px] leading-snug text-muted">
+          Download everything Eregion keeps about you as one file: your account, every deck with every version and its cards (the trash
+          too), your collection, a list of your uploaded art and the reports you made.
+        </p>
+        <button type="button" onClick={() => void download()} disabled={busy} className={btn.large.secondary}>
+          {busy ? "Preparing" : "Download my data"}
+        </button>
+        {error && <Message text={error} bad />}
       </div>
     </section>
   );
