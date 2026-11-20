@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { DiffView } from "@/components/DiffView";
+import { AnalysisShift } from "@/components/AnalysisShift";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
@@ -184,6 +185,7 @@ function Diff() {
           </p>
         )}
 
+        {diff && from !== null && to !== null && from !== to && <AnalysisShift deckId={id} from={from} to={to} />}
         {diff && from !== null && to !== null && <DiffView diff={diff} />}
       </main>
     </div>
