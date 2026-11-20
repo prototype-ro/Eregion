@@ -21,9 +21,18 @@ public class RateLimits {
 	private final RateLimitProperties properties;
 	private final RateLimiter limiter;
 
-	@Autowired
 	public RateLimits(RateLimitProperties properties) {
 		this(properties, new RateLimiter());
+	}
+
+	/**
+	 * store is "database" (the default: shared by every API server and kept across restarts) or "memory" (one
+	 * server, forgotten on restart).
+	 */
+	@Autowired
+	public RateLimits(RateLimitProperties properties, org.springframework.jdbc.core.simple.JdbcClient jdbc,
+			@org.springframework.beans.factory.annotation.Value("${eregion.rate.store:database}") String store) {
+		this(properties, "memory".equalsIgnoreCase(store) ? new RateLimiter() : new DatabaseRateLimiter(jdbc));
 	}
 
 	RateLimits(RateLimitProperties properties, RateLimiter limiter) {

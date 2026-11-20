@@ -1,7 +1,7 @@
 # Going live
 
-One machine running docker compose: Caddy (HTTPS) in front of the site, the API and Postgres. The API keeps rate
-limits in memory, so run one API instance until they move to the database.
+One machine running docker compose: Caddy (HTTPS) in front of the site, the API and Postgres. Rate limit counts live
+in the database, so more API instances can run behind the proxy later if one is not enough.
 
 ## Before the first deploy
 
@@ -67,7 +67,8 @@ Flyway has no down migrations: rolling back a release that changed the schema me
 - An outside uptime check (UptimeRobot, Better Stack...) on `https://<domain>/api/health` and `https://<domain>/`
   every minute, alerting you.
 - Disk space on the server: the database holds uploaded art.
-- `docker compose logs --since 1h backend` for errors. Server logs hold email addresses of people who hit errors;
+- `docker compose logs --since 1h backend` for errors. Each log line is one JSON object with a `requestId`; an error
+  a player sees ends with "(reference xxxxxxxx)", the start of that id. Server logs hold email addresses of people who hit errors;
   the privacy policy says logs are kept up to 30 days, so rotate Docker's logs within that.
 
 ## Moderation

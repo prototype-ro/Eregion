@@ -8,11 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
 /**
- * Counts how often something happens in a sliding window and says when a limit is used up. It keeps
- * its state in memory, which suits one server. With several servers each would count on its own,
- * so the effective limit grows with their number.
+ * Counts how often something happens in a sliding window and says when a limit is used up. This one keeps its state
+ * in memory, which suits tests and a single throwaway server: a restart forgets it, and with several servers each
+ * counts on its own. {@link DatabaseRateLimiter} is the one a deployment uses.
  */
-public final class RateLimiter {
+public class RateLimiter {
 
 	/** allowed is false when the limit is used up, and retryAfter says how long until a slot frees. */
 	public record Decision(boolean allowed, Duration retryAfter) {
