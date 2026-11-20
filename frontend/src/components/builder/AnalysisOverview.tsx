@@ -1,4 +1,4 @@
-import { healthWord, stepStrength, turnLabel, turnPosition } from "@/lib/analysis";
+import { healthWord, stepStrength, turnLabel, turnRange, turnPosition } from "@/lib/analysis";
 import type { AnalysisArchenemy, AnalysisHealth, AnalysisWinTurn } from "@/lib/types";
 import { COPPER_HOT, INK, MeterRow, Panel } from "./stats/screen";
 
@@ -27,7 +27,19 @@ const halftone = (color: string, radius: number, pitch = 6) => ({
 });
 
 /** Where in its bracket's range the deck's estimated turn falls, in words a player would say. */
-export function WinTurnBlock({ winTurn, rulesBracket, noFinisher = false }: { winTurn: AnalysisWinTurn; rulesBracket: number; noFinisher?: boolean }) {
+export function WinTurnBlock({
+  winTurn,
+  rulesBracket,
+  noFinisher = false,
+  simulatedComboTurn = null,
+}: {
+  winTurn: AnalysisWinTurn;
+  rulesBracket: number;
+  noFinisher?: boolean;
+  /** The simulator's average turn a game-ending combo was ready, to say so when it disagrees with the estimate. */
+  simulatedComboTurn?: number | null;
+}) {
+  const disagrees = simulatedComboTurn !== null && Math.abs(simulatedComboTurn - winTurn.turn) >= 2;
   const position = turnPosition(winTurn.turn);
   // Near either end the label hangs inward from the pin, so it never leaves the panel.
   const labelShift = position < 12 ? "0%" : position > 88 ? "-100%" : "-50%";
@@ -35,13 +47,16 @@ export function WinTurnBlock({ winTurn, rulesBracket, noFinisher = false }: { wi
     <Panel
       title="Estimated win turn"
       clip={false}
-      right={<p className="text-[clamp(40px,4.4vw,64px)] leading-none font-medium tracking-[-0.05em]">{turnLabel(winTurn.turn)}</p>}
+      right={<p className="text-[clamp(40px,4.4vw,64px)] leading-none font-medium tracking-[-0.05em]">{turnRange(winTurn.turn)}</p>}
       foot={
         <>
           The brackets are turn ranges, and the pin is where this deck lands.{" "}
           {winTurn.basis === "combo" ? "A combo in the deck can be run sooner than the rest of its signals suggest. " : ""}
           {rulesBracket > winTurn.bracket ? `The bracket rules still put it in bracket ${rulesBracket}. ` : ""}
           {noFinisher ? "No combo that ends the game was found, so this reads how fast the deck gets going, not a way to win. " : ""}
+          {disagrees && simulatedComboTurn !== null
+            ? `The simulated games disagree: they had a game-ending combo ready around turn ${Math.round(simulatedComboTurn)} on average. Read both as rough. `
+            : ""}
           It is an estimate from the cards and simulated games of the deck, not a model trained on played games.
         </>
       }

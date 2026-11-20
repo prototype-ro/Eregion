@@ -73,6 +73,12 @@ export function BracketBlock({ bracket }: { bracket: AnalysisBracket }) {
         {bracket.floor === bracket.estimated ? "The rules and the speed signals agree" : basisLabel(bracket.basis)}. Rules floor {bracket.floor}, speed estimate{" "}
         {bracket.estimated}.
       </p>
+      {bracket.estimated > bracket.floor && (
+        <p className="mt-2 text-[13px] leading-snug text-muted">
+          The rules floor is exact. The speed estimate is a reasoned guess, good to about one bracket either way.
+          {bracket.bracket === 5 ? " Bracket 5 is about how a deck is built and played for a cEDH table, which no list of cards can show: read it as \u201cplays at cEDH speed\u201d." : ""}
+        </p>
+      )}
 
       {bracket.reasons.length > 0 && (
         <ul className="mt-5 flex flex-col gap-2 text-[14px]">

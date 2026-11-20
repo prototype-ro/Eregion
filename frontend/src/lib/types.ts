@@ -456,6 +456,8 @@ export interface AnalysisSpeed {
   comboTurn: number | null;
   /** Chance a game-ending combo can be executed by turns "4", "6", "8" and "10". Empty without such a combo. */
   comboByTurn: Record<string, number>;
+  /** Average turn a game-ending combo was ready, counting games that never got there as turn 12; null without such a combo. */
+  comboMean?: number | null;
   assumptions: string[];
 }
 

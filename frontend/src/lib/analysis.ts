@@ -87,6 +87,16 @@ export function turnLabel(turn: number): string {
   return Number.isInteger(turn) ? String(turn) : turn.toFixed(1);
 }
 
+/**
+ * The estimated win turn as the range it really is. The estimate is a reading of signals, good to about a turn either
+ * way, so "7.3" claimed a precision it does not have: it reads "7 to 8".
+ */
+export function turnRange(turn: number): string {
+  const low = Math.max(1, Math.round(turn - 0.75));
+  const high = Math.max(low + 1, Math.round(turn + 0.75));
+  return `${low}–${high}`;
+}
+
 /** The word for a health score, so the ring never has to carry the meaning on its colour alone. */
 export function healthWord(score: number): string {
   const tone = healthTone(score);

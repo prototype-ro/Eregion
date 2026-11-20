@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { turnLabel } from "@/lib/analysis";
+import { turnLabel, turnRange } from "@/lib/analysis";
 import { formatPrice } from "@/lib/links";
 import { std } from "@/lib/ui";
 import { useAnalysis } from "@/lib/useAnalysis";
@@ -73,8 +73,8 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
   if (analysis?.winTurn && !tooSmall)
     figures.push({
       label: "Win turn",
-      value: turnLabel(analysis.winTurn.turn),
-      note: noFinisher ? "estimated, no combo found" : "estimated",
+      value: turnRange(analysis.winTurn.turn),
+      note: noFinisher ? "rough estimate, no combo found" : "rough estimate",
     });
   figures.push({
     label: "Deck value",
@@ -151,7 +151,7 @@ export function StatsSection({ deckId, stats, lines, saved, savedVersion, remove
 
         {showAnalysis && analysis && !tooSmall && (
           <>
-            {analysis.winTurn && analysis.bracket && <WinTurnBlock winTurn={analysis.winTurn} rulesBracket={analysis.bracket.bracket} noFinisher={noFinisher} />}
+            {analysis.winTurn && analysis.bracket && <WinTurnBlock winTurn={analysis.winTurn} rulesBracket={analysis.bracket.bracket} noFinisher={noFinisher} simulatedComboTurn={analysis.speed?.comboMean ?? null} />}
 
             <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
               {analysis.health && <HealthBlock health={analysis.health} />}
