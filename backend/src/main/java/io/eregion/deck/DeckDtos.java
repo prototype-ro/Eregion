@@ -150,14 +150,17 @@ public final class DeckDtos {
 			VersionDetail latest,
 			String visibility,
 			Integer publishedVersion,
-			String description) {
+			String description,
+			/** Whether the public page shows the versions that led to the published one. */
+			boolean publicHistory) {
 	}
 
 	/** Makes a deck public, showing one chosen version, or private again. versionNumber is required for public. */
 	public record RenameBranchRequest(@NotBlank @Size(max = 40) String name) {
 	}
 
-	public record VisibilityRequest(@NotBlank String visibility, Integer versionNumber) {
+	/** showHistory, when given, sets whether a public deck shows the versions that led to its published one. */
+	public record VisibilityRequest(@NotBlank String visibility, Integer versionNumber, Boolean showHistory) {
 	}
 
 	/**

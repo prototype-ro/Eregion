@@ -131,7 +131,7 @@ public class DeckService {
 				.map(version -> detail(version, userId))
 				.orElse(null);
 		return new DeckDetail(deck.id(), deck.name(), deck.format(), deck.createdAt(), deck.updatedAt(), latest,
-				deck.visibility(), deck.publishedVersion(), deck.description());
+				deck.visibility(), deck.publishedVersion(), deck.description(), deck.publicHistory());
 	}
 
 	@Transactional
@@ -179,6 +179,9 @@ public class DeckService {
 			}
 			case "private" -> decks.setPublished(deckId, null);
 			default -> throw ApiException.badRequest("visibility must be public or private");
+		}
+		if (request.showHistory() != null) {
+			decks.setPublicHistory(deckId, request.showHistory());
 		}
 		return get(deckId, userId);
 	}

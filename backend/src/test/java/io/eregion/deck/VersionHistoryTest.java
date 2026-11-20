@@ -192,7 +192,7 @@ class VersionHistoryTest extends PostgresTest {
 	void thePublicVersionCannotBeDeleted() {
 		UUID deck = newDeck(line(sol, 1));
 		save(deck, 1, null, line(sol, 1), line(island, 2));
-		inTx(() -> service.setVisibility(deck, user, new VisibilityRequest("public", 1)));
+		inTx(() -> service.setVisibility(deck, user, new VisibilityRequest("public", 1, null)));
 
 		assertThat(statusOf(() -> inTx(() -> service.deleteVersion(deck, user, 1)))).isEqualTo(HttpStatus.CONFLICT);
 	}
@@ -201,7 +201,7 @@ class VersionHistoryTest extends PostgresTest {
 	void aTrashedDeckIsHiddenUntilRestoredAndPurgingRemovesEverything() {
 		UUID deck = newDeck(line(sol, 1));
 		save(deck, 1, "Side", line(sol, 1), line(ponder, 1));
-		inTx(() -> service.setVisibility(deck, user, new VisibilityRequest("public", 1)));
+		inTx(() -> service.setVisibility(deck, user, new VisibilityRequest("public", 1, null)));
 
 		inTx(() -> {
 			service.delete(deck, user);

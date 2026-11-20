@@ -192,6 +192,8 @@ export interface DeckDetail {
   /** The version number shown on Explore, when the deck is public. */
   publishedVersion: number | null;
   description: string;
+  /** Whether the public page shows the versions that led to the published one. */
+  publicHistory: boolean;
 }
 
 export interface CardChange {

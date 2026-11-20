@@ -30,16 +30,18 @@ interface Props {
   showCollection: boolean;
   /** A page someone else's deck: no changes to compare against. */
   readOnly?: boolean;
-  /** Whether to ask the server for the analysis; only a signed-in viewer can. */
+  /** Whether to ask the server for the analysis; only a signed-in viewer can, unless analysisSource is given. */
   analyse?: boolean;
+  /** Where a ready analysis of these cards can be read without signing in, such as a public deck's own address. */
+  analysisSource?: string;
 }
 
 /**
  * The deck's numbers and its analysis in one section under the cards: a readout of the headline figures, the composition and the
  * curve as halftone screens, then what the deck is, how fast it is and how reliably it runs.
  */
-export function StatsSection({ deckId, stats, lines, saved, savedVersion, removed, showCollection, readOnly = false, analyse = true }: Props) {
-  const { analysis, updating, failure, empty, retry } = useAnalysis(lines, analyse);
+export function StatsSection({ deckId, stats, lines, saved, savedVersion, removed, showCollection, readOnly = false, analyse = true, analysisSource }: Props) {
+  const { analysis, updating, failure, empty, retry } = useAnalysis(lines, analyse, analysisSource);
   // The graphs glow in the version timeline's strand colour: the person's pick, or the commander's art.
   const { color: strand } = useStrandColor(lines.find((line) => line.board === "commander")?.imageArtCrop ?? null);
   const glow = useMemo(() => glowOf(strand), [strand]);

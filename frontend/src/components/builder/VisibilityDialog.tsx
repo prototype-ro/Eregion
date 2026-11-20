@@ -13,6 +13,8 @@ interface Props {
   timeline: Timeline;
   visibility: Visibility;
   publishedVersion: number | null;
+  /** Whether the public page shows the versions that led to the published one. */
+  publicHistory: boolean;
   /** The version open in the builder, offered first when nothing is published yet. */
   currentVersion: number | null;
   onChanged: (deck: DeckDetail) => void;
@@ -27,18 +29,19 @@ export function VisibilityDialog(props: Props) {
   );
 }
 
-function Form({ onClose, deckId, timeline, visibility, publishedVersion, currentVersion, onChanged }: Props) {
+function Form({ onClose, deckId, timeline, visibility, publishedVersion, publicHistory, currentVersion, onChanged }: Props) {
   const versions = timeline.branches
     .flatMap((branch) => branch.versions.map((version) => ({ ...version, branch: branch.name })))
     .sort((a, b) => b.versionNumber - a.versionNumber);
 
   const [choice, setChoice] = useState<Visibility>(visibility);
   const [versionNumber, setVersionNumber] = useState<number | null>(publishedVersion ?? currentVersion ?? versions[0]?.versionNumber ?? null);
+  const [showHistory, setShowHistory] = useState(publicHistory);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const needsVersion = choice === "public" && versionNumber === null;
-  const unchanged = choice === visibility && (choice === "private" || versionNumber === publishedVersion);
+  const unchanged = choice === visibility && (choice === "private" || (versionNumber === publishedVersion && showHistory === publicHistory));
 
   async function save() {
     setSaving(true);
@@ -46,7 +49,7 @@ function Form({ onClose, deckId, timeline, visibility, publishedVersion, current
     try {
       const deck = await api<DeckDetail>(`/api/decks/${deckId}/visibility`, {
         method: "PUT",
-        body: { visibility: choice, versionNumber: choice === "public" ? versionNumber : undefined },
+        body: { visibility: choice, versionNumber: choice === "public" ? versionNumber : undefined, showHistory: choice === "public" ? showHistory : undefined },
       });
       onChanged(deck);
       onClose();
@@ -97,6 +100,13 @@ function Form({ onClose, deckId, timeline, visibility, publishedVersion, current
             </select>
           )}
           <p className="text-sm leading-snug text-muted">Only this version is shown. Edits and newer versions stay private until you publish again.</p>
+          <label className="mt-2 flex cursor-pointer items-start gap-3">
+            <input type="checkbox" checked={showHistory} onChange={(event) => setShowHistory(event.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent-text)]" />
+            <span className="text-sm leading-snug">
+              Show how it got here
+              <span className="block text-muted">Visitors see the versions this one grew from, with their notes and what each changed. Never a later version.</span>
+            </span>
+          </label>
         </div>
       )}
 

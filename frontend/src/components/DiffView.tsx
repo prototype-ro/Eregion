@@ -99,7 +99,8 @@ function Retagged({ change }: { change: TagChange }) {
   );
 }
 
-export function DiffView({ diff }: { diff: DeckDiff }) {
+/** showOwned is off on a public deck: the visitor's collection says nothing about someone else's deck. */
+export function DiffView({ diff, showOwned = true }: { diff: DeckDiff; showOwned?: boolean }) {
   const { stats } = diff;
   // Changes in what the cards do, such as +2 Ramp, -1 Removal. Cards with no known role are not a change worth reporting.
   const roleChanges = knownRoles(stats.roleDelta);
@@ -124,12 +125,14 @@ export function DiffView({ diff }: { diff: DeckDiff }) {
       note: `${signed(stats.landsDelta)} from ${stats.from.lands}`,
       accent: false,
     },
-    {
-      label: "Owned",
-      value: `${stats.to.owned} of ${stats.to.totalCards}`,
-      note: `${stats.to.missing} still needed`,
-      accent: false,
-    },
+    ...(showOwned ? [
+      {
+        label: "Owned",
+        value: `${stats.to.owned} of ${stats.to.totalCards}`,
+        note: `${stats.to.missing} still needed`,
+        accent: false,
+      },
+    ] : []),
   ];
 
   return (

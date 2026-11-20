@@ -44,16 +44,18 @@ public class ExploreController {
 	private final DeckRepository decks;
 	private final RateLimits limits;
 	private final Mailer mail;
+	private final io.eregion.analysis.AnalysisService analysis;
 	/** Who hears about each report. Blank leaves reports in the deck_reports table only. */
 	private final String moderationEmail;
 	private final String publicUrl;
 
-	public ExploreController(ExploreRepository explore, DeckRepository decks, RateLimits limits, Mailer mail,
+	public ExploreController(ExploreRepository explore, DeckRepository decks, RateLimits limits, Mailer mail, io.eregion.analysis.AnalysisService analysis,
 			@Value("${eregion.moderation.email:}") String moderationEmail, @Value("${eregion.public-url:http://localhost:3000}") String publicUrl) {
 		this.explore = explore;
 		this.decks = decks;
 		this.limits = limits;
 		this.mail = mail;
+		this.analysis = analysis;
 		this.moderationEmail = moderationEmail;
 		this.publicUrl = publicUrl;
 	}
@@ -86,6 +88,60 @@ public class ExploreController {
 					+ "\n\nTheir reason:\n" + reason + "\n\nTo take it off Explore, run:\nUPDATE decks SET visibility = 'private', published_version_id = NULL, published_at = NULL WHERE id = '"
 					+ deckId + "';\n\nEvery report is kept in the deck_reports table.");
 		}
+	}
+
+	/**
+	 * The analysis of a public deck's published version (bracket and its reasons, combos, consistency, speed), for
+	 * anyone, signed in or not: a shared link should show what the deck is, not ask the visitor to make an account.
+	 */
+	@GetMapping("/{deckId}/analysis")
+	public io.eregion.analysis.AnalysisDtos.Analysis analysis(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		limits.publicRead(http);
+		var published = explore.find(CurrentUser.idOrNull(jwt), deckId).orElseThrow(() -> ApiException.notFound("Deck"));
+		List<io.eregion.analysis.AnalysisDtos.CardInput> cards = decks.versionLines(published.versionId(), null).stream()
+				.map(line -> new io.eregion.analysis.AnalysisDtos.CardInput(line.cardId(), line.board(), line.quantity()))
+				.toList();
+		return analysis.analyze(cards);
+	}
+
+	/** One step of a public deck's history: the version, and what changed from the step before it. */
+	public record PublicHistoryStep(int versionNumber, String note, java.time.Instant createdAt, int cardCount, int added, int removed, int changed) {
+	}
+
+	/**
+	 * How a public deck got to its published version, oldest first, with what each step changed. Empty when the owner
+	 * hides the history. Only the published version and its ancestors are ever listed.
+	 */
+	@GetMapping("/{deckId}/history")
+	public List<PublicHistoryStep> history(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		limits.publicRead(http);
+		explore.find(CurrentUser.idOrNull(jwt), deckId).orElseThrow(() -> ApiException.notFound("Deck"));
+		List<ExploreRepository.HistoryStep> steps = explore.history(deckId);
+		List<PublicHistoryStep> out = new java.util.ArrayList<>();
+		List<DeckCardLine> before = List.of();
+		for (ExploreRepository.HistoryStep step : steps) {
+			List<DeckCardLine> lines = decks.versionLines(step.versionId(), null);
+			var diff = io.eregion.deck.DeckDiffer.diff(0, before, step.versionNumber(), lines);
+			boolean first = out.isEmpty();
+			out.add(new PublicHistoryStep(step.versionNumber(), step.note(), step.createdAt(), step.cardCount(),
+					first ? 0 : diff.added().size(), first ? 0 : diff.removed().size(), first ? 0 : diff.changed().size()));
+			before = lines;
+		}
+		return out;
+	}
+
+	/** What changed between two versions in a public deck's history. Both must be on the way to the published one. */
+	@GetMapping("/{deckId}/diff")
+	public io.eregion.deck.DeckDtos.DeckDiff diff(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId,
+			@RequestParam int from, @RequestParam int to) {
+		limits.publicRead(http);
+		explore.find(CurrentUser.idOrNull(jwt), deckId).orElseThrow(() -> ApiException.notFound("Deck"));
+		java.util.Map<Integer, UUID> shown = new java.util.HashMap<>();
+		explore.history(deckId).forEach(step -> shown.put(step.versionNumber(), step.versionId()));
+		if (!shown.containsKey(from) || !shown.containsKey(to)) {
+			throw ApiException.notFound("Version");
+		}
+		return io.eregion.deck.DeckDiffer.diff(from, decks.versionLines(shown.get(from), null), to, decks.versionLines(shown.get(to), null));
 	}
 
 	/** A private or missing deck looks the same: not found. */

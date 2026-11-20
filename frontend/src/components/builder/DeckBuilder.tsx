@@ -138,7 +138,7 @@ function remember(key: string, value: string) {
 }
 
 interface Props {
-  deck: { id: string; name: string; format: string; visibility: Visibility; publishedVersion: number | null; description: string };
+  deck: { id: string; name: string; format: string; visibility: Visibility; publishedVersion: number | null; description: string; publicHistory: boolean };
   /** The version opened in the builder. Null for a deck with no saved version yet. */
   version: VersionDetail | null;
   timeline: Timeline;
@@ -179,6 +179,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   // Phones fold the group, sort and collection controls away; the board itself comes first.
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [visibility, setVisibility] = useState<Visibility>(deck.visibility);
+  const [publicHistory, setPublicHistory] = useState(deck.publicHistory);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(deck.publishedVersion);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
@@ -1298,10 +1299,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         timeline={timeline}
         visibility={visibility}
         publishedVersion={publishedVersion}
+        publicHistory={publicHistory}
         currentVersion={version?.versionNumber ?? null}
         onChanged={(changed) => {
           setVisibility(changed.visibility);
           setPublishedVersion(changed.publishedVersion);
+          setPublicHistory(changed.publicHistory);
           setToast(changed.visibility === "public" ? `Version ${changed.publishedVersion} is public` : "Deck is private");
         }}
       />

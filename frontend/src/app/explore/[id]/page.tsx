@@ -7,6 +7,7 @@ import { CardGallery, CardStacks } from "@/components/builder/CardViews";
 import { CardList } from "@/components/builder/CardList";
 import { ExportDialog } from "@/components/ExportDialog";
 import { ReportDialog } from "@/components/ReportDialog";
+import { PublicHistory } from "@/components/PublicHistory";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
@@ -160,7 +161,9 @@ export default function PublicDeckPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-3 border-b border-line pb-4">
+          <PublicHistory deckId={id} />
+
+          <div className="mt-14 flex flex-wrap items-center justify-end gap-x-6 gap-y-3 border-b border-line pb-4">
             <div className="flex items-center gap-3">
               <label htmlFor="pub-group" className="text-sm text-muted">
                 Group by
@@ -225,7 +228,7 @@ export default function PublicDeckPage() {
           )}
 
           <div className="mt-16">
-            <StatsSection deckId={id} stats={detail.stats} lines={detail.cards} saved={null} savedVersion={detail.deck.versionNumber} removed={[]} showCollection={false} readOnly analyse={!!me} />
+            <StatsSection deckId={id} stats={detail.stats} lines={detail.cards} saved={null} savedVersion={detail.deck.versionNumber} removed={[]} showCollection={false} readOnly analysisSource={`/api/explore/${id}/analysis`} />
           </div>
         </main>
       )}

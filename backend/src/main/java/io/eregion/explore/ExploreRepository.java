@@ -53,6 +53,10 @@ public class ExploreRepository {
 			 WHERE d.visibility = 'public' AND d.deleted_at IS NULL
 			""";
 
+	/** One version on the way to a public deck's published version. */
+	public record HistoryStep(UUID versionId, int versionNumber, String note, java.time.Instant createdAt, int cardCount) {
+	}
+
 	private final JdbcClient jdbc;
 
 	public ExploreRepository(JdbcClient jdbc) {
@@ -121,5 +125,32 @@ public class ExploreRepository {
 				rs.getTimestamp("published_at").toInstant(),
 				rs.getBoolean("mine"),
 				rs.getString("description"));
+	}
+
+	/**
+	 * The published version of a public deck and the versions it grew from, oldest first: the first parent of each
+	 * version back to the deck's first, which is the line the owner actually followed. Never a version saved after the
+	 * published one, and nothing at all when the owner hides the history. At most the latest 60.
+	 */
+	public List<HistoryStep> history(UUID deckId) {
+		return jdbc.sql("""
+				WITH RECURSIVE chain AS (
+				    SELECT v.id, v.version_number, v.note, v.created_at, v.parent_version_id, 0 AS depth
+				      FROM decks d JOIN deck_versions v ON v.id = d.published_version_id
+				     WHERE d.id = :deck AND d.visibility = 'public' AND d.deleted_at IS NULL AND d.public_history
+				    UNION ALL
+				    SELECT p.id, p.version_number, p.note, p.created_at, p.parent_version_id, c.depth + 1
+				      FROM deck_versions p JOIN chain c ON p.id = c.parent_version_id
+				     WHERE c.depth < 59
+				)
+				SELECT id, version_number, note, created_at,
+				       COALESCE((SELECT SUM(dc.quantity) FROM deck_version_cards dc
+				                  WHERE dc.version_id = chain.id AND dc.board IN ('commander', 'main')), 0) AS card_count
+				  FROM chain ORDER BY version_number
+				""")
+				.param("deck", deckId)
+				.query((rs, n) -> new HistoryStep(rs.getObject("id", UUID.class), rs.getInt("version_number"), rs.getString("note"),
+						rs.getTimestamp("created_at").toInstant(), rs.getInt("card_count")))
+				.list();
 	}
 }

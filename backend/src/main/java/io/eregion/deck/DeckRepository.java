@@ -24,7 +24,7 @@ import io.eregion.deck.DeckDtos.VersionSummary;
 public class DeckRepository {
 
 	public record DeckRow(UUID id, UUID ownerId, String name, String format, Instant createdAt, Instant updatedAt,
-			String visibility, Integer publishedVersion, String description) {
+			String visibility, Integer publishedVersion, String description, boolean publicHistory) {
 	}
 
 	/** A version plus where it sits in the branch graph. head is true when nothing newer is on its branch. */
@@ -79,7 +79,7 @@ public class DeckRepository {
 	/** Only returns the deck when it belongs to the user, so a stranger's id looks like a missing one. */
 	public Optional<DeckRow> findOwned(UUID deckId, UUID ownerId) {
 		return jdbc.sql("""
-				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility, d.description,
+				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility, d.description, d.public_history,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version
 				  FROM decks d WHERE d.id = :id AND d.owner_id = :owner AND d.deleted_at IS NULL
 				""")
@@ -94,7 +94,8 @@ public class DeckRepository {
 						rs.getTimestamp("updated_at").toInstant(),
 						rs.getString("visibility"),
 						(Integer) rs.getObject("published_version"),
-						rs.getString("description")))
+						rs.getString("description"),
+						rs.getBoolean("public_history")))
 				.optional();
 	}
 
@@ -215,6 +216,11 @@ public class DeckRepository {
 				.param("id", deckId)
 				.param("version", versionId)
 				.update();
+	}
+
+	/** Whether a public deck shows the versions that led to its published one. */
+	public void setPublicHistory(UUID deckId, boolean shown) {
+		jdbc.sql("UPDATE decks SET public_history = :shown WHERE id = :id").param("id", deckId).param("shown", shown).update();
 	}
 
 	public void touch(UUID deckId) {

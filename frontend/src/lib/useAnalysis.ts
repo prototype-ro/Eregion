@@ -18,7 +18,7 @@ export interface AnalysisFailure {
  * The analysis of a deck as it is now, saved or not. Answers are kept by deck shape, so editing a deck back to an earlier shape shows
  * its analysis at once. While a newer answer is on its way the last one stays on screen, marked as updating.
  */
-export function useAnalysis(lines: DeckCardLine[], enabled = true) {
+export function useAnalysis(lines: DeckCardLine[], enabled = true, source?: string) {
   const request = useMemo(() => analysisRequest(lines), [lines]);
   const key = useMemo(() => analysisKey(request), [request]);
   const empty = request.cards.length === 0;
@@ -33,7 +33,8 @@ export function useAnalysis(lines: DeckCardLine[], enabled = true) {
     if (!enabled || empty || have) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      api<DeckAnalysis>("/api/analysis", { method: "POST", body: request })
+      // A public deck's analysis comes ready from its own address, open to visitors who are not signed in.
+      (source ? api<DeckAnalysis>(source) : api<DeckAnalysis>("/api/analysis", { method: "POST", body: request }))
         .then((data) => {
           if (cancelled) return;
           setResults((previous) => {
@@ -55,7 +56,7 @@ export function useAnalysis(lines: DeckCardLine[], enabled = true) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [enabled, empty, have, key, request, attempt]);
+  }, [enabled, empty, have, key, request, attempt, source]);
 
   const current = results[key] ?? null;
   const failed = failure && failure.key === key ? failure : null;
