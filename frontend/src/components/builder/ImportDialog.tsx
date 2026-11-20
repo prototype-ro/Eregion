@@ -183,12 +183,12 @@ export function ImportDialog({
               onChange={(event) => setText(event.target.value)}
               rows={12}
               spellCheck={false}
-              placeholder={"1 Sol Ring\n1 Arcane Signet\n4 Island\n\nSideboard\n1 Mana Drain\n\nor https://archidekt.com/decks/..."}
+              placeholder={"1 Sol Ring\n1 Arcane Signet\n4 Island\n\nSideboard\n1 Mana Drain\n\nor https://tappedout.net/mtg-decks/..."}
               className="w-full resize-y rounded-3xl border border-line bg-surface px-5 py-4 font-mono text-sm leading-relaxed text-ink placeholder:text-muted focus:border-ink focus:outline-none"
             />
             <p className="text-sm text-muted">
               Works with lists copied from Moxfield, Archidekt, MTG Arena and MTGO. Set codes like (CMM) are ignored.
-              Headings such as Commander and Sideboard are understood. A link to a deck on Archidekt, Scryfall, TappedOut or MTGGoldfish is read for you. Moxfield blocks that, so copy its export instead.
+              Headings such as Commander and Sideboard are understood. A link to a deck on Scryfall, TappedOut or MTGGoldfish is read for you. Moxfield and Archidekt do not allow that, so copy their export instead.
             </p>
           </div>
 

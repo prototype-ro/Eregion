@@ -14,19 +14,6 @@ import io.eregion.common.ApiException;
 
 class DeckImportServiceTest {
 
-	private static final String ARCHIDEKT = """
-			{"name": "Fun With Fungus",
-			 "categories": [{"name": "Commander", "includedInDeck": true}, {"name": "Maybeboard", "includedInDeck": false}, {"name": "Ramp", "includedInDeck": true}],
-			 "cards": [
-			   {"quantity": 1, "categories": ["Commander"], "card": {"collectorNumber": "227", "edition": {"editioncode": "tsp"}, "oracleCard": {"name": "Thelon of Havenwood"}}},
-			   {"quantity": 1, "categories": ["Ramp"], "card": {"collectorNumber": "263", "edition": {"editioncode": "c21"}, "oracleCard": {"name": "Sol Ring"}}},
-			   {"quantity": 12, "categories": [], "card": {"collectorNumber": "300", "edition": {"editioncode": "unf"}, "oracleCard": {"name": "Forest"}}},
-			   {"quantity": 1, "categories": ["Maybeboard"], "card": {"oracleCard": {"name": "Cultivate"}}},
-			   {"quantity": 0, "categories": [], "card": {"oracleCard": {"name": "Ghost"}}},
-			   {"quantity": 1, "categories": [], "card": {"oracleCard": {"name": ""}}}
-			 ]}
-			""";
-
 	/** A fetcher that answers what it is told and remembers what it was asked for. */
 	private static final class Fake implements DeckFetcher {
 		final List<URI> asked = new ArrayList<>();
@@ -41,27 +28,6 @@ class DeckImportServiceTest {
 			asked.add(uri);
 			return answer;
 		}
-	}
-
-	@Test
-	void anArchidektDeckBecomesSectionsOfCards() {
-		var fake = new Fake(200, ARCHIDEKT);
-
-		var deck = new DeckImportService(fake).fetch("https://archidekt.com/decks/63634/fun");
-
-		assertThat(fake.asked).containsExactly(URI.create("https://archidekt.com/api/decks/63634/"));
-		assertThat(deck.name()).isEqualTo("Fun With Fungus");
-		assertThat(deck.site()).isEqualTo("Archidekt");
-		assertThat(deck.text()).isEqualTo("""
-				Commander
-				1 Thelon of Havenwood (TSP) 227
-
-				Deck
-				1 Sol Ring (C21) 263
-				12 Forest (UNF) 300
-
-				Maybeboard
-				1 Cultivate""");
 	}
 
 	@Test
@@ -85,6 +51,18 @@ class DeckImportServiceTest {
 	}
 
 	@Test
+	void archidektIsExplainedAndNeverFetched() {
+		var fake = new Fake(200, "");
+
+		assertThatThrownBy(() -> new DeckImportService(fake).fetch("https://archidekt.com/decks/63634/fun_with_fungus"))
+				.isInstanceOfSatisfying(ApiException.class, ex -> {
+					assertThat(ex.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(ex.getMessage()).contains("Archidekt does not let other sites read").contains("Export");
+				});
+		assertThat(fake.asked).isEmpty();
+	}
+
+	@Test
 	void aLinkThatIsNotADeckIsRefusedWithoutAnyRequest() {
 		var fake = new Fake(200, "");
 
@@ -94,7 +72,7 @@ class DeckImportServiceTest {
 
 	@Test
 	void aMissingDeckIsNotFound() {
-		assertThatThrownBy(() -> new DeckImportService(new Fake(404, "")).fetch("https://archidekt.com/decks/1"))
+		assertThatThrownBy(() -> new DeckImportService(new Fake(404, "")).fetch("https://www.mtggoldfish.com/deck/1"))
 				.isInstanceOfSatisfying(ApiException.class, ex -> {
 					assertThat(ex.status()).isEqualTo(HttpStatus.NOT_FOUND);
 					assertThat(ex.getMessage()).contains("private");
@@ -112,19 +90,13 @@ class DeckImportServiceTest {
 
 	@Test
 	void aSlowSiteIsReportedAsSuch() {
-		assertThatThrownBy(() -> new DeckImportService(new Fake(0, "")).fetch("https://archidekt.com/decks/1"))
+		assertThatThrownBy(() -> new DeckImportService(new Fake(0, "")).fetch("https://www.mtggoldfish.com/deck/1"))
 				.isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.getMessage()).contains("did not answer in time"));
 	}
 
 	@Test
 	void anOversizedAnswerIsRefused() {
-		assertThatThrownBy(() -> new DeckImportService(new Fake(413, "")).fetch("https://archidekt.com/decks/1")).hasMessageContaining("bigger than a Commander deck");
-	}
-
-	@Test
-	void garbageFromArchidektIsHandled() {
-		assertThatThrownBy(() -> new DeckImportService(new Fake(200, "<<not json")).fetch("https://archidekt.com/decks/1")).isInstanceOf(ApiException.class).hasMessageContaining("unreadable");
-		assertThatThrownBy(() -> new DeckImportService(new Fake(200, "{\"name\":\"Empty\",\"cards\":[]}")).fetch("https://archidekt.com/decks/1")).hasMessageContaining("no cards");
+		assertThatThrownBy(() -> new DeckImportService(new Fake(413, "")).fetch("https://www.mtggoldfish.com/deck/1")).hasMessageContaining("bigger than a Commander deck");
 	}
 
 	@Test

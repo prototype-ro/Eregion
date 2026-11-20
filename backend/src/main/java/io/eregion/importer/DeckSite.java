@@ -14,7 +14,11 @@ import java.util.regex.Pattern;
  */
 public enum DeckSite {
 
-	ARCHIDEKT("Archidekt", "archidekt.com", Pattern.compile("^/decks/(\\d{1,10})(?:/.*)?$"), "https://archidekt.com/api/decks/%s/", "application/json"),
+	/**
+	 * Recognised but not fetched: Archidekt's terms allow only personal, non-commercial use and forbid automated
+	 * requests and building a similar site (archidekt.com/terms, sections 2.2 and 3).
+	 */
+	ARCHIDEKT("Archidekt", "archidekt.com", Pattern.compile("^/decks/(\\d{1,10})(?:/.*)?$"), null, null),
 	SCRYFALL("Scryfall", "scryfall.com", Pattern.compile("^/@[^/]{1,40}/decks/([0-9a-fA-F-]{36})(?:/.*)?$"), "https://api.scryfall.com/decks/%s/export/text", "text/plain"),
 	TAPPEDOUT("TappedOut", "tappedout.net", Pattern.compile("^/mtg-decks/([a-z0-9][a-z0-9-]{2,120})/?$"), "https://tappedout.net/mtg-decks/%s/?fmt=txt", "text/plain"),
 	GOLDFISH("MTGGoldfish", "mtggoldfish.com", Pattern.compile("^/deck/(\\d{1,10})(?:/.*)?$"), "https://www.mtggoldfish.com/deck/download/%s", "text/plain"),

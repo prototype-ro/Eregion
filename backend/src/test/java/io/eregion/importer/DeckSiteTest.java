@@ -27,7 +27,8 @@ class DeckSiteTest {
 
 	@Test
 	void theFetchedAddressIsBuiltFromATemplateWithOnlyTheId() {
-		assertThat(parse("https://archidekt.com/decks/63634/anything-here?x=https://evil.example").apiUri().toString()).isEqualTo("https://archidekt.com/api/decks/63634/");
+		assertThat(parse("https://www.mtggoldfish.com/deck/4123456/anything?x=https://evil.example").apiUri().toString()).isEqualTo("https://www.mtggoldfish.com/deck/download/4123456");
+		assertThat(parse("https://archidekt.com/decks/63634/anything-here").apiUri()).isNull();
 		assertThat(parse("https://tappedout.net/mtg-decks/kess-storm/").apiUri().toString()).isEqualTo("https://tappedout.net/mtg-decks/kess-storm/?fmt=txt");
 		assertThat(parse("https://moxfield.com/decks/oEWXWHM5eEGMmopExLWRCA").apiUri()).isNull();
 	}
