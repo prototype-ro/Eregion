@@ -50,7 +50,7 @@ public class ExploreRepository {
 			  FROM decks d
 			  JOIN users u ON u.id = d.owner_id
 			  JOIN deck_versions v ON v.id = d.published_version_id
-			 WHERE d.visibility = 'public'
+			 WHERE d.visibility = 'public' AND d.deleted_at IS NULL
 			""";
 
 	private final JdbcClient jdbc;
@@ -93,7 +93,7 @@ public class ExploreRepository {
 
 	/** Records a report. One per player per deck, so asking again changes nothing. False when the deck is not public or is the reporter's own. */
 	public boolean report(UUID deckId, UUID reporterId, String reason) {
-		boolean reportable = jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :deck AND visibility = 'public' AND owner_id <> :reporter)")
+		boolean reportable = jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :deck AND visibility = 'public' AND deleted_at IS NULL AND owner_id <> :reporter)")
 				.param("deck", deckId).param("reporter", reporterId).query(Boolean.class).single();
 		if (reportable) {
 			jdbc.sql("INSERT INTO deck_reports (deck_id, reporter_id, reason) VALUES (:deck, :reporter, :reason) ON CONFLICT (deck_id, reporter_id) DO NOTHING")

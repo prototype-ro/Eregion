@@ -112,7 +112,7 @@ public class DeckService {
 	public DeckDetail create(UUID userId, CreateDeckRequest request) {
 		String format = request.format() == null || request.format().isBlank() ? "commander" : request.format().trim();
 		if (decks.deckCount(userId) >= MAX_DECKS_PER_USER) {
-			throw ApiException.conflict("You can keep up to " + MAX_DECKS_PER_USER + " decks. Delete some first");
+			throw ApiException.conflict("You can keep up to " + MAX_DECKS_PER_USER + " decks, counting the trash. Delete some and empty the trash first");
 		}
 		UUID deckId = decks.insertDeck(userId, request.name().trim(), format);
 		UUID main = decks.insertMainBranch(deckId, MAIN_BRANCH);
@@ -135,8 +135,27 @@ public class DeckService {
 	}
 
 	@Transactional
+	/** Moves the deck to the trash for 30 days. While there it is hidden everywhere, Explore included. */
 	public void delete(UUID deckId, UUID userId) {
 		owned(deckId, userId);
+		decks.trash(deckId);
+	}
+
+	public List<DeckDtos.TrashedDeck> trash(UUID userId) {
+		return decks.trashed(userId);
+	}
+
+	public void restore(UUID deckId, UUID userId) {
+		if (!decks.restore(deckId, userId)) {
+			throw ApiException.notFound("Deck in the trash");
+		}
+	}
+
+	/** Removes a deck from the trash for good, before its 30 days are up. */
+	public void deleteForever(UUID deckId, UUID userId) {
+		if (!decks.inTrash(deckId, userId)) {
+			throw ApiException.notFound("Deck in the trash");
+		}
 		decks.delete(deckId);
 	}
 

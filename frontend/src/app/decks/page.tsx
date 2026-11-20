@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BulkDeleteDeckDialog, DeleteDeckDialog, RenameDeckDialog } from "@/components/decks/DeckDialogs";
+import { TrashSection } from "@/components/decks/TrashSection";
 import { DeckSelectionBar } from "@/components/decks/DeckSelectionBar";
 import { NewDeckDialog, type NewDeckDraft } from "@/components/decks/NewDeckDialog";
 import { DeckRow, DeckTile } from "@/components/decks/DeckTile";
@@ -100,9 +101,12 @@ export default function DecksPage() {
     }
   }, [restored, sort, direction, filters.visibility, filters.legality, filters.colors, filters.status, view]);
 
+  // Bumped on every reload of the list, so the trash below picks up a deck that was just deleted or restored.
+  const [loads, setLoads] = useState(0);
   const load = useCallback(async () => {
     try {
       setDecks(await api<DeckSummary[]>("/api/decks"));
+      setLoads((n) => n + 1);
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -380,6 +384,13 @@ export default function DecksPage() {
             </p>
           </div>
         )}
+        <TrashSection
+          refresh={loads}
+          onRestored={(message) => {
+            setToast(message);
+            void load();
+          }}
+        />
       </main>
 
       <NewDeckDialog

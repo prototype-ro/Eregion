@@ -41,8 +41,9 @@ export default function PrivacyPage() {
 
       <LegalSection title="How long">
         <p>
-          Until you delete your account. Deleting it (on the Account page) removes the account, every deck and version,
-          your collection, your art and your reports at once. Copies in backups are gone within 30 days.
+          Until you delete it. A deleted deck waits in your trash for 30 days so it can be restored, then it is removed.
+          Deleting your account (on the Account page) removes the account, every deck and version, the trash, your
+          collection, your art and your reports at once. Copies in backups are gone within 30 days.
         </p>
       </LegalSection>
 

@@ -81,7 +81,7 @@ public class DeckRepository {
 		return jdbc.sql("""
 				SELECT d.id, d.owner_id, d.name, d.format, d.created_at, d.updated_at, d.visibility, d.description,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version
-				  FROM decks d WHERE d.id = :id AND d.owner_id = :owner
+				  FROM decks d WHERE d.id = :id AND d.owner_id = :owner AND d.deleted_at IS NULL
 				""")
 				.param("id", deckId)
 				.param("owner", ownerId)
@@ -128,7 +128,7 @@ public class DeckRepository {
 				  LEFT JOIN LATERAL (SELECT id, version_number, branch_id FROM deck_versions
 				                      WHERE deck_id = d.id ORDER BY version_number DESC LIMIT 1) v ON TRUE
 				  LEFT JOIN deck_branches b ON b.id = v.branch_id
-				 WHERE d.owner_id = :owner
+				 WHERE d.owner_id = :owner AND d.deleted_at IS NULL
 				 ORDER BY d.updated_at DESC
 				""")
 				.param("owner", ownerId)
@@ -221,6 +221,48 @@ public class DeckRepository {
 		jdbc.sql("UPDATE decks SET updated_at = now() WHERE id = :id").param("id", deckId).update();
 	}
 
+	/** Moves a deck to its owner's trash. Everything stays as it was, so restoring puts it back exactly. */
+	public void trash(UUID deckId) {
+		jdbc.sql("UPDATE decks SET deleted_at = now() WHERE id = :id AND deleted_at IS NULL").param("id", deckId).update();
+	}
+
+	/** Puts a trashed deck back. False when it is not in this owner's trash (any more). */
+	public boolean restore(UUID deckId, UUID ownerId) {
+		return jdbc.sql("UPDATE decks SET deleted_at = NULL, updated_at = now() WHERE id = :id AND owner_id = :owner AND deleted_at IS NOT NULL")
+				.param("id", deckId).param("owner", ownerId).update() == 1;
+	}
+
+	/** True when this owner has the deck in their trash. */
+	public boolean inTrash(UUID deckId, UUID ownerId) {
+		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :id AND owner_id = :owner AND deleted_at IS NOT NULL)")
+				.param("id", deckId).param("owner", ownerId).query(Boolean.class).single();
+	}
+
+	/** The owner's trashed decks, most recently deleted first, with when each will be removed for good. */
+	public List<DeckDtos.TrashedDeck> trashed(UUID ownerId) {
+		return jdbc.sql("""
+				SELECT id, name, deleted_at, deleted_at + make_interval(days => :days) AS purge_at
+				  FROM decks WHERE owner_id = :owner AND deleted_at IS NOT NULL
+				 ORDER BY deleted_at DESC
+				""")
+				.param("owner", ownerId).param("days", TRASH_DAYS)
+				.query((rs, n) -> new DeckDtos.TrashedDeck(rs.getObject("id", UUID.class), rs.getString("name"),
+						rs.getTimestamp("deleted_at").toInstant(), rs.getTimestamp("purge_at").toInstant()))
+				.list();
+	}
+
+	/** Decks that have been in the trash longer than the trash keeps them. */
+	public List<UUID> expiredTrash() {
+		return jdbc.sql("SELECT id FROM decks WHERE deleted_at < now() - make_interval(days => :days)")
+				.param("days", TRASH_DAYS).query(UUID.class).list();
+	}
+
+	/** Trashed versions older than the trash keeps them, across every deck. */
+	public int purgeExpiredVersionTrash() {
+		return jdbc.sql("DELETE FROM trashed_versions WHERE trashed_at < now() - make_interval(days => :days)").param("days", TRASH_DAYS).update();
+	}
+
+	/** Removes a deck and everything in it for good. */
 	public void delete(UUID deckId) {
 		// Versions point at each other and at branches, so clear those links before the cascade.
 		jdbc.sql("UPDATE decks SET visibility = 'private', published_version_id = NULL, published_at = NULL WHERE id = :id").param("id", deckId).update();

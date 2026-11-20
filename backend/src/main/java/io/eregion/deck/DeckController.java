@@ -82,10 +82,28 @@ public class DeckController {
 		return service.duplicate(deckId, CurrentUser.id(jwt));
 	}
 
+	/** Moves the deck to the trash, where it stays for 30 days. */
 	@DeleteMapping("/{deckId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
 		service.delete(deckId, CurrentUser.id(jwt));
+	}
+
+	@GetMapping("/trash")
+	public List<DeckDtos.TrashedDeck> trash(@AuthenticationPrincipal Jwt jwt) {
+		return service.trash(CurrentUser.id(jwt));
+	}
+
+	@PostMapping("/{deckId}/restore")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void restore(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		service.restore(deckId, CurrentUser.id(jwt));
+	}
+
+	@DeleteMapping("/{deckId}/forever")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void deleteForever(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
+		service.deleteForever(deckId, CurrentUser.id(jwt));
 	}
 
 	/** Publish one version for the Explore page, or make the deck private again. */

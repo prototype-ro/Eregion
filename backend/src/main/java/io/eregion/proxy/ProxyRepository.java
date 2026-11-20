@@ -34,7 +34,7 @@ public class ProxyRepository {
 	}
 
 	public boolean ownsDeck(UUID deckId, UUID userId) {
-		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :deck AND owner_id = :user)")
+		return jdbc.sql("SELECT EXISTS (SELECT 1 FROM decks WHERE id = :deck AND owner_id = :user AND deleted_at IS NULL)")
 				.param("deck", deckId).param("user", userId).query(Boolean.class).single();
 	}
 

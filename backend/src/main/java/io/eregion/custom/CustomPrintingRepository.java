@@ -101,7 +101,7 @@ public class CustomPrintingRepository {
 				SELECT cp.content_type, cp.data FROM custom_printings cp
 				 WHERE cp.id = :id
 				   AND (cp.user_id = :viewer OR EXISTS (
-				        SELECT 1 FROM decks d JOIN deck_version_cards dc ON dc.version_id = d.published_version_id
+				        SELECT 1 FROM decks d JOIN deck_version_cards dc ON dc.version_id = d.published_version_id AND d.deleted_at IS NULL
 				         WHERE d.visibility = 'public' AND dc.custom_printing_id = cp.id))
 				""")
 				.param("id", id)

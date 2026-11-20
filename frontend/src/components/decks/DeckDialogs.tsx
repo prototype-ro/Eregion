@@ -106,10 +106,10 @@ function BulkDeleteForm({ decks, onClose, onDone }: BulkProps) {
     const succeeded = decks.length - failed.length;
     const message =
       failed.length === 0
-        ? `Deleted ${plural(succeeded, "deck")}`
+        ? `Moved ${plural(succeeded, "deck")} to the trash`
         : succeeded === 0
           ? `Could not delete ${plural(failed.length, "deck")}`
-          : `Deleted ${succeeded} of ${decks.length} decks, ${failed.length} failed`;
+          : `Moved ${succeeded} of ${decks.length} decks to the trash, ${failed.length} failed`;
     onDone(message, failed);
   }
 
@@ -117,7 +117,7 @@ function BulkDeleteForm({ decks, onClose, onDone }: BulkProps) {
     <div className="flex flex-col gap-5">
       <h2 className="font-display text-[44px] leading-none">Delete decks</h2>
       <p className="text-[15px] leading-snug">
-        Delete {plural(decks.length, "deck")}? Each one&apos;s versions and branches are removed for good, and any that are public disappear from Explore. This cannot be undone.
+        Move {plural(decks.length, "deck")} to the trash? Their versions and branches go with them, and any that are public disappear from Explore. You can restore them from the trash for 30 days.
       </p>
       <div className="flex gap-2.5">
         <button type="button" disabled={busy} onClick={() => void remove()} className={btn.large.dangerSolid}>
@@ -140,7 +140,7 @@ function DeleteForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
     setError(null);
     try {
       await api(`/api/decks/${deck.id}`, { method: "DELETE" });
-      onDone(`Deleted ${deck.name}`);
+      onDone(`Moved ${deck.name} to the trash`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not delete the deck.");
       setBusy(false);
@@ -151,8 +151,8 @@ function DeleteForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
     <div className="flex flex-col gap-5">
       <h2 className="font-display text-[44px] leading-none">Delete deck</h2>
       <p className="text-[15px] leading-snug">
-        Delete <span className="font-medium">{deck.name}</span>? Its {plural(deck.versionCount, "version")} and {plural(deck.branchCount, "branch", "branches")} are removed for good
-        {deck.visibility === "public" ? ", and it disappears from Explore" : ""}. This cannot be undone.
+        Move <span className="font-medium">{deck.name}</span> to the trash? Its {plural(deck.versionCount, "version")} and {plural(deck.branchCount, "branch", "branches")} go
+        with it{deck.visibility === "public" ? ", and it disappears from Explore" : ""}. You can restore it from the trash for 30 days.
       </p>
       {error && (
         <p role="alert" className="rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">

@@ -164,6 +164,10 @@ public final class DeckDtos {
 	 * A deck as listed on the decks page. The numbers describe the latest version, the one the deck opens
 	 * on. issues is what keeps that version from being a legal Commander deck, empty when it is.
 	 */
+	/** A deck in its owner's trash: when it was deleted and when it will be removed for good. */
+	public record TrashedDeck(UUID id, String name, java.time.Instant deletedAt, java.time.Instant purgeAt) {
+	}
+
 	public record DeckSummary(
 			UUID id,
 			String name,
