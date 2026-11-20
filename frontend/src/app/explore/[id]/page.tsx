@@ -8,6 +8,7 @@ import { CardList } from "@/components/builder/CardList";
 import { ExportDialog } from "@/components/ExportDialog";
 import { ReportDialog } from "@/components/ReportDialog";
 import { PublicHistory } from "@/components/PublicHistory";
+import { SampleHand } from "@/components/SampleHand";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { CardPreview } from "@/components/builder/CardPreview";
 import { StatsSection } from "@/components/builder/StatsSection";
@@ -39,6 +40,7 @@ export default function PublicDeckPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [handOpen, setHandOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [shared, setShared] = useState<string | null>(null);
   // undefined while checking, null for a visitor who is not signed in. Public decks can be read without an account.
@@ -155,6 +157,9 @@ export default function PublicDeckPage() {
               <button type="button" onClick={() => setExportOpen(true)} className={btn.large.secondary}>
                 Export
               </button>
+              <button type="button" onClick={() => setHandOpen(true)} className={btn.large.secondary}>
+                Sample hand
+              </button>
               <button type="button" onClick={() => void copy()} disabled={copying} className={btn.large.primary}>
                 {copying ? "Copying" : me === null ? "Sign in to copy" : "Copy to my decks"}
               </button>
@@ -233,6 +238,7 @@ export default function PublicDeckPage() {
         </main>
       )}
       {detail && <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} deckId={id} />}
+      {detail && <SampleHand open={handOpen} onClose={() => setHandOpen(false)} lines={detail.cards} />}
       {detail && <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={detail.deck.name} lines={counted} />}
     </div>
   );

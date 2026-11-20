@@ -23,6 +23,7 @@ import { ProxyPanel } from "./ProxyPanel";
 import { LoreDialog } from "./LoreDialog";
 import { useProxies } from "@/lib/useProxies";
 import { useFeatures } from "@/lib/features";
+import { SampleHand } from "@/components/SampleHand";
 import { ownedCopies } from "@/lib/collection";
 import { DescriptionDialog } from "./DescriptionDialog";
 import { VisibilityDialog } from "./VisibilityDialog";
@@ -214,6 +215,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [importOpen, setImportOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [editListOpen, setEditListOpen] = useState(false);
+  const [handOpen, setHandOpen] = useState(false);
   const router = useRouter();
   const [comparing, setComparing] = useState(false);
   // The timeline puts its branch and zoom controls in the panel's title row.
@@ -1063,6 +1065,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           <button type="button" onClick={() => setExportOpen(true)} disabled={lines.length === 0} className={`${btn.quiet} text-sm`}>
             Export
           </button>
+          <button type="button" onClick={() => setHandOpen(true)} disabled={mainCount < 7} className={`${btn.quiet} text-sm`}>
+            Sample hand
+          </button>
         </div>
       </div>
       <div className="h-7" />
@@ -1208,6 +1213,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
       {/* Overlays */}
       <DescriptionDialog open={descriptionOpen} onClose={() => setDescriptionOpen(false)} deckId={deck.id} description={deck.description} onSaved={onReload} />
+      <SampleHand open={handOpen} onClose={() => setHandOpen(false)} lines={lines} />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} deckName={deck.name} lines={lines} />
       <Dialog open={confirmApply} onClose={() => setConfirmApply(false)} label="Update the public version" size="sm">
         <div className="flex flex-col gap-5">
