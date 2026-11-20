@@ -762,6 +762,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       if (via === "click" && window.matchMedia("(max-width: 1023px)").matches) setPeekKey(lineKey(line));
     },
     onMenu: (line: DeckCardLine, x: number, y: number) => setMenu({ line, x, y }),
+    onQuantity: changeQuantity,
     checkCollection,
     cardSize,
     // The other roles of a card show as small badges while the list is grouped by role, where they tell what else it does.
@@ -1088,9 +1089,20 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
       {/* The mainboard heading. Search, view and display options live in the dock at the bottom of the screen. */}
       <div ref={mainboardRef} className="atm-accent flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-line">
-        <h2 className="py-2.5 text-[15px] sm:text-base">
-          Mainboard <span className="text-sm text-muted">{mainCount}</span>
-        </h2>
+        <div className="flex flex-wrap items-baseline gap-x-4">
+          <h2 className="py-2.5 text-[15px] sm:text-base">
+            Mainboard <span className="text-sm text-muted">{mainCount}</span>
+          </h2>
+          {/* What waits outside the hundred, at a glance, with a jump to it. */}
+          {sideBoards.some((board) => board.count > 0) && (
+            <a href="#other-boards" className="text-[13px] text-muted hover:text-ink">
+              {sideBoards
+                .filter((board) => board.count > 0)
+                .map((board) => `${board.title} ${board.count}`)
+                .join(" · ")}
+            </a>
+          )}
+        </div>
         <div className="-mr-3 flex flex-wrap items-center pb-1 md:pb-0">
           <button type="button" onClick={() => setAdvancedOpen(true)} className={`${btn.quiet} text-sm`}>
             Advanced search

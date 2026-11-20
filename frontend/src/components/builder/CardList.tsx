@@ -1,6 +1,6 @@
 "use client";
 
-import { DotsThree } from "@phosphor-icons/react";
+import { DotsThree, Minus, Plus } from "@phosphor-icons/react";
 import { copiesLabel, copiesSpoken } from "@/lib/copies";
 import { stdIcon } from "@/lib/ui";
 import { lineKey, type LineGroup } from "@/lib/groups";
@@ -25,6 +25,8 @@ export interface ViewProps {
   showRoles?: boolean;
   /** Skips each group's heading and share bar, for a board too small to benefit from them. */
   hideGroupHeaders?: boolean;
+  /** One copy more or fewer, from the row's own stepper. Left out, the list has no stepper. */
+  onQuantity?: (line: DeckCardLine, delta: number) => void;
 }
 
 /**
@@ -64,7 +66,7 @@ export function DotsButton({
   );
 }
 
-function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSelect, onMenu }: { line: DeckCardLine; selected: boolean; isNew: boolean; checkCollection: boolean; readOnly: boolean; showRoles: boolean; onSelect: ViewProps["onSelect"]; onMenu: ViewProps["onMenu"] }) {
+function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSelect, onMenu, onQuantity }: { line: DeckCardLine; selected: boolean; isNew: boolean; checkCollection: boolean; readOnly: boolean; showRoles: boolean; onSelect: ViewProps["onSelect"]; onMenu: ViewProps["onMenu"]; onQuantity?: ViewProps["onQuantity"] }) {
   const needs = checkCollection && line.owned < line.quantity;
   return (
     <li
@@ -106,6 +108,17 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
           )}
         </span>
       </button>
+      {/* One more or fewer copy without opening the menu. Shown on hover and while a key is on the row, so the list stays quiet. */}
+      {!readOnly && onQuantity && line.board !== "commander" && (
+        <span className="flex opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(pointer:coarse)]:opacity-100">
+          <button type="button" onClick={() => onQuantity(line, -1)} aria-label={`One fewer ${line.name}`} className={`${stdIcon("md", "quiet")} -my-px`}>
+            <Minus size={14} weight="bold" aria-hidden />
+          </button>
+          <button type="button" onClick={() => onQuantity(line, 1)} aria-label={`One more ${line.name}`} className={`${stdIcon("md", "quiet")} -my-px`}>
+            <Plus size={14} weight="bold" aria-hidden />
+          </button>
+        </span>
+      )}
       {/* Always there, dimmed, so it is clear that a card has a menu. It lights up under the pointer. The row is 34px, so the 36px button takes 1px off each side. */}
       {!readOnly && <DotsButton line={line} onMenu={onMenu} variant="quiet" className="-my-px group-hover/row:text-ink" />}
     </li>
@@ -115,7 +128,7 @@ function Row({ line, selected, isNew, checkCollection, readOnly, showRoles, onSe
 /** How many rows a group title keeps with it at the top of a column. */
 const KEEP_WITH_TITLE = 2;
 
-export function CardList({ groups, selectedKey, newKeys, checkCollection, readOnly = false, showRoles = false, hideGroupHeaders = false, onSelect, onMenu }: ViewProps) {
+export function CardList({ groups, selectedKey, newKeys, checkCollection, readOnly = false, showRoles = false, hideGroupHeaders = false, onSelect, onMenu, onQuantity }: ViewProps) {
   if (groups.length === 0) {
     return <p className="max-w-[420px] py-6 text-lg leading-normal text-muted">Nothing here yet. Search above to add cards.</p>;
   }
@@ -132,6 +145,7 @@ export function CardList({ groups, selectedKey, newKeys, checkCollection, readOn
       showRoles={showRoles}
       onSelect={onSelect}
       onMenu={onMenu}
+      onQuantity={onQuantity}
     />
   );
   return (
