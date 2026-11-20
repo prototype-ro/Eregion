@@ -45,13 +45,16 @@ interface Props {
   branchLocked: boolean;
   onToggleBranch: () => void;
   onBranches: () => void;
+  /** Bring the open branch's changes into main. Only given while a branch other than main is open at its newest version. */
+  onMergeIntoMain?: () => void;
 }
 
 const item = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center rounded-xl px-3 text-left transition-colors hover:bg-surface disabled:opacity-40";
 const button = "pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
-export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, canSaveNew, saveNewLabel, onSaveNew, branching, branchLocked, onToggleBranch, onBranches, comparing, onToggleCompare, versionCount }: Props) {
+export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, canSaveNew, saveNewLabel, onSaveNew, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount }: Props) {
+  const [helpOpen, setHelpOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -193,6 +196,11 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
                 Compare
               </button>
             )}
+            {onMergeIntoMain && !dirty && (
+              <button type="button" onClick={onMergeIntoMain} className={button}>
+                Merge into main
+              </button>
+            )}
           </Presence>
         )}
         <div ref={menu} className="relative">
@@ -284,6 +292,28 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           onReload();
         }}
       />
+      <button type="button" aria-expanded={helpOpen} onClick={() => setHelpOpen((open) => !open)} className={`${btn.quiet} mt-2 text-sm`}>
+        How versions work
+      </button>
+      {helpOpen && (
+        <ul className="mt-2 flex max-w-[640px] flex-col gap-1.5 text-sm leading-snug text-muted">
+          <li>
+            <span className="text-ink">Save new version</span> keeps what you had and adds a step to the deck&rsquo;s history. <span className="text-ink">Update v{number}</span>{" "}
+            changes the version you are on instead.
+          </li>
+          <li>
+            <span className="text-ink">Branch off</span> to try an idea, such as a cheaper mana base, without touching your main deck. Each line of saves is a
+            branch; <span className="text-ink">main</span> is the one the deck opens on.
+          </li>
+          <li>
+            <span className="text-ink">Merge into main</span> brings a branch&rsquo;s changes back. When both lines changed the same card, you choose which to keep.
+          </li>
+          <li>
+            <span className="text-ink">Compare</span> shows what changed between any two versions, cards and numbers. Nothing is ever lost: a deleted version
+            can be brought back for 30 days.
+          </li>
+        </ul>
+      )}
     </div>
   );
 }

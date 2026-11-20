@@ -1033,6 +1033,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 branchLocked={viewingOlder}
                 onToggleBranch={() => setBranching((value) => !value)}
                 onBranches={() => setBranchesOpen(true)}
+                onMergeIntoMain={(() => {
+                  const open = timeline.branches.find((branch) => branch.id === version.branchId);
+                  const atHead = open?.versions.at(-1)?.versionNumber === version.versionNumber;
+                  return open && !open.main && atHead ? () => startMerge(open) : undefined;
+                })()}
               />
             )}
           </Presence>
