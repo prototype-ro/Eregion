@@ -8,6 +8,11 @@ export const SITE = {
   operator: "",
   /** Where people write about privacy requests, copyright claims and anything else. */
   contactEmail: "",
+  /**
+   * Where people can chip in for hosting (Ko-fi, Patreon, GitHub Sponsors). Wizards' Fan Content Policy allows
+   * donations as long as nothing on the site is held back for them. Blank hides the link.
+   */
+  donateUrl: "",
   /** Minimum age to create an account. */
   minimumAge: 16,
   /** The date the privacy policy and terms last changed, shown at the top of each. */

@@ -15,6 +15,11 @@ export function SiteFooter() {
         {SITE.contactEmail && (
           <a href={`mailto:${SITE.contactEmail}`} className="inline-flex min-h-9 items-center">Contact</a>
         )}
+        {SITE.donateUrl && (
+          <a href={SITE.donateUrl} rel="noopener" className="inline-flex min-h-9 items-center">
+            Support {SITE.name}
+          </a>
+        )}
       </nav>
       <p className="max-w-[880px]">
         {SITE.name} is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards.

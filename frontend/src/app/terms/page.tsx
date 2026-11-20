@@ -8,7 +8,7 @@ export default function TermsPage() {
     <LegalPage title="Terms">
       <p>
         These terms are an agreement between you and {SITE.operator || "the operator of " + SITE.name}. By creating an
-        account you accept them. {SITE.name} is free to use.
+        account you accept them. {SITE.name} is free to use, and stays free: donations, if you choose to give, unlock nothing.
       </p>
 
       <LegalSection title="Your account">
