@@ -352,15 +352,38 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
   // Keep the edits on this device a moment after each change, so a refresh or an ended session loses nothing.
   // While a recovered draft is waiting for an answer it is left alone.
+  // The pending save, so leaving the page can write it at once instead of losing the last 600 ms of edits.
+  const pendingDraft = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (recovered) return;
     if (!dirty) {
+      pendingDraft.current = null;
       clearDraft(deck.id, versionNumber);
       return;
     }
-    const timer = setTimeout(() => saveDraft(deck.id, versionNumber, signature(baseLines), lines), 600);
+    const write = () => {
+      pendingDraft.current = null;
+      saveDraft(deck.id, versionNumber, signature(baseLines), lines);
+    };
+    pendingDraft.current = write;
+    const timer = setTimeout(write, 600);
     return () => clearTimeout(timer);
   }, [lines, dirty, recovered, deck.id, versionNumber, baseLines]);
+
+  // A phone switching apps, a closed tab or a discarded background tab never waits for the timer, and does not
+  // always fire beforeunload either: write the pending draft the moment the page is hidden.
+  useEffect(() => {
+    const flush = () => pendingDraft.current?.();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // Leaving the page with unsaved edits would lose them, so let the browser ask first.
   useEffect(() => {

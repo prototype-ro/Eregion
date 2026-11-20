@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { exportDeck } from "./export.ts";
+import { csvText, exportDeck } from "./export.ts";
 import { parseDecklist } from "./decklist.ts";
 import type { DeckCardLine } from "./types";
 
@@ -84,4 +84,11 @@ test("what is exported can be imported again", () => {
 test("a deck name becomes a safe file name", () => {
   assert.equal(exportDeck([], "plain", "Atraxa: Superfriends / 2026!").filename, "atraxa-superfriends-2026.txt");
   assert.equal(exportDeck([], "plain", "???").filename, "deck.txt");
+});
+
+test("csv neutralises a tag that a spreadsheet would run as a formula", () => {
+  assert.equal(csvText("=HYPERLINK(\"x\")"), "'=HYPERLINK(\"x\")");
+  assert.equal(csvText("@SUM(A1)"), "'@SUM(A1)");
+  assert.equal(csvText("-1+1"), "'-1+1");
+  assert.equal(csvText("ramp; draw"), "ramp; draw");
 });

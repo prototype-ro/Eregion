@@ -34,6 +34,13 @@ function printing(line: DeckCardLine): string {
   return ` (${line.setCode.toUpperCase()})${line.collectorNumber ? ` ${line.collectorNumber}` : ""}`;
 }
 
+/**
+ * A spreadsheet runs a cell that starts with = + - or @ as a formula, so text a player typed (tags) gets a leading
+ * apostrophe there, which spreadsheets show as plain text. Card names come from Scryfall and some really start with
+ * a sign ("+2 Mace"), so they are left as they are.
+ */
+export const csvText = (text: string) => (/^[=+\-@\t\r]/.test(text) ? `'${text}` : text);
+
 const csvCell = (value: string | number) => {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -58,7 +65,7 @@ export function exportDeck(lines: DeckCardLine[], format: ExportFormat, deckName
     text = [
       "Quantity,Name,Board,Set,Collector Number,Tags,Price USD",
       ...rows.map((line) =>
-        [line.quantity, line.name, line.board, line.customPrintingId ? "" : line.setCode.toUpperCase(), line.customPrintingId ? "" : line.collectorNumber, line.tags.join("; "), line.priceUsd ?? ""].map(csvCell).join(","),
+        [line.quantity, line.name, line.board, line.customPrintingId ? "" : line.setCode.toUpperCase(), line.customPrintingId ? "" : line.collectorNumber, csvText(line.tags.join("; ")), line.priceUsd ?? ""].map(csvCell).join(","),
       ),
     ].join("\n");
     cards = count(rows);

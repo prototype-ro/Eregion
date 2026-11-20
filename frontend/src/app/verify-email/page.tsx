@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { refreshMe } from "@/lib/me";
+import type { User } from "@/lib/types";
 import { btn } from "@/lib/ui";
 
 export default function VerifyEmailPage() {
@@ -36,7 +37,13 @@ function Verify() {
         setState("done");
         refreshMe();
       })
-      .catch((err) => {
+      .catch(async (err) => {
+        // A link opened twice (or first by a mail scanner) is spent, but the address may well be confirmed already.
+        const me = await api<User>("/api/me").catch(() => null);
+        if (me?.emailVerified) {
+          setState("done");
+          return;
+        }
         setState("failed");
         setMessage(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
       });
@@ -60,7 +67,8 @@ function Verify() {
           <div role="alert" className="max-w-[520px]">
             <p className="text-lg leading-normal text-add-text">{message}</p>
             <p className="mt-4 text-[15px] text-muted">
-              Signed in? Ask for a new link from your{" "}
+              A link works once. If you already used it, <Link href="/login" className="text-accent-text underline underline-offset-4">sign in</Link> and
+              your decks page will say whether the address is confirmed. Signed in? Ask for a new link from your{" "}
               <Link href="/account" className="text-accent-text underline underline-offset-4">
                 account page
               </Link>
