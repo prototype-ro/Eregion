@@ -59,7 +59,9 @@ export function ColourEclipses({ composition }: { composition: AnalysisCompositi
     const pips = composition.pips[color.key] ?? 0;
     const sources = composition.sources[color.key] ?? 0;
     const share = totalPips ? pips / totalPips : 0;
-    const needed = share * totalSources;
+    // A colour needs its share of the pips from the cards that make coloured mana. Measuring against the sum of every
+    // colour's sources counted each dual land twice and asked a two-colour deck for more red sources than it has cards.
+    const needed = share * (composition.producers ?? totalSources);
     const R = Math.max(10, MAX_R * Math.sqrt(share / maxShare));
     // The ring is the disc scaled by what the mana base makes against what the spells ask for.
     const ring = needed > 0 ? R * Math.sqrt(sources / needed) : R * 0.6;
@@ -82,7 +84,7 @@ export function ColourEclipses({ composition }: { composition: AnalysisCompositi
       right={<p className="font-mono text-[11px] tracking-[0.12em] text-muted uppercase">pips against sources</p>}
       foot={
         h
-          ? `${h.name}: ${h.pips} pips ask for about ${Math.round(h.needed)} of your ${totalSources} coloured sources; you have ${h.sources}.${h.short ? ` Short by ${Math.round(h.needed - h.sources)}.` : ""}`
+          ? `${h.name}: ${h.pips} pips ask for about ${Math.round(h.needed)} of your ${composition.producers ?? totalSources} mana-making cards to make ${h.name.toLowerCase()}; ${h.sources} do.${h.short ? ` Add about ${Math.round(h.needed - h.sources)} lands or rocks that make it, or trade some for duals.` : ""}`
           : `The disc is how much the spells ask for a colour, the ring is how much the mana base makes. A ring inside its disc is short.${colorless ? ` ${colorless} colourless sources.` : ""} Median mana value ${composition.medianManaValue}.`
       }
     >

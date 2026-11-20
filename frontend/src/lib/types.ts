@@ -339,6 +339,8 @@ export interface AnalysisComposition {
   pips: Record<string, number>;
   /** Cards that can make each colour (W U B R G) or colourless (C). */
   sources: Record<string, number>;
+  /** Cards that make coloured mana at all; a dual land counts once. Absent from older answers. */
+  producers?: number;
 }
 
 export interface AnalysisConsistency {

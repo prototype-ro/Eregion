@@ -1,5 +1,5 @@
 {
-  "_about": "How Scryfall Tagger tags (searched as otag:<tag>) become the roles Eregion shows. A card gets the FIRST category, from the top, that it has any tag of, so the order is the priority: a card that is both a board wipe and removal is a Board Wipe. Tutor sits below Removal and Ramp on purpose, because Tagger also calls a land search (Cultivate) or Path to Exile a tutor. Cards with none of these tags stay uncategorized. Tags are Tagger slugs; a tag that does not exist on Scryfall just finds nothing. longTail lists roles that only apply to cards none of the main categories claimed: each is named after what Scryfall's community calls it, ranked below the main roles, and the order is its priority.",
+  "_about": "How Scryfall Tagger tags (searched as otag:<tag>) become the roles Eregion shows. A card gets the FIRST category, from the top, that it has any tag of, so the order is the priority: a card that is both a board wipe and removal is a Board Wipe. Tutor sits below Removal and Ramp on purpose, because Tagger also calls a land search (Cultivate) or Path to Exile a tutor. Cards with none of these tags stay uncategorized. Tags are Tagger slugs; a tag that does not exist on Scryfall just finds nothing. An entry may add Scryfall search terms after the slug: Tagger counts ward as a tax, so Stax reads 'tax -kw:ward' or every ward creature would be called Stax. longTail lists roles that only apply to cards none of the main categories claimed: each is named after what Scryfall's community calls it, ranked below the main roles, and the order is its priority.",
   "categories": [
     {"name": "Win Condition", "tags": ["alternate-win-condition"]},
     {"name": "Board Wipe", "tags": ["board-wipe"]},
@@ -11,7 +11,7 @@
     {"name": "Protection", "tags": ["protection", "protects-permanent"]},
     {"name": "Recursion", "tags": ["recursion", "reanimate"]},
     {"name": "Extra Combat", "tags": ["extra-combat"]},
-    {"name": "Stax", "tags": ["hatebear", "tax"]},
+    {"name": "Stax", "tags": ["hatebear", "tax -kw:ward"]},
     {"name": "Tokens", "tags": ["repeatable-token-generator"]},
     {"name": "Lifegain", "tags": ["lifegain"]}
   ],

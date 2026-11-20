@@ -63,6 +63,19 @@ class CompositionCalculatorTest {
 	}
 
 	@Test
+	void aDualLandIsOneProducerThoughItMakesTwoColours() {
+		AnalysisCard commander = Cards.commander("Niv", "{W}{U}{B}{R}{G}", 5, "UR");
+		Composition result = CompositionCalculator.compute(List.of(
+				commander,
+				Cards.land("Volcanic Island", "Land - Island Mountain", "({T}: Add {U} or {R}.)", 4),
+				Cards.land("Mountain", "Basic Land - Mountain", "({T}: Add {R}.)", 6),
+				Cards.land("Wastes", "Basic Land", "{T}: Add {C}.", 2)));
+		assertThat(result.sources().get("U")).isEqualTo(4);
+		assertThat(result.sources().get("R")).isEqualTo(10);
+		assertThat(result.producers()).isEqualTo(10);
+	}
+
+	@Test
 	void sideboardsDoNotCount() {
 		AnalysisCard maybe = new AnalysisCard("Island", "", 0, "Land", "Basic Land - Island", "({T}: Add {U}.)", "", null, 5, "maybe", Set.of());
 		assertThat(CompositionCalculator.compute(List.of(maybe)).sources().get("U")).isZero();

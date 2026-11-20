@@ -100,6 +100,13 @@ public final class EngineClassifier {
 		List<Theme> top = scored.stream().limit(TOP_THEMES).toList();
 
 		String tribe = tribe(spells);
+		// A deck full of the creature type its commander asks for is built around that tribe, whatever the card text
+		// themes add up to: a Miirym deck of Dragons is a Dragon deck, not a Control deck.
+		if (tribe != null && commanderRewards(cards, tribe)) {
+			List<String> members = spells.stream().filter(card -> isOfType(card, tribe)).map(AnalysisCard::name).distinct().limit(SIGNATURE_CARDS).toList();
+			String runnerUp = top.get(0).score() >= MIN_SCORE ? top.get(0).name() : null;
+			return new Engine(tribe + " tribal", "Built around " + tribe + " creatures, which the commander rewards.", 1.0, runnerUp, false, top, tribe, members);
+		}
 		Theme first = top.get(0);
 		if (first.score() < MIN_SCORE) {
 			return new Engine(NO_THEME, "No single plan stands out. The deck is a pile of good cards.", 0, null, false, top, tribe, List.of());
@@ -131,6 +138,27 @@ public final class EngineClassifier {
 		return Math.min(1.0, lean);
 	}
 
+	/** Whether a commander's rules text names this creature type, as Miirym does for Dragons or Edgar Markov for Vampires. */
+	static boolean commanderRewards(List<AnalysisCard> cards, String tribe) {
+		Pattern named = Pattern.compile("\\b" + Pattern.quote(tribe.toLowerCase(Locale.ROOT)) + "s?\\b");
+		return cards.stream().filter(AnalysisCard::isCommander)
+				.anyMatch(card -> named.matcher(card.oracleText().toLowerCase(Locale.ROOT)).find());
+	}
+
+	private static boolean isOfType(AnalysisCard card, String type) {
+		return "Creature".equals(card.primaryType()) && subtypes(card).contains(type);
+	}
+
+	/** The words after the dash of a type line ("Creature — Dragon Wizard" gives Dragon and Wizard), or none. */
+	private static List<String> subtypes(AnalysisCard card) {
+		String line = card.typeLine();
+		int dash = Math.max(line.indexOf('—'), line.indexOf(" - "));
+		if (dash < 0) {
+			return List.of();
+		}
+		return List.of(line.substring(dash + (line.charAt(dash) == '—' ? 1 : 3)).trim().split("\\s+"));
+	}
+
 	/** The creature type most creatures share, when enough of them do. */
 	static String tribe(List<AnalysisCard> spells) {
 		Map<String, Integer> counts = new HashMap<>();
@@ -140,11 +168,7 @@ public final class EngineClassifier {
 				continue;
 			}
 			creatures += card.quantity();
-			int dash = Math.max(card.typeLine().indexOf('—'), card.typeLine().indexOf(" - "));
-			if (dash < 0) {
-				continue;
-			}
-			for (String type : card.typeLine().substring(dash + (card.typeLine().charAt(dash) == '—' ? 1 : 3)).trim().split("\\s+")) {
+			for (String type : subtypes(card)) {
 				if (!type.isBlank()) {
 					counts.merge(type, card.quantity(), Integer::sum);
 				}

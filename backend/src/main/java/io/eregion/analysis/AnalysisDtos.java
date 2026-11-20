@@ -14,7 +14,12 @@ public final class AnalysisDtos {
 			/** Coloured pips in the costs of the non-land cards, hybrids split between their colours. */
 			Map<String, Double> pips,
 			/** Cards that can make each colour (W U B R G) or colourless (C), restricted to the commander's identity. */
-			Map<String, Integer> sources) {
+			Map<String, Integer> sources,
+			/**
+			 * Cards that make coloured mana at all. A dual land counts once here but in two colours above, so this, not the
+			 * sum of the colours, is what a colour's share of the pips is measured against.
+			 */
+			int producers) {
 	}
 
 	public record Consistency(

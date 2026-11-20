@@ -31,6 +31,7 @@ public final class CompositionCalculator {
 			sources.put(color, 0);
 		}
 		sources.put("C", 0);
+		int producers = 0;
 
 		for (AnalysisCard card : cards) {
 			if (!card.counted()) {
@@ -42,12 +43,17 @@ public final class CompositionCalculator {
 				}
 				addPips(card, pips);
 			}
+			boolean coloured = false;
 			for (String color : ManaSources.colorsOf(card, identity)) {
 				sources.merge(color, card.quantity(), Integer::sum);
+				coloured |= !"C".equals(color);
+			}
+			if (coloured) {
+				producers += card.quantity();
 			}
 		}
 		pips.replaceAll((color, count) -> round2(count));
-		return new Composition(median(values), pips, sources);
+		return new Composition(median(values), pips, sources, producers);
 	}
 
 	/** The union of the colour identities of the commanders, or empty when there is no commander to read it from. */

@@ -32,6 +32,32 @@ class EngineClassifierTest {
 	}
 
 	@Test
+	void aDeckOfTheTypeItsCommanderRewardsIsThatTribe() {
+		List<AnalysisCard> cards = new ArrayList<>(filler(4));
+		cards.add(new AnalysisCard("Miirym, Sentinel Wyrm", "{3}{G}{U}{R}", 6, "Creature", "Legendary Creature - Dragon Spirit",
+				"Flying, ward {2}. Whenever another nontoken Dragon you control enters, create a token that's a copy of it.", "GUR", "Stax", 1,
+				"commander", Set.of()));
+		cards.add(text("Dragon", "Creature", "Creature - Dragon", "Flying", null, 12));
+		cards.add(text("Counter A", "Instant", "Instant", "Counter target spell.", "Counterspell", 10));
+		cards.add(text("Wipe", "Sorcery", "Sorcery", "", "Board Wipe", 6));
+		Engine engine = CLASSIFIER.classify(cards);
+		assertThat(engine.primary()).isEqualTo("Dragon tribal");
+		assertThat(engine.runnerUp()).isEqualTo("Control");
+		assertThat(engine.signatureCards()).contains("Dragon");
+	}
+
+	@Test
+	void aTribeTheCommanderDoesNotAskForStaysASideNote() {
+		List<AnalysisCard> cards = new ArrayList<>(filler(4));
+		cards.add(text("Dragon", "Creature", "Creature - Dragon", "Flying", null, 12));
+		cards.add(text("Counter A", "Instant", "Instant", "Counter target spell.", "Counterspell", 10));
+		cards.add(text("Wipe", "Sorcery", "Sorcery", "", "Board Wipe", 6));
+		Engine engine = CLASSIFIER.classify(cards);
+		assertThat(engine.primary()).isEqualTo("Control");
+		assertThat(engine.tribe()).isEqualTo("Dragon");
+	}
+
+	@Test
 	void signatureCardsAreTheOnesThatLeanMost() {
 		List<AnalysisCard> cards = new ArrayList<>(filler(12));
 		cards.add(text("Raise", "Sorcery", "Sorcery", "Create three 1/1 white Soldier creature tokens.", null, 10));
