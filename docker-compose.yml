@@ -34,6 +34,8 @@ services:
       EREGION_DB_PASSWORD: ${EREGION_DB_PASSWORD:-eregion}
       EREGION_JWT_SECRET: ${EREGION_JWT_SECRET:-}
       EREGION_ENV: production
+      # One JSON object per log line, each with the request id, for any log collector.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       EREGION_PUBLIC_URL: ${EREGION_PUBLIC_URL:-http://localhost:3000}
       EREGION_CORS_ORIGINS: ${EREGION_PUBLIC_URL:-http://localhost:3000}
       EREGION_COOKIE_SECURE: "true"

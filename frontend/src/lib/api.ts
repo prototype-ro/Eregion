@@ -33,7 +33,7 @@ export async function api<T>(path: string, { method = "GET", body }: RequestOpti
       cache: "no-store",
     });
   } catch {
-    throw new ApiError(0, "Cannot reach the server. Is the backend running?");
+    throw new ApiError(0, "Cannot reach the server. Check your connection and try again.");
   }
 
   if (!response.ok) {
@@ -43,6 +43,8 @@ export async function api<T>(path: string, { method = "GET", body }: RequestOpti
       const problem = await response.json();
       message = problem.detail ?? message;
       fields = problem.fields;
+      // A server failure carries the id that finds it in the logs, worth quoting when writing in about it.
+      if (problem.requestId) message = `${message} (reference ${String(problem.requestId).slice(0, 8)})`;
     } catch {
       // Not JSON, keep the status text.
     }
