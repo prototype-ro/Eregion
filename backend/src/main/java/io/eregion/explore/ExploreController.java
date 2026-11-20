@@ -62,11 +62,21 @@ public class ExploreController {
 
 	@GetMapping
 	public List<PublicDeck> search(HttpServletRequest http, @AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) UUID commander,
-			@RequestParam(required = false) String q, @RequestParam(defaultValue = "24") int limit,
-			@RequestParam(defaultValue = "0") int offset) {
+			@RequestParam(required = false) String q, @RequestParam(required = false) String colors, @RequestParam(required = false) Integer bracket,
+			@RequestParam(required = false) Double maxPrice, @RequestParam(defaultValue = "newest") String sort,
+			@RequestParam(defaultValue = "24") int limit, @RequestParam(defaultValue = "0") int offset) {
 		limits.publicRead(http);
 		String text = q == null || q.isBlank() ? null : q.trim().substring(0, Math.min(q.trim().length(), 80));
-		return explore.search(CurrentUser.idOrNull(jwt), commander, text, Math.max(1, Math.min(limit, MAX_PAGE)), Math.max(0, offset));
+		// Colours go into a pattern, so only the five colour letters are let through.
+		String identity = colors == null ? null : colors.toUpperCase(java.util.Locale.ROOT).replaceAll("[^WUBRG]", "");
+		ExploreRepository.Sort order = switch (sort) {
+			case "price-low" -> ExploreRepository.Sort.PRICE_LOW;
+			case "price-high" -> ExploreRepository.Sort.PRICE_HIGH;
+			default -> ExploreRepository.Sort.NEWEST;
+		};
+		return explore.search(CurrentUser.idOrNull(jwt), commander, text, identity == null || identity.isEmpty() ? null : identity,
+				bracket == null || bracket < 1 || bracket > 5 ? null : bracket, maxPrice == null || maxPrice <= 0 ? null : maxPrice, order,
+				Math.max(1, Math.min(limit, MAX_PAGE)), Math.max(0, offset));
 	}
 
 	public record ReportRequest(@NotBlank @Size(max = 500) String reason) {

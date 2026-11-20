@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { BracketPill } from "@/components/BracketPill";
+import { ManaCost } from "@/components/Mana";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CardArt } from "@/components/CardArt";
@@ -9,6 +11,16 @@ import { api, ApiError } from "@/lib/api";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { Card, PublicDeck } from "@/lib/types";
 import { btn, field } from "@/lib/ui";
+
+const filterSelect =
+  "min-h-9 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11";
+const COLOR_NAMES = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" } as const;
+
+/** Adds or takes away one colour, keeping the WUBRG order. */
+function toggleColor(current: string, color: string): string {
+  const on = current.includes(color);
+  return "WUBRG".split("").filter((c) => (c === color ? !on : current.includes(c))).join("");
+}
 
 const PAGE = 24;
 
@@ -32,6 +44,11 @@ function Explore() {
   const [more, setMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [colors, setColors] = useState<string>("");
+  const [bracket, setBracket] = useState<string>("");
+  const [maxPrice, setMaxPrice] = useState<string>("");
+  const [sort, setSort] = useState<string>("newest");
+  const filtered = Boolean(colors || bracket || maxPrice);
   const latest = useRef(0);
 
   // Wait a moment after typing before asking the server.
@@ -52,9 +69,13 @@ function Explore() {
       const search = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
       if (commanderId) search.set("commander", commanderId);
       if (query) search.set("q", query);
+      if (colors) search.set("colors", colors);
+      if (bracket) search.set("bracket", bracket);
+      if (maxPrice) search.set("maxPrice", maxPrice);
+      if (sort !== "newest") search.set("sort", sort);
       return `/api/explore?${search}`;
     },
-    [commanderId, query],
+    [commanderId, query, colors, bracket, maxPrice, sort],
   );
 
   useEffect(() => {
@@ -112,6 +133,65 @@ function Explore() {
               className={field.lg}
             />
           </div>
+          <fieldset className="flex items-center gap-1.5">
+            <legend className="sr-only">Colours the deck stays within</legend>
+            {(["W", "U", "B", "R", "G"] as const).map((color) => {
+              const on = colors.includes(color);
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  aria-pressed={on}
+                  aria-label={COLOR_NAMES[color]}
+                  title="Show decks whose colours stay within the ones picked"
+                  onClick={() => setColors((current) => toggleColor(current, color))}
+                  className={`flex size-9 items-center justify-center rounded-full border text-[18px] [@media(pointer:coarse)]:size-11 ${on ? "border-accent-text" : "border-line opacity-50"}`}
+                >
+                  <ManaCost cost={`{${color}}`} />
+                </button>
+              );
+            })}
+          </fieldset>
+          <label className="sr-only" htmlFor="explore-bracket">
+            Bracket
+          </label>
+          <select id="explore-bracket" value={bracket} onChange={(event) => setBracket(event.target.value)} className={filterSelect}>
+            <option value="">Any bracket</option>
+            {[1, 2, 3, 4].map((n) => (
+              <option key={n} value={n}>{`Bracket ${n}`}</option>
+            ))}
+            <option value="5">cEDH</option>
+          </select>
+          <label className="sr-only" htmlFor="explore-price">
+            Price
+          </label>
+          <select id="explore-price" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} className={filterSelect}>
+            <option value="">Any price</option>
+            {[50, 100, 250, 500, 1000].map((n) => (
+              <option key={n} value={n}>{`Up to $${n}`}</option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="explore-sort">
+            Order
+          </label>
+          <select id="explore-sort" value={sort} onChange={(event) => setSort(event.target.value)} className={filterSelect}>
+            <option value="newest">Newest first</option>
+            <option value="price-low">Cheapest first</option>
+            <option value="price-high">Priciest first</option>
+          </select>
+          {filtered && (
+            <button
+              type="button"
+              onClick={() => {
+                setColors("");
+                setBracket("");
+                setMaxPrice("");
+              }}
+              className="pill inline-flex min-h-9 items-center rounded-full border border-ink px-4 text-sm font-medium [@media(pointer:coarse)]:min-h-11"
+            >
+              Clear filters
+            </button>
+          )}
           {commanderId && (
             <p className="flex min-h-11 items-center gap-3 rounded-full border border-accent-text pr-2 pl-5 text-[15px]">
               <span>
@@ -130,10 +210,26 @@ function Explore() {
           </p>
         )}
         {decks === null && !error && <p className="text-muted">Loading decks.</p>}
-        {decks !== null && decks.length === 0 && (
-          <p className="max-w-[460px] text-lg leading-normal text-muted">
-            {commanderId || query ? "No public decks match. Try clearing the search." : "Nothing here yet. Make one of your decks public from its page to be the first."}
-          </p>
+        <p role="status" className="sr-only">
+          {decks === null ? "" : decks.length === 0 ? "No decks match." : `${decks.length}${more ? " or more" : ""} decks shown.`}
+        </p>
+        {decks !== null && decks.length === 0 && (commanderId || query || filtered) && (
+          <p className="max-w-[460px] text-lg leading-normal text-muted">No public decks match. Try clearing the search or the filters.</p>
+        )}
+        {decks !== null && decks.length === 0 && !commanderId && !query && !filtered && (
+          <div className="max-w-[620px] border-t border-line pt-8">
+            <p className="text-xl leading-normal">No shared decks yet.</p>
+            <p className="mt-3 text-[17px] leading-relaxed text-muted">
+              A deck shared here shows its cards, its bracket and analysis, and how it got there: every version it grew from,
+              with its owner&rsquo;s notes and what each change did. Anyone can open it, no account needed.
+            </p>
+            <p className="mt-3 text-[17px] leading-relaxed text-muted">
+              Build or import a deck, save a version or two, then choose Public on the deck&rsquo;s page.
+            </p>
+            <Link href="/decks" className="press mt-6 inline-flex min-h-11 items-center rounded-full bg-accent px-7 font-bold text-on-accent">
+              Start a deck
+            </Link>
+          </div>
         )}
 
         {decks !== null && decks.length > 0 && (
@@ -151,7 +247,10 @@ function Explore() {
                       {deck.name}
                     </Link>
                   </h2>
-                  <p className="mt-1.5 text-sm text-muted">{deck.commanderName ?? "No commander"}</p>
+                  <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
+                    {deck.commanderName ?? "No commander"}
+                    <BracketPill bracket={deck.bracket} name={deck.bracketName} />
+                  </p>
                   <p className="mt-1 font-mono text-[13px] text-muted">
                     by {deck.mine ? "you" : deck.ownerName}, v{deck.versionNumber}, {deck.cardCount} cards, {formatPrice(deck.priceUsd)}
                     {deck.colorIdentity ? `, ${sortColors(deck.colorIdentity)}` : ""}

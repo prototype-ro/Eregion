@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BracketPill } from "@/components/BracketPill";
 import Link from "next/link";
 import { ManaCost } from "@/components/Mana";
 import { plural, relativeTime } from "@/lib/deckfilter";
@@ -58,6 +59,7 @@ export function DeckBadges({ deck }: { deck: DeckSummary }) {
           {legality.text}
         </span>
       )}
+      <BracketPill bracket={deck.bracket} name={deck.bracketName} />
       {deck.visibility === "public" && <span className="rounded-full border border-accent-text px-2.5 py-0.5 text-xs text-accent-text">Public</span>}
       {deck.archived && <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-muted">Archived</span>}
     </>

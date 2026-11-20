@@ -24,7 +24,10 @@ public class ExploreRepository {
 			double priceUsd,
 			Instant publishedAt,
 			boolean mine,
-			String description) {
+			String description,
+			/** The published version's bracket, once worked out. */
+			Integer bracket,
+			String bracketName) {
 	}
 
 	/** A public deck's published version id, for loading its cards. */
@@ -46,8 +49,10 @@ public class ExploreRepository {
 			                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS card_count,
 			       COALESCE((SELECT SUM(COALESCE(dc.price_usd, c.price_usd, 0) * dc.quantity) FROM deck_version_cards dc
 			                   JOIN cards c ON c.id = dc.card_id
-			                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS price
+			                  WHERE dc.version_id = v.id AND dc.board IN ('commander', 'main')), 0) AS price,
+			       vb.bracket, vb.name AS bracket_name
 			  FROM decks d
+			  LEFT JOIN version_brackets vb ON vb.version_id = d.published_version_id
 			  JOIN users u ON u.id = d.owner_id
 			  JOIN deck_versions v ON v.id = d.published_version_id
 			 WHERE d.visibility = 'public' AND d.deleted_at IS NULL
@@ -67,20 +72,43 @@ public class ExploreRepository {
 	 * Public decks, newest first. commanderId limits the list to decks whose published version has that
 	 * card as a commander. text matches the deck name, the commander or the author.
 	 */
-	public List<PublicDeck> search(UUID viewerId, UUID commanderId, String text, int limit, int offset) {
-		return jdbc.sql(SELECT + """
+	/** How Explore can be ordered. Anything else is newest first. */
+	public enum Sort { NEWEST, PRICE_LOW, PRICE_HIGH }
+
+	/**
+	 * Public decks, newest first unless asked otherwise. commanderId limits the list to decks whose published version
+	 * has that card as a commander; text matches the deck name, the commander or the author; colors keeps decks whose
+	 * colour identity lies within those colours (letters of WUBRG); bracket and maxPrice filter on the published
+	 * version's bracket (once worked out) and price.
+	 */
+	public List<PublicDeck> search(UUID viewerId, UUID commanderId, String text, String colors, Integer bracket, Double maxPrice, Sort sort,
+			int limit, int offset) {
+		String order = switch (sort) {
+			case PRICE_LOW -> "q.price ASC, q.published_at DESC";
+			case PRICE_HIGH -> "q.price DESC, q.published_at DESC";
+			case NEWEST -> "q.published_at DESC";
+		};
+		return jdbc.sql("SELECT * FROM (" + SELECT + """
 				   AND (CAST(:commander AS uuid) IS NULL OR EXISTS (
 				        SELECT 1 FROM deck_version_cards dc
 				         WHERE dc.version_id = v.id AND dc.board = 'commander' AND dc.card_id = CAST(:commander AS uuid)))
 				   AND (CAST(:text AS text) IS NULL OR d.name ILIKE :text ESCAPE '!' OR u.display_name ILIKE :text ESCAPE '!'
 				        OR EXISTS (SELECT 1 FROM deck_version_cards dc JOIN cards c ON c.id = dc.card_id
 				                    WHERE dc.version_id = v.id AND dc.board = 'commander' AND c.name ILIKE :text ESCAPE '!'))
-				 ORDER BY d.published_at DESC
+				) q
+				 WHERE (CAST(:colors AS text) IS NULL OR q.color_identity ~ ('^[' || CAST(:colors AS text) || ']*$'))
+				   AND (CAST(:bracket AS int) IS NULL OR q.bracket = CAST(:bracket AS int))
+				   AND (CAST(:maxPrice AS double precision) IS NULL OR q.price <= CAST(:maxPrice AS double precision))
+				 ORDER BY """ + " " + order + """
+
 				 LIMIT :limit OFFSET :offset
 				""")
 				.param("viewer", viewerId)
 				.param("commander", commanderId)
 				.param("text", text == null ? null : "%" + escape(text) + "%")
+				.param("colors", colors)
+				.param("bracket", bracket)
+				.param("maxPrice", maxPrice)
 				.param("limit", limit)
 				.param("offset", offset)
 				.query((rs, n) -> map(rs))
@@ -124,7 +152,9 @@ public class ExploreRepository {
 				rs.getDouble("price"),
 				rs.getTimestamp("published_at").toInstant(),
 				rs.getBoolean("mine"),
-				rs.getString("description"));
+				rs.getString("description"),
+				(Integer) rs.getObject("bracket"),
+				rs.getString("bracket_name"));
 	}
 
 	/**

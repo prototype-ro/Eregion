@@ -88,6 +88,9 @@ export interface DeckSummary {
   /** Pinned decks sit at the top of the list. Archived decks are hidden unless asked for. */
   pinned: boolean;
   archived: boolean;
+  /** The latest version's bracket, once worked out in the background (decks of 60 or more cards). */
+  bracket?: number | null;
+  bracketName?: string | null;
 }
 
 export interface DeckCardLine {
@@ -252,6 +255,9 @@ export interface PublicDeck {
   publishedAt: string;
   mine: boolean;
   description: string;
+  /** The published version's bracket, once worked out. */
+  bracket?: number | null;
+  bracketName?: string | null;
 }
 
 export interface PublicDeckDetail {

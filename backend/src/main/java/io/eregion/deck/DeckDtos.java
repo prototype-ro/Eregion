@@ -190,7 +190,10 @@ public final class DeckDtos {
 			String visibility,
 			Integer publishedVersion,
 			boolean pinned,
-			boolean archived) {
+			boolean archived,
+			/** The latest version's bracket, once worked out (decks of 60 or more cards). */
+			Integer bracket,
+			String bracketName) {
 	}
 
 	/** Changes only the flags that are given. */

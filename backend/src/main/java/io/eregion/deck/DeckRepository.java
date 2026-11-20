@@ -102,7 +102,8 @@ public class DeckRepository {
 	/** What the decks page needs about one deck before legality is worked out. */
 	public record SummaryRow(UUID id, String name, String format, int latestVersion, UUID latestVersionId, String latestBranch,
 			boolean latestOnMain, int versionCount, int branchCount, int cardCount, double priceUsd, String commanderName,
-			List<String> artUrls, Instant updatedAt, String visibility, Integer publishedVersion, boolean pinned, boolean archived) {
+			List<String> artUrls, Instant updatedAt, String visibility, Integer publishedVersion, boolean pinned, boolean archived,
+			Integer bracket, String bracketName) {
 	}
 
 	/** Every deck of a player with the facts about its latest version, in one query. */
@@ -110,6 +111,8 @@ public class DeckRepository {
 		return jdbc.sql("""
 				SELECT d.id, d.name, d.format, d.updated_at, d.visibility, d.pinned, d.archived,
 				       (SELECT p.version_number FROM deck_versions p WHERE p.id = d.published_version_id) AS published_version,
+				       (SELECT vb.bracket FROM version_brackets vb WHERE vb.version_id = v.id) AS bracket,
+				       (SELECT vb.name FROM version_brackets vb WHERE vb.version_id = v.id) AS bracket_name,
 				       v.id AS latest_id, COALESCE(v.version_number, 0) AS latest_version,
 				       b.name AS latest_branch, COALESCE(b.is_main, TRUE) AS latest_main,
 				       (SELECT COUNT(*) FROM deck_versions x WHERE x.deck_id = d.id) AS version_count,
@@ -153,7 +156,9 @@ public class DeckRepository {
 							rs.getString("visibility"),
 							(Integer) rs.getObject("published_version"),
 							rs.getBoolean("pinned"),
-							rs.getBoolean("archived"));
+							rs.getBoolean("archived"),
+							(Integer) rs.getObject("bracket"),
+							rs.getString("bracket_name"));
 				})
 				.list();
 	}
@@ -458,6 +463,8 @@ public class DeckRepository {
 	/** Swaps all the cards of a version for new ones. */
 	public void replaceVersionCards(UUID versionId, List<DeckCardInput> cards) {
 		jdbc.sql("DELETE FROM deck_version_cards WHERE version_id = :v").param("v", versionId).update();
+		// The cards change, so the bracket worked out for them no longer holds.
+		jdbc.sql("DELETE FROM version_brackets WHERE version_id = :v").param("v", versionId).update();
 		insertVersionCards(versionId, cards);
 	}
 

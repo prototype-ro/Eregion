@@ -68,7 +68,7 @@ public class DeckService {
 			return new DeckSummary(row.id(), row.name(), row.format(), row.latestVersion(), row.latestBranch(), row.latestOnMain(),
 					row.versionCount(), row.branchCount(), row.cardCount(), StatsCalculator.round2(row.priceUsd()), row.commanderName(),
 					row.artUrls(), DeckLegality.identity(cards), DeckLegality.issues(cards), row.updatedAt(), row.visibility(),
-					row.publishedVersion(), row.pinned(), row.archived());
+					row.publishedVersion(), row.pinned(), row.archived(), row.bracket(), row.bracketName());
 		}).toList();
 	}
 
