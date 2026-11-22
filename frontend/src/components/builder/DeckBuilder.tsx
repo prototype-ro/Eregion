@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretUp, GlobeSimple, LockSimple, PencilSimpleLine, SlidersHorizontal } from "@phosphor-icons/react";
+import { CaretUp, GlobeSimple, ImageSquare, LockSimple, PencilSimpleLine, SlidersHorizontal } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Presence } from "@/components/motion/Presence";
@@ -51,6 +51,9 @@ import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
 import { lineName } from "@/lib/lineName";
 import { savePreferences, usePreferences } from "@/lib/preferences";
+import { type Backdrop, deckBackdrop } from "@/lib/backdrop";
+import { DeckBackdrop } from "@/components/DeckBackdrop";
+import { BackdropDialog } from "./BackdropDialog";
 import { Tour } from "@/components/tour/Tour";
 import { DECK_TOUR } from "@/lib/tour";
 import { RecentChanges } from "./RecentChanges";
@@ -229,6 +232,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const { variantsEnabled, tourDone, loaded: preferencesLoaded } = usePreferences();
   // The tour of this page: offered once, restartable from the versions help. Finishing or skipping it ends the offer.
   const [touring, setTouring] = useState(false);
+  // The art behind the header: the owner's Art Series card, or null for the commander's art.
+  const [backdrop, setBackdrop] = useState<Backdrop | null>(null);
+  const [backdropOpen, setBackdropOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    deckBackdrop(deck.id)
+      .then((answer) => live && setBackdrop(answer.backdrop))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [deck.id]);
   const finishTour = useCallback(() => {
     setTouring(false);
     if (!tourDone) void savePreferences({ tourDone: true }).catch(() => {});
@@ -975,11 +990,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       <PageAtmosphere identity={identity} />
       <div className="relative">
         <HeaderAtmosphere identity={identity} />
-        {/* Backdrop art. Placeholder until the art library exists. It keeps one size whatever the panel does, and is cut and faded where the header and panel end. */}
-        <div aria-hidden="true" className="art-clip pointer-events-none absolute inset-0 z-0 hidden overflow-hidden md:block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/art/nobg-knight.png" alt="" className="absolute top-0 left-[18%] h-[720px] w-auto max-w-none select-none" />
-        </div>
+        {/* The owner's chosen art, or the commander's, faded into the page behind the header. */}
+        <DeckBackdrop url={backdrop?.artUrl ?? baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} />
       {/* Header. Above the Versions panel (z-10), which comes later on the page, so the Legal popover is drawn over it. */}
       <div className="relative z-20 flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-3">
         <div className="min-w-0">
@@ -1023,6 +1035,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             >
               <PencilSimpleLine size={15} aria-hidden />
               {deck.description ? "Edit description" : "Add description"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBackdropOpen(true)}
+              className="glass inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11"
+            >
+              <ImageSquare size={15} aria-hidden />
+              Backdrop
             </button>
           </div>
           {/* The title sits over the commander art; a halo in the page colour keeps it readable whatever the art. */}
@@ -1410,6 +1430,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
       {/* Overlays */}
       {touring && <Tour steps={DECK_TOUR} onClose={finishTour} />}
+      <BackdropDialog
+        open={backdropOpen}
+        onClose={() => setBackdropOpen(false)}
+        deckId={deck.id}
+        current={backdrop}
+        commanderArt={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null}
+        onChanged={setBackdrop}
+      />
       <DescriptionDialog open={descriptionOpen} onClose={() => setDescriptionOpen(false)} deckId={deck.id} description={deck.description} onSaved={onReload} />
       <SampleHand open={handOpen} onClose={() => setHandOpen(false)} lines={lines} />
       <ShoppingList open={shoppingOpen} onClose={() => setShoppingOpen(false)} lines={withOwned} />

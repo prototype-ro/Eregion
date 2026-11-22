@@ -274,6 +274,8 @@ export interface PublicDeckDetail {
   deck: PublicDeck;
   cards: DeckCardLine[];
   stats: DeckStats;
+  /** The Art Series card behind the deck's header, or null for the commander's art. */
+  backdrop?: import("./backdrop").Backdrop | null;
 }
 
 export interface PrintingChange {

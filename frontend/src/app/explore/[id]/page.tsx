@@ -26,6 +26,7 @@ import { checkLegality } from "@/lib/legality";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { DeckDetail, PublicDeckDetail, User } from "@/lib/types";
 import { btn } from "@/lib/ui";
+import { DeckBackdrop } from "@/components/DeckBackdrop";
 
 type View = "list" | "stacks" | "gallery";
 const VIEWS: Array<[View, string]> = [["list", "List"], ["stacks", "Stacks"], ["gallery", "Gallery"]];
@@ -132,8 +133,9 @@ export default function PublicDeckPage() {
       )}
       {!error && !detail && <p className="py-16 text-muted">Loading the deck.</p>}
       {detail && (
-        <main id="main" tabIndex={-1} className="pb-24">
-          <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-8">
+        <main id="main" tabIndex={-1} className="relative pb-24">
+          <DeckBackdrop url={detail.backdrop?.artUrl ?? detail.deck.artUrl} />
+          <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-8">
             <div className="min-w-0">
               <Link href="/explore" className="inline-flex min-h-9 items-center text-sm text-muted [@media(pointer:coarse)]:min-h-11">
                 Back to Explore
