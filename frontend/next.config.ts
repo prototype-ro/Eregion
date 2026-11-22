@@ -36,6 +36,9 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
   poweredByHeader: false,
+  // Next's own corner badge (build status and issues) is hidden so the site looks as visitors see it. Errors still
+  // open the full-screen overlay when they happen. The owner's own tools switch on with Ctrl+Shift+D (DevTools.tsx).
+  devIndicators: false,
   // Next blocks its development resources (hot reload, hydration) for any host but localhost, which leaves a page opened on 127.0.0.1
   // a static shell with no developer tools. Development only: it has no effect on a production build.
   allowedDevOrigins: ["127.0.0.1"],
