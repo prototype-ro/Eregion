@@ -72,11 +72,13 @@ export function PublicHistory({ deckId }: { deckId: string }) {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="font-mono text-sm text-accent-text">v{step.versionNumber}</span>
                 <span className="text-sm text-muted">{day(step.createdAt)}</span>
-                <span className="text-sm text-muted">{step.cardCount} cards</span>
+                <span className="text-sm text-muted">{step.cardCount} {step.cardCount === 1 ? "card" : "cards"}</span>
                 {!first && (
                   <span className="font-mono text-sm" aria-label={`${step.added} added, ${step.removed} removed, ${step.changed} changed`}>
-                    <span className="text-add-text">+{step.added}</span> <span className="text-danger">−{step.removed}</span>
-                    {step.changed > 0 && <span className="text-muted"> ~{step.changed}</span>}
+                    {step.added > 0 && <span className="text-add-text">+{step.added} </span>}
+                    {step.removed > 0 && <span className="text-danger">−{step.removed} </span>}
+                    {step.changed > 0 && <span className="text-muted">{step.changed} changed</span>}
+                    {step.added === 0 && step.removed === 0 && step.changed === 0 && <span className="text-muted">no card changes</span>}
                   </span>
                 )}
                 {!first && (

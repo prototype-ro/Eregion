@@ -95,7 +95,7 @@ function Body({ line, deckId, timeline, current, onClose, onOpenVersion }: Props
                             here ? "border-accent-text bg-accent text-on-accent" : "border-line text-muted"
                           } ${open ? "outline-2 outline-offset-2 outline-ink" : ""}`}
                         >
-                          {here ? total : `v${version.versionNumber}`}
+                          v{version.versionNumber}
                         </button>
                       );
                     })}
@@ -103,7 +103,7 @@ function Body({ line, deckId, timeline, current, onClose, onOpenVersion }: Props
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-muted">Filled: the card is in that version, with its copies. Outlined: it is not.</p>
+            <p className="mt-3 text-xs text-muted">Filled: the card is in that version (point at it for the number of copies). Outlined: it is not.</p>
           </section>
 
           <section aria-label="What changed">

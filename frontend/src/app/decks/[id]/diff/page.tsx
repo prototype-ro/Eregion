@@ -41,16 +41,6 @@ function Diff() {
   const label = (version: VersionSummary) =>
     `v${version.versionNumber}${timeline && timeline.branches.length > 1 ? ` on ${branchOf(version.versionNumber) ?? "?"}` : ""}${version.note ? `, ${version.note}` : ""}`;
 
-  /** Compares the newest version of one branch with the newest of another. */
-  const compareHeads = (side: "from" | "to", branchId: string) => {
-    const tip = timeline?.branches.find((branch) => branch.id === branchId)?.versions.at(-1);
-    if (!tip) return;
-    if (side === "from") setFrom(tip.versionNumber);
-    else setTo(tip.versionNumber);
-  };
-  const branchIdOf = (versionNumber: number | null) =>
-    versionNumber === null ? "" : (timeline?.branches.find((branch) => branch.versions.some((version) => version.versionNumber === versionNumber))?.id ?? "");
-
   // Load the version list once and default to "previous to latest".
   useEffect(() => {
     (async () => {
@@ -148,26 +138,6 @@ function Diff() {
             </div>
           )}
         </div>
-
-        {timeline && timeline.branches.length > 1 && versions && versions.length >= 2 && (
-          <div className="mb-10 flex flex-wrap items-end gap-3 border-y border-line py-5">
-            <p className="w-full text-sm text-muted">Or compare the newest versions of two branches</p>
-            {(["from", "to"] as const).map((side) => (
-              <div key={side} className="flex flex-col gap-1.5">
-                <label htmlFor={`branch-${side}`} className="text-sm text-muted">
-                  {side === "from" ? "Branch to start from" : "Branch to compare against"}
-                </label>
-                <select id={`branch-${side}`} className={select} value={branchIdOf(side === "from" ? from : to)} onChange={(event) => compareHeads(side, event.target.value)}>
-                  {timeline.branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
 
         {error && (
           <p role="alert" className="mb-8 max-w-[560px] rounded-2xl border border-danger-line bg-danger/10 px-4 py-3 text-sm text-ink">

@@ -49,6 +49,7 @@ import { CardHistoryDialog } from "./CardHistoryDialog";
 import { MergeDialog } from "./MergeDialog";
 import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
+import { RecentChanges } from "./RecentChanges";
 import { VersionTimeline } from "./VersionTimeline";
 import { exportDeck } from "@/lib/export";
 
@@ -461,6 +462,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
 
   // Saving from anything but the newest version of a line has to start a new branch.
   const viewingOlder = version !== null && !version.head;
+  // The note row holds Save. The dock repeats Save only while that row is off screen, so one Save shows at a time.
+  const [draftRow, setDraftRow] = useState<HTMLDivElement | null>(null);
+  const [draftRowSeen, setDraftRowSeen] = useState(false);
+  useEffect(() => {
+    if (!draftRow) {
+      setDraftRowSeen(false);
+      return;
+    }
+    const watch = new IntersectionObserver(([entry]) => setDraftRowSeen(entry.isIntersecting), { threshold: 0.6 });
+    watch.observe(draftRow);
+    return () => watch.disconnect();
+  }, [draftRow]);
   const needsBranch = viewingOlder || branching;
   // Only a real edit, or a branch asked for, shows the save controls. Just looking at an older version does not.
   const showDraft = dirty || branching;
@@ -817,7 +830,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     onSelect: (line: DeckCardLine, via?: "hover" | "click") => {
       setSelectedKey(lineKey(line));
       // Without the side preview (below lg), clicking a card opens it in the peek sheet instead.
-      if (via === "click" && window.matchMedia("(max-width: 1023px)").matches) setPeekKey(lineKey(line));
+      // On a touch screen too, whatever its width: there the sheet is the way to the card's menu (see CardPeek).
+      if (via === "click" && window.matchMedia("(max-width: 1023px), (pointer: coarse)").matches) setPeekKey(lineKey(line));
     },
     onMenu: (line: DeckCardLine, x: number, y: number) => setMenu({ line, x, y }),
     onQuantity: changeQuantity,
@@ -858,7 +872,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   /** The note, the new branch's name and Discard, under the timeline. They appear only while there is something to save. */
   function renderFields() {
     return (
-      <div className="flex w-full flex-wrap items-center gap-2.5">
+      <div ref={setDraftRow} className="flex w-full flex-wrap items-center gap-2.5">
         <label className="sr-only" htmlFor="version-note">
           Version note
         </label>
@@ -885,16 +899,27 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             />
           </>
         )}
-        {dirty && (
+        {/* The one Save: beside the note it belongs to. It adds a version; replacing the open one is under More. */}
+        <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
+          {saveNewLabel}
+        </button>
+        {/* With changes made, starting a branch is a choice about this save, so it sits next to it. From an older
+            version every save branches, and before any change the switch is Branch off in the row below. */}
+        {dirty && version !== null && !viewingOlder && (
+          <button type="button" aria-pressed={branching} disabled={saving} onClick={() => setBranching((value) => !value)} className={btn.quiet}>
+            {branching ? `Keep on ${timeline.branches.find((b) => b.id === version.branchId)?.name ?? "this branch"}` : "Save as a branch"}
+          </button>
+        )}
+        {dirty ? (
           <button type="button" disabled={saving} onClick={() => setLines(baseLines)} className={btn.quiet}>
             Discard
           </button>
-        )}
-        {/* A deck with no version yet has no version actions row to hold Save, so the first save sits here beside the note. */}
-        {version === null && (
-          <button type="button" disabled={!canSave} onClick={save} className={`${btn.primary} sm:ml-auto`}>
-            {saveNewLabel}
-          </button>
+        ) : (
+          branching && (
+            <button type="button" onClick={() => setBranching(false)} className={btn.quiet}>
+              Cancel
+            </button>
+          )
         )}
       </div>
     );
@@ -904,6 +929,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const saveNewLabel = saving ? "Saving" : needsBranch ? "Save as new branch" : version === null ? "Save first version" : "Save new version";
   const applyHint = !version ? undefined : !dirty ? "Nothing changed yet" : applyCheck.ok ? `Save these changes over version ${version.versionNumber}, without adding a version` : (applyCheck.reason ?? undefined);
   const onApply = () => (versionIsPublic ? setConfirmApply(true) : void applyChanges());
+  /** Opens the comparison of the open version with another, older first. */
+  const compareWith = (n: number) => router.push(`/decks/${deck.id}/diff?from=${Math.min(n, version?.versionNumber ?? n)}&to=${Math.max(n, version?.versionNumber ?? n)}`);
 
   /** The cards of some groups, drawn the way the deck is being viewed. Switching the view plays a short entrance for the new one. */
   function renderCards(boardGroups: typeof groups, hideGroupHeaders = false) {
@@ -917,21 +944,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     );
   }
 
-  /** Save and Save new version, for the floating bar. The footer has the same two buttons among its others. */
+  /** Save for the floating bar, while the note row that also holds it is scrolled out of sight. */
   function renderSaveButtons() {
     return (
-      <>
-        {version && (
-          // Says which version it changes: a plain "Save" next to "Save new version" read as the normal way to save,
-          // and quietly replaced the version instead of adding one to the history.
-          <button type="button" disabled={!canApply} onClick={onApply} title={applyHint} aria-label={applyHint ? `Update version ${version.versionNumber}. ${applyHint}` : undefined} className={btn.secondary}>
-            Update v{version.versionNumber}
-          </button>
-        )}
-        <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
-          {saveNewLabel}
-        </button>
-      </>
+      <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
+        {saveNewLabel}
+      </button>
     );
   }
 
@@ -946,8 +964,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/art/nobg-knight.png" alt="" className="absolute top-0 left-[18%] h-[720px] w-auto max-w-none select-none" />
         </div>
-      {/* Header */}
-      <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-3">
+      {/* Header. Above the Versions panel (z-10), which comes later on the page, so the Legal popover is drawn over it. */}
+      <div className="relative z-20 flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-10 pb-3">
         <div className="min-w-0">
           <div className="mb-3.5 flex flex-wrap items-center gap-2">
             {dirty ? (
@@ -972,7 +990,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 value={declaredBracket ?? 0}
                 onChange={(event) => void declareBracket(Number(event.target.value))}
                 title="The bracket you call this deck. Shown on its public page next to the worked-out one."
-                className="bg-transparent text-[13px] font-medium focus:outline-none"
+                className="self-stretch bg-transparent text-[13px] font-medium focus:outline-none"
               >
                 <option value={0}>Your bracket: not set</option>
                 {[1, 2, 3, 4].map((n) => (
@@ -998,14 +1016,15 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             <DisplayName name={deck.name} />
           </h1>
           <div className="mt-2.5 space-y-1 text-[13px] leading-snug text-muted">
-            <div className="flex flex-wrap items-center gap-x-2">
+            {/* The popover is placed from this row's left edge, not from the word Legal: from there it ran past the right edge of a phone. */}
+            <div className="relative flex flex-wrap items-center gap-x-2">
               <span className="capitalize">{deck.format}</span>
               <span aria-hidden="true">|</span>
-              <details className="group/legal relative inline-block">
+              <details className="group/legal inline-block">
                 <summary className={`cursor-pointer list-none underline-offset-4 hover:underline ${legality.legal ? "" : "text-add-text"}`}>
                   {legality.legal ? "Legal" : `${legality.issues.length} ${legality.issues.length === 1 ? "issue" : "issues"}`}
                 </summary>
-                <div className="absolute left-0 z-30 mt-2 w-[min(360px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-bg p-4 text-sm text-ink shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                <div className="absolute left-0 z-30 mt-2 w-[min(360px,calc(100vw-2.5rem))] rounded-2xl border border-line bg-bg p-4 text-sm text-ink shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
                   {legality.legal ? (
                     <p>100 cards, one commander, one copy of each card, all inside the commander&apos;s colors.</p>
                   ) : (
@@ -1121,7 +1140,12 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
           </div>
         </div>
         <Presence show={timelineOpen} collapse id="timeline-body" className="pt-2">
-          <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} controlsSlot={controlsSlot} deckId={deck.id} menuBranchId={branchMenu?.branchId ?? null} artUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} onBranchClick={(branchId, anchor) => setBranchMenu((open) => (open?.branchId === branchId ? null : { branchId, anchor }))} onCompare={(n) => router.push(`/decks/${deck.id}/diff?from=${Math.min(n, version?.versionNumber ?? n)}&to=${Math.max(n, version?.versionNumber ?? n)}`)} />
+          {/* The dots need width a phone does not have; there the list below stands in for them. */}
+          <div className="hidden sm:block">
+            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} controlsSlot={controlsSlot} deckId={deck.id} menuBranchId={branchMenu?.branchId ?? null} artUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} onBranchClick={(branchId, anchor) => setBranchMenu((open) => (open?.branchId === branchId ? null : { branchId, anchor }))} onCompare={compareWith} />
+          </div>
+          {/* The newest saves with their notes, readable without hovering a dot. */}
+          <RecentChanges timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} onCompare={compareWith} />
         </Presence>
         <div>
           <Presence show={showDraft} collapse appear className="mt-4 border-t border-line pt-4 pb-1">
@@ -1146,9 +1170,6 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 canApply={canApply}
                 applyHint={applyHint}
                 onApply={onApply}
-                canSaveNew={canSave}
-                saveNewLabel={saveNewLabel}
-                onSaveNew={save}
                 branching={needsBranch}
                 branchLocked={viewingOlder}
                 onToggleBranch={() => setBranching((value) => !value)}
@@ -1347,7 +1368,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               </button>
             )}
             {showDraft ? (
-              renderSaveButtons()
+              !draftRowSeen && renderSaveButtons()
             ) : (
               <span className="hidden px-3 text-xs text-muted sm:inline">{version ? "All changes saved" : "No cards yet"}</span>
             )}
@@ -1489,6 +1510,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onChangePrinting={(line) => {
           setPeekKey(null);
           setPrintingKey(lineKey(line));
+        }}
+        onMore={(line, x, y) => {
+          setPeekKey(null);
+          // The menu shuts on any scroll, so it opens only once the closing dialog has handed focus back.
+          requestAnimationFrame(() => requestAnimationFrame(() => setMenu({ line, x, y })));
         }}
       />
       <PrintingPicker line={lineByKey(printingKey)} onClose={() => setPrintingKey(null)} onChoose={choosePrinting} onChooseCustom={chooseCustom} />

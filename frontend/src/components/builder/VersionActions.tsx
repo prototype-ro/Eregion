@@ -31,14 +31,10 @@ interface Props {
   versionCount: number;
   /** Tells the builder a version was deleted, so it can offer to undo it. */
   onDeleted: (versionNumber: number) => void;
-  /** Save over this version, when nothing else grew from it. */
+  /** Save over this version, when nothing else grew from it. Offered in More: adding a version is the normal way. */
   canApply: boolean;
   applyHint?: string;
   onApply: () => void;
-  /** Save as a new version, or as a new branch when the draft started from an older version. */
-  canSaveNew: boolean;
-  saveNewLabel: string;
-  onSaveNew: () => void;
   /** The next save starts a new branch. */
   branching: boolean;
   /** Saving from an older version always branches, so there is nothing to switch. */
@@ -53,7 +49,7 @@ const item = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center
 const button = "pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
-export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, canSaveNew, saveNewLabel, onSaveNew, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount }: Props) {
+export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount }: Props) {
   const [helpOpen, setHelpOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -155,7 +151,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
       <div className="flex flex-wrap items-center gap-2.5">
         {comparing ? (
           <Presence key="comparing" show appear y={6} exit={false} className="flex flex-wrap items-center gap-2.5">
-            <p className="px-2 text-sm text-ink">Pick a version on the timeline</p>
+            <p className="px-2 text-sm text-ink">Pick a version to compare with</p>
             {version.parentVersion !== null && (
               <Link href={`/decks/${deckId}/diff?from=${version.parentVersion}&to=${number}`} className={`${btn.quiet} text-sm`}>
                 or use v{version.parentVersion}
@@ -167,30 +163,18 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           </Presence>
         ) : (
           <Presence key="normal" show appear={swapped.current} y={6} exit={false} className="flex flex-wrap items-center gap-2.5">
-            {/* Names the version it changes, so it is never mistaken for the normal way to save (which adds a version). */}
-            <button
-              type="button"
-              disabled={!canApply}
-              onClick={onApply}
-              title={applyHint}
-              aria-label={applyHint ? `Update version ${version.versionNumber}. ${applyHint}` : undefined}
-              className={button}
-            >
-              Update v{version.versionNumber}
-            </button>
-            <button type="button" disabled={!canSaveNew} onClick={onSaveNew} className={`${btn.primary} !min-h-9 [@media(pointer:coarse)]:min-h-11`}>
-              {saveNewLabel}
-            </button>
-            <button
-              type="button"
-              aria-pressed={branching}
-              disabled={branchLocked}
-              onClick={onToggleBranch}
-              title={branchLocked ? "Saving from an older version always starts a new branch" : undefined}
-              className={`${button} ${branching ? "!border-accent-text !text-accent-text" : ""}`}
-            >
-              Branch off
-            </button>
+            {/* Save lives beside the note while there are changes. Branch off starts an experiment before any change;
+                once there are changes, the same switch sits next to Save. From an older version a save always branches. */}
+            {!dirty && !branchLocked && (
+              <button
+                type="button"
+                aria-pressed={branching}
+                onClick={onToggleBranch}
+                className={`${button} ${branching ? "!border-accent-text !text-accent-text" : ""}`}
+              >
+                Branch off
+              </button>
+            )}
             {versionCount > 1 && (
               <button type="button" onClick={onToggleCompare} className={button}>
                 Compare
@@ -225,6 +209,14 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             stagger=".menu-item"
             className="absolute bottom-full left-0 z-30 mb-2 flex w-60 flex-col rounded-2xl border border-line bg-bg p-1.5 text-sm shadow-[0_18px_40px_rgba(0,0,0,0.45)]"
           >
+            {dirty && (
+              <button type="button" role="menuitem" onClick={run(onApply)} disabled={!canApply} title={applyHint} className={`${item} menu-item`}>
+                <span>
+                  Replace v{number} with these changes
+                  <span className="block text-xs text-muted">{canApply ? "Changes this version instead of adding one" : applyHint}</span>
+                </span>
+              </button>
+            )}
             <button type="button" role="menuitem" onClick={run(() => setNoteOpen(true))} className={`${item} menu-item`}>
               Edit note
             </button>
@@ -298,8 +290,8 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
       {helpOpen && (
         <ul className="mt-2 flex max-w-[640px] flex-col gap-1.5 text-sm leading-snug text-muted">
           <li>
-            <span className="text-ink">Save new version</span> keeps what you had and adds a step to the deck&rsquo;s history. <span className="text-ink">Update v{number}</span>{" "}
-            changes the version you are on instead.
+            <span className="text-ink">Save new version</span> keeps what you had and adds a step to the deck&rsquo;s history. To change the version you are on
+            instead, use <span className="text-ink">Replace v{number}</span> under More.
           </li>
           <li>
             <span className="text-ink">Branch off</span> to try an idea, such as a cheaper mana base, without touching your main deck. Each line of saves is a
@@ -311,6 +303,9 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           <li>
             <span className="text-ink">Compare</span> shows what changed between any two versions, cards and numbers. Nothing is ever lost: a deleted version
             can be brought back for 30 days.
+          </li>
+          <li>
+            Press <kbd className="font-mono text-ink">[</kbd> and <kbd className="font-mono text-ink">]</kbd> to step to the previous and next version.
           </li>
         </ul>
       )}

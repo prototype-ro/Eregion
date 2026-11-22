@@ -8,6 +8,8 @@ interface Props {
   top: number | undefined;
   /** Changes when the tooltip moves to another dot while open, so its text can refresh without the whole shape popping again. */
   contentKey: number | undefined;
+  /** Opens upward from the point, so it never covers what sits under the dots (the version buttons). */
+  above?: boolean;
   children: ReactNode;
 }
 
@@ -29,7 +31,9 @@ const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefe
  * plays these without running any JavaScript per frame and without repainting, so they stay smooth even when the page is busy.
  * The shape, the border and the shadow are drawn once, at the finished size, and only scaled.
  */
-export function NodeTip({ show, left, top, contentKey, children }: Props) {
+export function NodeTip({ show, left, top, contentKey, above = false, children }: Props) {
+  // Which way the card falls out of the dot: down by default, up when it opens above.
+  const fall = above ? 1 : -1;
   const place = useRef<HTMLDivElement>(null);
   const drop = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
@@ -78,12 +82,12 @@ export function NodeTip({ show, left, top, contentKey, children }: Props) {
       { transform: "scale(1.5, 2.4)", opacity: 0, offset: 1 },
     ], { duration: 360, easing: SPRING });
     // A small drop with it, so it seems to fall out of the dot.
-    play(drop.current, [{ transform: "translateY(-14px)" }, { transform: "translateY(0)" }], { duration: 520, easing: OUT });
+    play(drop.current, [{ transform: `translateY(${14 * fall}px)` }, { transform: "translateY(0)" }], { duration: 520, easing: OUT });
     // The text waits for the card to be nearly open, then fades in as one piece.
     const t = play(text.current, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 300, easing: "ease-out" });
     t?.finished.then(() => (settled.current = true)).catch(() => {});
     return stop;
-  }, [show, mounted]);
+  }, [show, mounted, fall]);
 
   // Closes: the text goes, then the card folds back toward the dot.
   useLayoutEffect(() => {
@@ -96,14 +100,14 @@ export function NodeTip({ show, left, top, contentKey, children }: Props) {
     play(text.current, [{ opacity: 1 }, { opacity: 0 }], { duration: 80, easing: "ease-in" });
     play(card.current, [{ transform: "scale(1, 1)", opacity: 1 }, { transform: `scale(${BUBBLE / WIDTH}, 0.24)`, opacity: 0 }], { duration: 230, easing: IN });
     play(bubble.current, [{ opacity: 0, transform: "scale(1.5, 2.4)" }, { opacity: 0, transform: "scale(0.2)" }], { duration: 230 });
-    play(drop.current, [{ transform: "translateY(0)" }, { transform: "translateY(-10px)" }], { duration: 230, easing: IN });
+    play(drop.current, [{ transform: "translateY(0)" }, { transform: `translateY(${10 * fall}px)` }], { duration: 230, easing: IN });
     const last = running.current[2];
     let cancelled = false;
     last?.finished.then(() => !cancelled && setMounted(false)).catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [show, mounted]);
+  }, [show, mounted, fall]);
 
   // Moving to a neighbouring dot while open: the card slides over (a CSS transition on a transform), and only its text refreshes.
   useEffect(() => {
@@ -124,9 +128,10 @@ export function NodeTip({ show, left, top, contentKey, children }: Props) {
       className="pointer-events-none fixed top-0 left-0 z-40"
       style={{ width: WIDTH, transform: `translate3d(${x - WIDTH / 2}px, ${y}px, 0)`, transition: "transform 170ms cubic-bezier(0.2, 0.8, 0.2, 1)", willChange: "transform" }}
     >
-      <div ref={drop} className="relative" style={{ willChange: "transform" }}>
-        <div ref={card} aria-hidden="true" className="absolute inset-0 rounded-2xl border border-line bg-bg shadow-[0_18px_40px_rgba(0,0,0,0.5)]" style={{ transformOrigin: "50% 0%", willChange: "transform, opacity", opacity: 0 }} />
-        <div ref={bubble} aria-hidden="true" className="absolute top-0 left-1/2 rounded-full border border-line bg-bg" style={{ width: BUBBLE, height: BUBBLE, marginLeft: -BUBBLE / 2, transformOrigin: "50% 0%", willChange: "transform, opacity", opacity: 0 }} />
+      {/* Opening upward, the card hangs from its bottom edge at the point, so it grows away from the dot either way. */}
+      <div ref={drop} className={above ? "absolute bottom-0 left-0 w-full" : "relative"} style={{ willChange: "transform" }}>
+        <div ref={card} aria-hidden="true" className="absolute inset-0 rounded-2xl border border-line bg-bg shadow-[0_18px_40px_rgba(0,0,0,0.5)]" style={{ transformOrigin: above ? "50% 100%" : "50% 0%", willChange: "transform, opacity", opacity: 0 }} />
+        <div ref={bubble} aria-hidden="true" className={`absolute ${above ? "bottom-0" : "top-0"} left-1/2 rounded-full border border-line bg-bg`} style={{ width: BUBBLE, height: BUBBLE, marginLeft: -BUBBLE / 2, transformOrigin: above ? "50% 100%" : "50% 0%", willChange: "transform, opacity", opacity: 0 }} />
         <div ref={text} className="relative p-4 text-sm" style={{ willChange: "opacity", opacity: 0 }}>
           {children}
         </div>

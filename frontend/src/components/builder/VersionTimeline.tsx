@@ -61,6 +61,8 @@ interface Hover {
   node: Node;
   left: number;
   top: number;
+  /** The tooltip opens upward from top instead of down. */
+  above: boolean;
 }
 
 /** Which branches are drawn: all of them, or with many branches only those holding the newest versions plus the open and public ones. */
@@ -402,7 +404,9 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
    */
   function show(node: Node, element: HTMLElement, wait = true) {
     const box = element.getBoundingClientRect();
-    const next = { node, left: Math.min(Math.max(box.left + box.width / 2, 150), window.innerWidth - 150), top: box.bottom + 14 };
+    // Above the dot when there is room, so the card never covers the version buttons under the timeline.
+    const above = box.top > 210;
+    const next = { node, left: Math.min(Math.max(box.left + box.width / 2, 150), window.innerWidth - 150), top: above ? box.top - 6 : box.bottom + 14, above };
     if (showTimer.current) clearTimeout(showTimer.current);
     const warm = hover !== null || performance.now() - hiddenAt.current < 260;
     if (!wait || warm) {
@@ -670,7 +674,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
       </div>
       </div>
 
-      <NodeTip show={hover !== null} left={last?.left} top={last?.top} contentKey={tipVersion?.versionNumber}>
+      <NodeTip show={hover !== null} left={last?.left} top={last?.top} above={last?.above} contentKey={tipVersion?.versionNumber}>
         {last && tipVersion && (
           <>
           <p data-tip-line className="font-medium">
