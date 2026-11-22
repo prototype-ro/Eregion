@@ -45,6 +45,8 @@ interface Props {
   variants: boolean;
   /** The deck already has more than one line, so they can be managed even with variants off. */
   hasVariants: boolean;
+  /** Starts the tour of the deck page again. */
+  onTour: () => void;
   /** Bring the open branch's changes into main. Only given while a branch other than main is open at its newest version. */
   onMergeIntoMain?: () => void;
 }
@@ -53,7 +55,7 @@ const item = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center
 const button = "pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
-export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount, variants, hasVariants }: Props) {
+export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount, variants, hasVariants, onTour }: Props) {
   const [helpOpen, setHelpOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -172,6 +174,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             {variants && !dirty && !branchLocked && (
               <button
                 type="button"
+                data-tour="variant"
                 aria-pressed={branching}
                 onClick={onToggleBranch}
                 className={`${button} ${branching ? "!border-accent-text !text-accent-text" : ""}`}
@@ -180,7 +183,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
               </button>
             )}
             {versionCount > 1 && (
-              <button type="button" onClick={onToggleCompare} className={button}>
+              <button type="button" data-tour="compare" onClick={onToggleCompare} className={button}>
                 Compare
               </button>
             )}
@@ -325,6 +328,13 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           </li>
           <li>
             Press <kbd className="font-mono text-ink">[</kbd> and <kbd className="font-mono text-ink">]</kbd> to step to the previous and next version.
+          </li>
+          <li>
+            New here?{" "}
+            <button type="button" onClick={onTour} className="text-ink underline underline-offset-4">
+              Take the tour
+            </button>{" "}
+            of this page.
           </li>
         </ul>
       )}

@@ -50,7 +50,9 @@ import { MergeDialog } from "./MergeDialog";
 import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
 import { lineName } from "@/lib/lineName";
-import { usePreferences } from "@/lib/preferences";
+import { savePreferences, usePreferences } from "@/lib/preferences";
+import { Tour } from "@/components/tour/Tour";
+import { DECK_TOUR } from "@/lib/tour";
 import { RecentChanges } from "./RecentChanges";
 import { VersionTimeline } from "./VersionTimeline";
 import { exportDeck } from "@/lib/export";
@@ -224,7 +226,13 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const proxies = useProxies(deck.id);
   const { assistant } = useFeatures();
   // Variants (branches and merging) are an advanced choice in Account. Off, every deck keeps one simple line.
-  const { variantsEnabled } = usePreferences();
+  const { variantsEnabled, tourDone, loaded: preferencesLoaded } = usePreferences();
+  // The tour of this page: offered once, restartable from the versions help. Finishing or skipping it ends the offer.
+  const [touring, setTouring] = useState(false);
+  const finishTour = useCallback(() => {
+    setTouring(false);
+    if (!tourDone) void savePreferences({ tourDone: true }).catch(() => {});
+  }, [tourDone]);
   const [proxyCardId, setProxyCardId] = useState<string | null>(null);
   const [loreOpen, setLoreOpen] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
@@ -985,6 +993,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             <span aria-hidden="true" className="mx-1 hidden h-5 w-px bg-line sm:block" />
             <button
               type="button"
+              data-tour="share"
               onClick={() => setVisibilityOpen(true)}
               aria-label={visibility === "public" ? `Public, showing version ${publishedVersion}. Change visibility` : "Private. Change visibility"}
               className={`glass inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium [@media(pointer:coarse)]:min-h-11 ${visibility === "public" ? "text-accent-text" : ""}`}
@@ -1128,7 +1137,18 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       )}
 
       {/* Version timeline, collapsible */}
-      <section aria-labelledby="timeline-heading" className="atm-accent atm-accent-glow relative z-10 mb-10 rounded-card border border-line bg-surface/60 px-4 py-4 sm:px-6">
+      <Presence show={preferencesLoaded && !tourDone && !touring && version !== null} collapse>
+        <div className="relative z-10 mb-4 flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface/60 px-5 py-3 text-[15px]">
+          <span className="min-w-0 flex-1">New here? A one minute tour shows what each part of this page does.</span>
+          <button type="button" onClick={() => setTouring(true)} className={btn.primary}>
+            Start the tour
+          </button>
+          <button type="button" onClick={finishTour} className={btn.quiet}>
+            No thanks
+          </button>
+        </div>
+      </Presence>
+      <section data-tour="versions" aria-labelledby="timeline-heading" className="atm-accent atm-accent-glow relative z-10 mb-10 rounded-card border border-line bg-surface/60 px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
           <h2 id="timeline-heading" title="Press [ and ] to step through versions" className="text-lg font-medium">
             Versions
@@ -1184,6 +1204,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 onBranches={() => setBranchesOpen(true)}
                 variants={variantsEnabled}
                 hasVariants={timeline.branches.length > 1}
+                onTour={() => setTouring(true)}
                 onMergeIntoMain={(() => {
                   if (!variantsEnabled) return undefined;
                   const open = timeline.branches.find((branch) => branch.id === version.branchId);
@@ -1265,7 +1286,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         )}
       />
 
-      <div className="mt-16">
+      <div data-tour="stats" className="mt-16">
         <StatsSection
           deckId={deck.id}
           stats={stats}
@@ -1388,6 +1409,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       />
 
       {/* Overlays */}
+      {touring && <Tour steps={DECK_TOUR} onClose={finishTour} />}
       <DescriptionDialog open={descriptionOpen} onClose={() => setDescriptionOpen(false)} deckId={deck.id} description={deck.description} onSaved={onReload} />
       <SampleHand open={handOpen} onClose={() => setHandOpen(false)} lines={lines} />
       <ShoppingList open={shoppingOpen} onClose={() => setShoppingOpen(false)} lines={withOwned} />

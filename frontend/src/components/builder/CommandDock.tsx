@@ -44,7 +44,7 @@ export function CommandDock({ shown, search, views, display, save }: Props) {
     <div inert={!shown} className={`pointer-events-none fixed inset-x-3 bottom-3 z-40 flex justify-center transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${shown ? "" : "translate-y-6 opacity-0"}`}>
       <div className="dock atm-accent atm-accent-glow pointer-events-auto relative flex w-full max-w-[780px] items-center gap-1 rounded-full p-1 pl-3.5 sm:gap-1.5">
         <MagnifyingGlass size={16} aria-hidden className="shrink-0 text-muted" />
-        <div className="min-w-[120px] flex-1 sm:min-w-[170px]">{search}</div>
+        <div data-tour="search" className="min-w-[120px] flex-1 sm:min-w-[170px]">{search}</div>
         <span aria-hidden="true" className="hidden h-5 w-px bg-line sm:block" />
         <div className="hidden shrink-0 sm:block">{views}</div>
         <div ref={holder} className="relative shrink-0">

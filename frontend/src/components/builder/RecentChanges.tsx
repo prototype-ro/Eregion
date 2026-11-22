@@ -50,7 +50,7 @@ export function RecentChanges({ timeline, current, published, onSelect, comparin
   const shown = all ? versions : versions.slice(0, limit);
 
   return (
-    <div className="mt-3">
+    <div data-tour="history" className="mt-3">
       <h3 className="sr-only">Recent changes</h3>
       <ol className="flex flex-col">
         {shown.map((version) => {
