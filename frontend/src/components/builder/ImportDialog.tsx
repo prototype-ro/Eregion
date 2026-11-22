@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
+import { literalInput } from "@/lib/ui";
 import { api, ApiError } from "@/lib/api";
 import { parseDecklist, type ParsedEntry } from "@/lib/decklist";
 import type { Board, Card, ResolveResult } from "@/lib/types";
@@ -182,7 +183,7 @@ export function ImportDialog({
               value={text}
               onChange={(event) => setText(event.target.value)}
               rows={12}
-              spellCheck={false}
+              {...literalInput}
               placeholder={"1 Sol Ring\n1 Arcane Signet\n4 Island\n\nSideboard\n1 Mana Drain\n\nor https://tappedout.net/mtg-decks/..."}
               className="w-full resize-y rounded-3xl border border-line bg-surface px-5 py-4 font-mono text-sm leading-relaxed text-ink placeholder:text-muted focus:border-ink focus:outline-none"
             />

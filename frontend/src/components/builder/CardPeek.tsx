@@ -11,6 +11,11 @@ interface Props {
   showCollection: boolean;
   onClose: () => void;
   onChangePrinting: (line: DeckCardLine) => void;
+  /**
+   * Opens the card's full menu (tags, history, quantity, move, remove) at a screen point. On a touch screen the
+   * gallery and stacks have no three-dots button, so a tap on the card leads here and this is the way to those actions.
+   */
+  onMore?: (line: DeckCardLine, x: number, y: number) => void;
 }
 
 const Fact = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -21,7 +26,7 @@ const Fact = ({ label, children }: { label: string; children: React.ReactNode })
 );
 
 /** The center peek: one card in full, with everything we know about it. */
-export function CardPeek({ line, showCollection, onClose, onChangePrinting }: Props) {
+export function CardPeek({ line, showCollection, onClose, onChangePrinting, onMore }: Props) {
   return (
     <Dialog open={line !== null} onClose={onClose} label={line ? `${line.name} details` : "Card details"} size="md">
       {line && (
@@ -81,6 +86,18 @@ export function CardPeek({ line, showCollection, onClose, onChangePrinting }: Pr
               >
                 Change printing
               </button>
+              {onMore && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    const box = event.currentTarget.getBoundingClientRect();
+                    onMore(line, box.left, box.top);
+                  }}
+                  className="pill min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full border border-ink px-5 text-[13px] [@media(pointer:coarse)]:text-[15px] font-medium"
+                >
+                  More options
+                </button>
+              )}
               <button type="button" onClick={onClose} className="press min-h-9 [@media(pointer:coarse)]:min-h-11 rounded-full bg-accent px-6 text-[13px] [@media(pointer:coarse)]:text-[15px] font-bold text-on-accent">
                 Close
               </button>

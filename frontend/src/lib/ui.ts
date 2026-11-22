@@ -65,11 +65,21 @@ export const STD_TAG = {
     "inline-flex items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--text)_24%,transparent)] bg-[color-mix(in_srgb,var(--bg)_78%,transparent)] font-mono font-bold text-accent-text shadow-[inset_0_1px_0_var(--glass-hi),0_4px_14px_var(--glass-shadow)] backdrop-blur-[14px] backdrop-saturate-[1.7]",
 } as const;
 
-/** Text fields and selects: a pill, in the same two sizes as the buttons, so a form row lines up. */
+/**
+ * Text fields and selects: a pill, in the same two sizes as the buttons, so a form row lines up.
+ * On a touch screen every field and select is 16px whatever these classes say (globals.css): iOS Safari zooms the
+ * page into any field set smaller when it is tapped, and the zoom stays after the keyboard closes.
+ */
 export const STD_FIELD = {
   md: "min-h-9 w-full rounded-full border border-line bg-surface px-4 text-[13px] text-ink placeholder:text-muted focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-5 [@media(pointer:coarse)]:text-[15px]",
   lg: "min-h-11 w-full rounded-full border border-line bg-surface px-5 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none",
 } as const;
+
+/**
+ * For fields that take card names, deck names, search terms or list text: a phone keyboard must not capitalize,
+ * autocorrect or spell-check them, or "mulldrifter" can come out as a different word. Spread it onto the input.
+ */
+export const literalInput = { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } as const;
 
 export const btn = {
   primary: std("primary"),

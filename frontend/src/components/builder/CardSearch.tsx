@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ManaCost } from "@/components/Mana";
 import { useEffect, useRef, useState } from "react";
-import { field } from "@/lib/ui";
+import { field, literalInput } from "@/lib/ui";
 import { useCardSearch } from "@/lib/useCardSearch";
 import type { Board, Card } from "@/lib/types";
 
@@ -84,6 +84,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
         aria-controls={resultsId}
         aria-describedby={`${inputId}-status`}
         autoComplete="off"
+        {...literalInput}
         placeholder={placeholder}
         className={dock ? "dock-search-field min-h-9 w-full rounded-full bg-transparent px-2 text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:outline-none [@media(pointer:coarse)]:min-h-11" : compact ? field.md : "min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"}
       />
@@ -109,11 +110,13 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
               const have = owned.get(card.id) ?? 0;
               const already = inDeck.has(card.id);
               return (
+                // On a phone the buttons go on a second line under the name: beside it they left the name a few letters
+                // wide ("Drago..."), and the name is how you tell which card you are adding.
                 <li
                   key={card.id}
-                  className="grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-4 rounded-2xl px-3 py-2.5 sm:grid-cols-[72px_minmax(0,1fr)_auto_auto]"
+                  className="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-2xl px-3 py-2.5 sm:grid-cols-[72px_minmax(0,1fr)_auto_auto] sm:gap-x-4"
                 >
-                  <div className="relative h-[52px] w-[72px] overflow-hidden rounded-xl bg-surface-2">
+                  <div className="relative h-10 w-14 overflow-hidden rounded-xl bg-surface-2 sm:h-[52px] sm:w-[72px]">
                     {card.imageArtCrop && (
                       <Image
                         src={card.imageArtCrop}
@@ -125,7 +128,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-[17px] font-medium">{card.name}</p>
+                    <p className="text-[17px] leading-snug font-medium sm:truncate">{card.name}</p>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted">
                       {card.typeLine}
                       {card.manaCost && (
@@ -146,7 +149,7 @@ export function CardSearch({ inDeck, owned, showCollection, onAdd, onSetCommande
                   ) : (
                     <span className="hidden sm:block" />
                   )}
-                  <div className="flex gap-2">
+                  <div className="col-start-2 flex flex-wrap gap-2 sm:col-start-auto sm:flex-nowrap">
                     {board === "main" && card.typeLine.includes("Legendary") && card.typeLine.includes("Creature") && (
                       <button
                         type="button"

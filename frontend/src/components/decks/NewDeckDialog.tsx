@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { useCardSearch } from "@/lib/useCardSearch";
 import type { Card } from "@/lib/types";
-import { btn, field } from "@/lib/ui";
+import { btn, field, literalInput } from "@/lib/ui";
 
 export interface NewDeckDraft {
   name: string;
@@ -91,6 +91,7 @@ function Form({ onClose, busy, error, onCreate, onFromList }: Props) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               autoComplete="off"
+              {...literalInput}
               placeholder="Search legendary creatures"
               className={field.lg}
             />

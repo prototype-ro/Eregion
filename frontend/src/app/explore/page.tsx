@@ -10,7 +10,7 @@ import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { formatPrice, sortColors } from "@/lib/links";
 import type { Card, PublicDeck } from "@/lib/types";
-import { btn, field } from "@/lib/ui";
+import { btn, field, literalInput } from "@/lib/ui";
 
 const filterSelect =
   "min-h-9 rounded-full border border-line bg-surface px-4 text-sm text-ink focus:border-ink focus:outline-none [@media(pointer:coarse)]:min-h-11";
@@ -129,6 +129,7 @@ function Explore() {
               value={text}
               onChange={(event) => setText(event.target.value)}
               maxLength={80}
+              {...literalInput}
               placeholder="Search by deck, commander or author"
               className={field.lg}
             />

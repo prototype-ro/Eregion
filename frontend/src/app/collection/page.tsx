@@ -14,7 +14,7 @@ import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
 import { customArtUrl, formatPrice } from "@/lib/links";
 import type { Card, CustomPrinting } from "@/lib/types";
-import { btn } from "@/lib/ui";
+import { btn, literalInput } from "@/lib/ui";
 
 interface Entry {
   card: Card;
@@ -234,6 +234,7 @@ export default function CollectionPage() {
                   id="collection-filter"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
+                  {...literalInput}
                   placeholder="Part of a name"
                   className="min-h-9 [@media(pointer:coarse)]:min-h-11 w-64 rounded-full border border-line bg-surface px-5 text-[13px] [@media(pointer:coarse)]:text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
                 />

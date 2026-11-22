@@ -229,6 +229,41 @@ textarea:focus-visible {
   outline: none;
 }
 
+/*
+ * Fields on a touch screen. Kept outside any layer on purpose, so it wins over the size utilities on each field.
+ * 16px: iOS Safari zooms the whole page into a field whose text is smaller when it is tapped, and the page stays
+ * zoomed after the keyboard closes, even on the next page.
+ * Selects: Safari's own select look ignores min-height, which left them about 24px tall on an iPhone. Without that
+ * look the 44px touch height applies, and the arrow is drawn here instead, in the muted text colour of the theme.
+ */
+:root {
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23a3a3a0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2355554f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  }
+}
+:root[data-theme="light"] {
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2355554f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+}
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: var(--select-chevron);
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 12px;
+    padding-right: 36px;
+  }
+}
+
 /* Matte key: the secondary look from the button standard (lib/ui.ts), for the controls that still carry the pill class. */
 .pill {
   background: color-mix(in srgb, var(--text) 8%, var(--bg));

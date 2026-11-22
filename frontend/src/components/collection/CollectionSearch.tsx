@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { formatPrice } from "@/lib/links";
+import { literalInput } from "@/lib/ui";
 import type { Card } from "@/lib/types";
 import { useCardSearch } from "@/lib/useCardSearch";
 
@@ -37,6 +38,7 @@ export function CollectionSearch({ quantities, onAdd }: Props) {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         autoComplete="off"
+        {...literalInput}
         placeholder="Search by card name"
         className="min-h-14 w-full rounded-full border border-line bg-surface px-6 text-[17px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
       />

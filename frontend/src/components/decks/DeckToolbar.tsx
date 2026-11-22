@@ -5,7 +5,7 @@ import { useState } from "react";
 import { SortDirectionButton } from "@/components/builder/SortDirectionButton";
 import { ManaCost } from "@/components/Mana";
 import { DECK_SORTS, isFiltering, NO_FILTERS, type DeckDirection, type DeckFilters, type DeckSort } from "@/lib/deckfilter";
-import { btn, field } from "@/lib/ui";
+import { btn, field, literalInput } from "@/lib/ui";
 
 interface Props {
   filters: DeckFilters;
@@ -51,6 +51,7 @@ export function DeckToolbar({ filters, onFilters, sort, direction, onSort, onFli
             onChange={(event) => set({ query: event.target.value })}
             placeholder="Search by deck or commander"
             autoComplete="off"
+            {...literalInput}
             className={field.lg}
           />
         </div>

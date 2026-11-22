@@ -10,7 +10,7 @@ import { toOklch } from "@/lib/artColor";
 import { formatPrice } from "@/lib/links";
 import { buildQuery, COLORS, COMPARES, emptyForm, identityPicks, RARITIES, type Color, type Compare, type Numeric, type SearchForm } from "@/lib/searchQuery";
 import type { Board, Card } from "@/lib/types";
-import { btn, field } from "@/lib/ui";
+import { btn, field, literalInput } from "@/lib/ui";
 import { useAdvancedSearch } from "@/lib/useAdvancedSearch";
 import { useStrandColor } from "@/lib/useStrandColor";
 import { glowOf, type Glow } from "./stats/screen";
@@ -174,13 +174,13 @@ export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, comma
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
           <form onSubmit={submit} className="flex flex-col gap-4 lg:max-h-[68vh] lg:overflow-auto lg:pr-2">
             <Row name="Card name" htmlFor="adv-name">
-              <input id="adv-name" value={form.name} onChange={(event) => update({ name: event.target.value })} className={field.md} />
+              <input id="adv-name" {...literalInput} value={form.name} onChange={(event) => update({ name: event.target.value })} className={field.md} />
             </Row>
             <Row name="Type" htmlFor="adv-type">
-              <input id="adv-type" value={form.type} placeholder="legendary creature, dragon" onChange={(event) => update({ type: event.target.value })} className={field.md} />
+              <input id="adv-type" {...literalInput} value={form.type} placeholder="legendary creature, dragon" onChange={(event) => update({ type: event.target.value })} className={field.md} />
             </Row>
             <Row name="Rules text" htmlFor="adv-text">
-              <input id="adv-text" value={form.text} placeholder={'flying "draw a card"'} onChange={(event) => update({ text: event.target.value })} className={field.md} />
+              <input id="adv-text" {...literalInput} value={form.text} placeholder={'flying "draw a card"'} onChange={(event) => update({ text: event.target.value })} className={field.md} />
               <p className="text-xs text-muted">Put exact phrases in quotes. A minus in front means without.</p>
             </Row>
             <Row name="Role in a deck" htmlFor="adv-role">
@@ -220,7 +220,7 @@ export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, comma
               <Compared id="adv-mv" name="Mana value" value={form.manaValue} onChange={(manaValue) => update({ manaValue })} />
             </Row>
             <Row name="Mana cost" htmlFor="adv-cost">
-              <input id="adv-cost" value={form.manaCost} placeholder="{2}{G} or 2G" onChange={(event) => update({ manaCost: event.target.value })} className={field.md} />
+              <input id="adv-cost" {...literalInput} value={form.manaCost} placeholder="{2}{G} or 2G" onChange={(event) => update({ manaCost: event.target.value })} className={field.md} />
             </Row>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Row name="Power" htmlFor="adv-pow">
@@ -289,7 +289,7 @@ export function AdvancedSearch({ open, onClose, inDeck, commanderIdentity, comma
               <label htmlFor="adv-syntax" className={label}>
                 Search syntax
               </label>
-              <input id="adv-syntax" value={syntax} onChange={(event) => setEdited(event.target.value)} spellCheck={false} placeholder="t:dragon c:r mv<=5" className={`${field.md} font-mono [font-variant-ligatures:none]`} />
+              <input id="adv-syntax" value={syntax} onChange={(event) => setEdited(event.target.value)} {...literalInput} placeholder="t:dragon c:r mv<=5" className={`${field.md} font-mono [font-variant-ligatures:none]`} />
               <p className="text-xs text-muted">
                 The form writes this for you. Type here for anything the form does not cover, such as <span className="font-mono">is:commander</span> or{" "}
                 <span className="font-mono">keyword:flying</span>.

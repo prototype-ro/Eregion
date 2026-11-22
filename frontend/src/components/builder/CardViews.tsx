@@ -124,7 +124,9 @@ export function CardStacks({ groups, selectedKey, newKeys, checkCollection, card
                     <span className="pointer-events-none absolute top-0 right-1.5 flex items-center gap-1" style={{ height: strip }}>
                       <Badges line={line} isNew={newKeys.has(key)} />
                       {!readOnly && (
-                        <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100">
+                        // Shown on hover. A touch screen has no hover, and showing it there for good would cover the mana cost
+                        // on every strip, so it is left out: a tap opens the card's sheet, whose More options opens this menu.
+                        <span className="pointer-events-auto opacity-0 group-focus-within/stack:opacity-100 group-hover/stack:opacity-100 [@media(pointer:coarse)]:hidden">
                           <DotsButton line={line} onMenu={onMenu} size={menuSize} />
                         </span>
                       )}
@@ -186,7 +188,7 @@ export function CardGallery({ groups, selectedKey, newKeys, checkCollection, car
                     {newKeys.has(key) && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent">New</span>}
                     {needs && <span className="rounded-full border border-add-line bg-bg px-2 py-0.5 text-xs text-add-text">Need</span>}
                     {!readOnly && (
-                      <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100">
+                      <span className="pointer-events-auto opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100 [@media(pointer:coarse)]:hidden">
                         <DotsButton line={line} onMenu={onMenu} />
                       </span>
                     )}
