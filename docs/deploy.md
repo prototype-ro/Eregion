@@ -3,6 +3,12 @@
 One machine running docker compose: Caddy (HTTPS) in front of the site, the API and Postgres. Rate limit counts live
 in the database, so more API instances can run behind the proxy later if one is not enough.
 
+Two ways to run it:
+
+- **One machine** runs everything (`docker compose --profile app`). The steps below, from "Before the first deploy".
+- **Free hosting**: the site on Vercel's free plan, the API and database on Oracle Cloud's Always Free machine
+  (`docker compose --profile api`). Costs nothing; see "Free hosting" at the end.
+
 ## Before the first deploy
 
 1. A server with Docker (2 GB of memory is enough to start) and a domain whose DNS points at it. Open ports 80 and
@@ -91,3 +97,89 @@ see a Moderation link at the top of the site (`/admin`): open reports with Take 
 account by email and disabling it (sign-in refused, sessions ended, public decks made private, nothing deleted), and
 deleting a piece of uploaded art for a copyright claim. Every action is logged with who did it. Copyright claims
 arrive at the contact address in the footer.
+
+## Free hosting: the site on Vercel, the API on Oracle Cloud
+
+Nothing here costs money. The site gets an address like `eregion.vercel.app`; the API sits on a free Oracle machine
+behind its own address that only the site uses. A real domain can be added to Vercel later without changing anything else.
+
+```
+visitor -> eregion.vercel.app (Vercel) -> /api/* -> eregion-api.duckdns.org (Caddy on Oracle) -> API -> Postgres
+```
+
+### 1. The API machine (Oracle Cloud Always Free)
+
+1. Create an Oracle Cloud account (a card is asked for to check who you are; Always Free resources are not charged).
+   Choose the **Brazil East (Sao Paulo)** home region; it cannot be changed later.
+2. Create a compute instance: shape **VM.Standard.A1.Flex** (Ampere, ARM), 2 OCPU and 12 GB memory is plenty,
+   image **Ubuntu 24.04**. Keep the SSH key it offers. If it says it is out of capacity, try again later or pick
+   another availability domain.
+3. In the instance's subnet, **Security List**, add ingress rules for TCP ports 80 and 443 from `0.0.0.0/0`.
+4. Oracle's Ubuntu image also blocks those ports in its own firewall. On the machine:
+
+   ```bash
+   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+   sudo netfilter-persistent save
+   ```
+
+5. Install Docker: `curl -fsSL https://get.docker.com | sh`, then `sudo usermod -aG docker ubuntu` and log in again.
+
+Oracle may reclaim an Always Free machine that sits nearly idle for a week. Keep the nightly backup (below) copied
+off the machine, so a reclaimed machine can be rebuilt from it.
+
+### 2. A name for the API (DuckDNS, free)
+
+Sign in at duckdns.org, create a subdomain (for example `eregion-api`) and set it to the machine's public IP. Visitors
+never see this name; only the site uses it.
+
+### 3. Email (a Gmail account, free)
+
+Create a Gmail account for the site, turn on 2-step verification, then create an **app password**
+(Google Account, Security, App passwords). Gmail sends about 500 emails a day, enough to start.
+
+### 4. Start the API
+
+```bash
+git clone <your repository> eregion && cd eregion
+cp .env.example .env   # then fill in:
+```
+
+```bash
+EREGION_API_DOMAIN=eregion-api.duckdns.org
+EREGION_PROXY_SECRET=...                       # openssl rand -hex 32; the same value goes into Vercel
+EREGION_PUBLIC_URL=https://eregion.vercel.app  # the site's address, for links in emails
+EREGION_JWT_SECRET=...                         # openssl rand -base64 48
+EREGION_DB_PASSWORD=...                        # openssl rand -base64 24
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=the-site@gmail.com
+SPRING_MAIL_PASSWORD=...                       # the app password
+EREGION_MAIL_FROM=Eregion <the-site@gmail.com>
+EREGION_MODERATION_EMAIL=you@example.com
+```
+
+```bash
+docker compose --profile api up -d --build
+docker compose ps    # db, backend and api-proxy running
+curl -s -o /dev/null -w "%{http_code}\n" https://eregion-api.duckdns.org/api/explore   # 404: no secret, as it should be
+```
+
+The API refuses every request without the secret, so nobody can skip the site and call it directly.
+
+### 5. The site (Vercel, free)
+
+1. Push the repository to GitHub and import it at vercel.com (the free Hobby plan).
+2. **Root Directory**: `frontend`. Vercel finds Next.js by itself; `frontend/vercel.json` runs the server code in
+   Sao Paulo, next to the API.
+3. **Environment variables**:
+   - `BACKEND_URL` = `https://eregion-api.duckdns.org`
+   - `EREGION_PROXY_SECRET` = the same value as on the API machine
+   - `SITE_URL` = `https://eregion.vercel.app` (the address Vercel gives the project; rename it in the project's
+     Domains settings)
+4. Deploy, open the site, and run the hand check from "Deploy" above: sign up, the confirmation email, a password
+   reset, import a list, save two versions, compare them, publish, open the public page signed out.
+
+Vercel's free plan is for non-commercial use: keep `donateUrl` in `frontend/src/lib/site.ts` empty while on it.
+Custom art uploads are capped at 4 MB because Vercel passes on at most 4.5 MB per request.
+

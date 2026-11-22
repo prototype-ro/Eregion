@@ -22,7 +22,8 @@ services:
   # Put the settings in a .env file next to this one (see .env.example). The API refuses to start without a real
   # EREGION_JWT_SECRET (openssl rand -base64 48) and without a mail server (SPRING_MAIL_*).
   backend:
-    profiles: ["app"]
+    # "app" runs the whole site here; "api" runs only the API, for when the site is on Vercel (see docs/deploy.md).
+    profiles: ["app", "api"]
     build: ./backend
     restart: unless-stopped
     depends_on:
@@ -41,6 +42,8 @@ services:
       EREGION_COOKIE_SECURE: "true"
       # Only the site reaches the API, so the one X-Forwarded-For hop it adds is trusted.
       EREGION_TRUST_PROXY: "true"
+      # Shared with the site when it runs on another host (Vercel), so the API knows each visitor's address.
+      EREGION_PROXY_SECRET: ${EREGION_PROXY_SECRET:-}
       EREGION_MAIL_FROM: ${EREGION_MAIL_FROM:-}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
@@ -89,6 +92,29 @@ services:
       - "443:443/udp"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+
+  # The API alone, with HTTPS, for when the site runs on Vercel: docker compose --profile api up -d --build
+  # EREGION_API_DOMAIN is this machine's name (for example eregion-api.duckdns.org). Only requests from the site's own
+  # proxy, which carry EREGION_PROXY_SECRET, reach the API; anything else is turned away.
+  api-proxy:
+    profiles: ["api"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      EREGION_API_DOMAIN: ${EREGION_API_DOMAIN:-}
+      EREGION_PROXY_SECRET: ${EREGION_PROXY_SECRET:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.api:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
 

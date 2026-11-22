@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { backendFetch } from "@/lib/backend";
 import { siteUrl } from "@/lib/siteUrl";
 
 // Rebuilt at most once an hour, so new public decks show up without a deploy.
@@ -14,11 +15,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const pages: MetadataRoute.Sitemap = ["", "/explore", "/privacy", "/terms"].map((path) => ({ url: `${base}${path}` }));
   try {
-    const backend = process.env.BACKEND_URL ?? "http://localhost:8080";
-    const response = await fetch(`${backend}/api/explore?limit=100`, { next: { revalidate } });
+    const response = await backendFetch("/api/explore?limit=100", { next: { revalidate } });
     if (!response.ok) return pages;
     const decks = (await response.json()) as PublicDeck[];
-    const commanders = await fetch(`${backend}/api/explore/commanders?minDecks=3`, { next: { revalidate } })
+    const commanders = await backendFetch("/api/explore/commanders?minDecks=3", { next: { revalidate } })
       .then((r) => (r.ok ? (r.json() as Promise<Array<{ cardId: string }>>) : []))
       .catch(() => []);
     return [

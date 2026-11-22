@@ -1,0 +1,11 @@
+# The API on its own, when the site runs on Vercel. Caddy gets the TLS certificate for EREGION_API_DOMAIN by itself.
+# Only the site's proxy (frontend/src/proxy.ts) knows EREGION_PROXY_SECRET and sends it as X-Eregion-Proxy, so a
+# request without it never reaches the API: nobody can skip the site and call the API directly.
+{$EREGION_API_DOMAIN} {
+	encode zstd gzip
+	@site header X-Eregion-Proxy {$EREGION_PROXY_SECRET}
+	handle @site {
+		reverse_proxy backend:8080
+	}
+	respond 404
+}
