@@ -35,7 +35,8 @@ import jakarta.validation.constraints.Size;
 @RequestMapping("/api/explore")
 public class ExploreController {
 
-	public record PublicDeckDetail(PublicDeck deck, List<DeckCardLine> cards, DeckStats stats) {
+	/** backdrop is the Art Series card behind the deck's header, or null for the commander's art. */
+	public record PublicDeckDetail(PublicDeck deck, List<DeckCardLine> cards, DeckStats stats, io.eregion.deck.BackdropRepository.Backdrop backdrop) {
 	}
 
 	private static final int MAX_PAGE = 48;
@@ -48,9 +49,11 @@ public class ExploreController {
 	/** Who hears about each report. Blank leaves reports in the deck_reports table only. */
 	private final String moderationEmail;
 	private final String publicUrl;
+	private final io.eregion.deck.BackdropRepository backdrops;
 
 	public ExploreController(ExploreRepository explore, DeckRepository decks, RateLimits limits, Mailer mail, io.eregion.analysis.AnalysisService analysis,
-			@Value("${eregion.moderation.email:}") String moderationEmail, @Value("${eregion.public-url:http://localhost:3000}") String publicUrl) {
+			@Value("${eregion.moderation.email:}") String moderationEmail, @Value("${eregion.public-url:http://localhost:3000}") String publicUrl,
+			io.eregion.deck.BackdropRepository backdrops) {
 		this.explore = explore;
 		this.decks = decks;
 		this.limits = limits;
@@ -58,6 +61,7 @@ public class ExploreController {
 		this.analysis = analysis;
 		this.moderationEmail = moderationEmail;
 		this.publicUrl = publicUrl;
+		this.backdrops = backdrops;
 	}
 
 	@GetMapping
@@ -170,6 +174,6 @@ public class ExploreController {
 		var published = explore.find(viewer, deckId).orElseThrow(() -> ApiException.notFound("Deck"));
 		// "owned" is counted against the viewer's own collection, so they can see what they are missing.
 		List<DeckCardLine> cards = decks.versionLines(published.versionId(), viewer);
-		return new PublicDeckDetail(published.deck(), cards, StatsCalculator.compute(cards));
+		return new PublicDeckDetail(published.deck(), cards, StatsCalculator.compute(cards), backdrops.find(published.deck().id()).orElse(null));
 	}
 }
