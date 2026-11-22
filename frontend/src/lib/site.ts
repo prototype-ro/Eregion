@@ -5,9 +5,9 @@
 export const SITE = {
   name: "Eregion",
   /** The person or company responsible for the site and its data. */
-  operator: "",
+  operator: "Rodrigo Lage",
   /** Where people write about privacy requests, copyright claims and anything else. */
-  contactEmail: "",
+  contactEmail: "rodrigo.lage.2@gmail.com",
   /**
    * Where people can chip in for hosting (Ko-fi, Patreon, GitHub Sponsors). Wizards' Fan Content Policy allows
    * donations as long as nothing on the site is held back for them. Blank hides the link.
