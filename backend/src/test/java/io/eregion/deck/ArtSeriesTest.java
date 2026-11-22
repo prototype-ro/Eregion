@@ -35,6 +35,18 @@ class ArtSeriesTest {
 	}
 
 	@Test
+	void aShuffleDrawsDifferentCardsFromThePool() {
+		List<BackdropRepository.Backdrop> pool = java.util.stream.IntStream.range(0, 20)
+				.mapToObj(n -> new BackdropRepository.Backdrop(UUID.randomUUID(), "Card " + n, null, "Set Art Series", "https://cards.scryfall.io/art_crop/" + n + ".jpg"))
+				.toList();
+		var drawn = ArtSeries.pick(pool, 4, new java.util.Random(7));
+		assertThat(drawn).hasSize(4).doesNotHaveDuplicates().allMatch(pool::contains);
+		// A small pool gives what it has.
+		assertThat(ArtSeries.pick(pool.subList(0, 2), 4, new java.util.Random(7))).hasSize(2);
+		assertThat(ArtSeries.pick(List.of(), 4, new java.util.Random(7))).isEmpty();
+	}
+
+	@Test
 	void searchTextIsCleanedBeforeItReachesScryfall() {
 		assertThat(ArtSeries.query("  Wurmcoil \"Engine\"  ")).isEqualTo("layout:art-series name:\"Wurmcoil Engine\"");
 		assertThat(ArtSeries.query("a")).isNull();

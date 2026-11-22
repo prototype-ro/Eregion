@@ -50,6 +50,13 @@ public class BackdropController {
 		return artSeries.search(q);
 	}
 
+	/** A few Art Series cards at random (four unless asked otherwise, at most eight), to choose from without knowing names. */
+	@GetMapping("/api/art-series/random")
+	public List<Backdrop> random(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "count", defaultValue = "4") int count) {
+		limits.search(CurrentUser.id(jwt));
+		return artSeries.random(Math.min(Math.max(count, 1), 8));
+	}
+
 	@GetMapping("/api/decks/{deckId}/backdrop")
 	public Choice get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID deckId) {
 		owned(deckId, CurrentUser.id(jwt));

@@ -12,6 +12,9 @@ export interface Backdrop {
 /** Art Series cards whose name contains q. */
 export const searchArtSeries = (q: string) => api<Backdrop[]>(`/api/art-series?q=${encodeURIComponent(q)}`);
 
+/** A few Art Series cards at random, for players who know none by name. */
+export const randomArtSeries = (count = 4) => api<Backdrop[]>(`/api/art-series/random?count=${count}`);
+
 /** The deck's chosen art, or null while it shows its commander's. */
 export const deckBackdrop = (deckId: string) => api<{ backdrop: Backdrop | null }>(`/api/decks/${deckId}/backdrop`);
 
