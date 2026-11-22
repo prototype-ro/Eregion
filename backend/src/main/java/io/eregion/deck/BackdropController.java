@@ -20,7 +20,7 @@ import io.eregion.common.ApiException;
 import io.eregion.deck.BackdropRepository.Backdrop;
 import io.eregion.ratelimit.RateLimits;
 
-/** The art behind a deck's header: the commander's by default, or an Art Series card its owner chose. */
+/** The art behind a deck's header: the commander's by default, or another card's art its owner chose. */
 @RestController
 public class BackdropController {
 
@@ -32,29 +32,29 @@ public class BackdropController {
 	}
 
 	private final BackdropRepository backdrops;
-	private final ArtSeries artSeries;
+	private final CardArt cardArt;
 	private final DeckRepository decks;
 	private final RateLimits limits;
 
-	public BackdropController(BackdropRepository backdrops, ArtSeries artSeries, DeckRepository decks, RateLimits limits) {
+	public BackdropController(BackdropRepository backdrops, CardArt cardArt, DeckRepository decks, RateLimits limits) {
 		this.backdrops = backdrops;
-		this.artSeries = artSeries;
+		this.cardArt = cardArt;
 		this.decks = decks;
 		this.limits = limits;
 	}
 
-	/** Art Series cards whose name contains q. Each search counts toward the player's search pace. */
-	@GetMapping("/api/art-series")
+	/** Cards whose name contains q, with their art. Each search counts toward the player's search pace. */
+	@GetMapping("/api/card-art")
 	public List<Backdrop> search(@AuthenticationPrincipal Jwt jwt, @RequestParam("q") String q) {
 		limits.search(CurrentUser.id(jwt));
-		return artSeries.search(q);
+		return cardArt.search(q);
 	}
 
-	/** A few Art Series cards at random (four unless asked otherwise, at most eight), to choose from without knowing names. */
-	@GetMapping("/api/art-series/random")
+	/** A few cards' art at random (four unless asked otherwise, at most eight), to choose from without knowing names. */
+	@GetMapping("/api/card-art/random")
 	public List<Backdrop> random(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "count", defaultValue = "4") int count) {
 		limits.search(CurrentUser.id(jwt));
-		return artSeries.random(Math.min(Math.max(count, 1), 8));
+		return cardArt.random(Math.min(Math.max(count, 1), 8));
 	}
 
 	@GetMapping("/api/decks/{deckId}/backdrop")
@@ -68,10 +68,9 @@ public class BackdropController {
 		UUID user = CurrentUser.id(jwt);
 		owned(deckId, user);
 		if (request == null || request.scryfallId() == null) {
-			throw ApiException.badRequest("Choose an Art Series card");
+			throw ApiException.badRequest("Choose a card's art");
 		}
-		limits.search(user);
-		Backdrop art = artSeries.byId(request.scryfallId()).orElseThrow(() -> ApiException.badRequest("That is not an Art Series card"));
+		Backdrop art = cardArt.byId(request.scryfallId()).orElseThrow(() -> ApiException.badRequest("That card has no art to use"));
 		backdrops.save(deckId, art);
 		return new Choice(art);
 	}

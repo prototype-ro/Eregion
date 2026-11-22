@@ -232,7 +232,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const { variantsEnabled, tourDone, loaded: preferencesLoaded } = usePreferences();
   // The tour of this page: offered once, restartable from the versions help. Finishing or skipping it ends the offer.
   const [touring, setTouring] = useState(false);
-  // The art behind the header: the owner's Art Series card, or null for the commander's art.
+  // The art behind the header: the card art its owner chose, or null for the commander's art.
   const [backdrop, setBackdrop] = useState<Backdrop | null>(null);
   const [backdropOpen, setBackdropOpen] = useState(false);
   useEffect(() => {

@@ -6,7 +6,7 @@ const FADE = "linear-gradient(to right, transparent 0%, black 45%), linear-gradi
 const BLEED = "calc(-1 * clamp(20px, 3.4vw, 80px))";
 
 /**
- * The art behind a deck's header: the owner's Art Series card, or the commander's art. Decorative, since the title says what
+ * The art behind a deck's header: the card art its owner chose, or the commander's. Decorative, since the title says what
  * the deck is. Hidden on small screens, where the header has no room beside it.
  */
 export function DeckBackdrop({ url }: { url: string | null | undefined }) {

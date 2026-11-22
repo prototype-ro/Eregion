@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-/** An Art Series card chosen to sit behind a deck's header. */
+/** A card's art chosen to sit behind a deck's header. */
 export interface Backdrop {
   scryfallId: string;
   name: string;
@@ -9,11 +9,11 @@ export interface Backdrop {
   artUrl: string;
 }
 
-/** Art Series cards whose name contains q. */
-export const searchArtSeries = (q: string) => api<Backdrop[]>(`/api/art-series?q=${encodeURIComponent(q)}`);
+/** Cards whose name contains q, with their art. */
+export const searchCardArt = (q: string) => api<Backdrop[]>(`/api/card-art?q=${encodeURIComponent(q)}`);
 
-/** A few Art Series cards at random, for players who know none by name. */
-export const randomArtSeries = (count = 4) => api<Backdrop[]>(`/api/art-series/random?count=${count}`);
+/** A few cards' art at random, to choose from without knowing names. */
+export const randomCardArt = (count = 4) => api<Backdrop[]>(`/api/card-art/random?count=${count}`);
 
 /** The deck's chosen art, or null while it shows its commander's. */
 export const deckBackdrop = (deckId: string) => api<{ backdrop: Backdrop | null }>(`/api/decks/${deckId}/backdrop`);

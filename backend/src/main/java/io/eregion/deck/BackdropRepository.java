@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class BackdropRepository {
 
-	/** An Art Series card: its Scryfall id, the card it shows, the artist, the Art Series set and the art's address. */
+	/** A card's art: the printing's Scryfall id, the card's name, the artist, the set and the art's address. */
 	public record Backdrop(UUID scryfallId, String name, String artist, String setName, String artUrl) {
 	}
 
