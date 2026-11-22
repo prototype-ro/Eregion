@@ -174,7 +174,6 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             {variants && !dirty && !branchLocked && (
               <button
                 type="button"
-                data-tour="variant"
                 aria-pressed={branching}
                 onClick={onToggleBranch}
                 className={`${button} ${branching ? "!border-accent-text !text-accent-text" : ""}`}
@@ -315,11 +314,8 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             </>
           ) : (
             <li>
-              Want two builds side by side, such as a budget one? Turn on{" "}
-              <Link href="/account#history-heading" className="text-ink underline underline-offset-4">
-                Variants in Account
-              </Link>
-              .
+              Want two builds side by side, such as a budget one? Switch the timeline to <span className="text-ink">Advanced</span>, at the top of
+              this panel.
             </li>
           )}
           <li>

@@ -13,7 +13,7 @@ export const DECK_TOUR: TourStep[] = [
   { target: "compare", title: "Compare any two", body: "Pick two versions to see every card in and out, and how the curve, price and bracket moved." },
   { target: "stats", title: "Know what you built", body: "Mana curve, colours, bracket and how often you hit your land drops, worked out from the list." },
   { target: "share", title: "Share it", body: "Make the deck public to show it on Explore. You choose which version people see." },
-  { target: "variant", title: "Try a variant", body: "Test an idea, such as a budget build, without touching the main deck." },
+  { target: "mode", title: "Basic or advanced", body: "Basic keeps one line of versions. Advanced adds variants: try a build, such as a budget one, beside the main deck and bring the changes you like back." },
 ];
 
 /** The steps whose target is on the page, in order. */

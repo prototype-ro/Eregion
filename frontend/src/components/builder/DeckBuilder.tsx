@@ -50,7 +50,7 @@ import { MergeDialog } from "./MergeDialog";
 import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
 import { lineName } from "@/lib/lineName";
-import { savePreferences, usePreferences } from "@/lib/preferences";
+import { savePreferences, setVariants, usePreferences } from "@/lib/preferences";
 import { type Backdrop, deckBackdrop } from "@/lib/backdrop";
 import { DeckBackdrop } from "@/components/DeckBackdrop";
 import { BackdropDialog } from "./BackdropDialog";
@@ -1174,6 +1174,34 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
             Versions
           </h2>
           <div ref={setControlsSlot} className="ml-auto flex min-w-0 items-center" />
+          {/* Basic keeps one line of versions; Advanced adds variants. The same setting as in Account, kept on the account. */}
+          <div
+            role="radiogroup"
+            aria-label="Timeline mode"
+            data-tour="mode"
+            title="Basic keeps one line of versions. Advanced adds variants: try a build beside the main deck and bring changes back."
+            className="flex items-center rounded-full border border-line p-0.5 text-xs"
+          >
+            {([[false, "Basic"], [true, "Advanced"]] as const).map(([advanced, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={variantsEnabled === advanced}
+                disabled={!preferencesLoaded}
+                onClick={() => {
+                  if (variantsEnabled === advanced) return;
+                  if (!advanced) setBranching(false);
+                  void setVariants(advanced).catch(() => setToast("Could not change the timeline mode. Try again."));
+                }}
+                className={`min-h-7 rounded-full px-3 font-medium transition-colors [@media(pointer:coarse)]:min-h-10 ${
+                  variantsEnabled === advanced ? "bg-ink text-bg" : "text-muted hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="-mr-3 flex items-center">
             <button
               type="button"
