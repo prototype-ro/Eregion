@@ -11,8 +11,15 @@ import io.eregion.common.ApiException;
 @Repository
 public class Preferences {
 
-	/** variantsEnabled: the timeline offers variants (branches) and merging. Off for every new account. */
-	public record Settings(boolean variantsEnabled) {
+	/**
+	 * variantsEnabled: the timeline offers variants (branches) and merging. Off for every new account.
+	 * tourDone: the player finished or skipped the deck page tour, so it is no longer offered.
+	 */
+	public record Settings(boolean variantsEnabled, boolean tourDone) {
+	}
+
+	/** A change to some settings: the ones left null keep their value. */
+	public record Update(Boolean variantsEnabled, Boolean tourDone) {
 	}
 
 	private final JdbcClient jdbc;
@@ -22,15 +29,18 @@ public class Preferences {
 	}
 
 	public Settings of(UUID userId) {
-		return jdbc.sql("SELECT variants_enabled FROM users WHERE id = :u")
+		return jdbc.sql("SELECT variants_enabled, tour_done FROM users WHERE id = :u")
 				.param("u", userId)
-				.query((rs, n) -> new Settings(rs.getBoolean(1)))
+				.query((rs, n) -> new Settings(rs.getBoolean(1), rs.getBoolean(2)))
 				.optional()
 				.orElseThrow(() -> ApiException.notFound("User"));
 	}
 
-	public Settings setVariants(UUID userId, boolean enabled) {
-		jdbc.sql("UPDATE users SET variants_enabled = :e WHERE id = :u").param("e", enabled).param("u", userId).update();
+	public Settings update(UUID userId, Update change) {
+		jdbc.sql("""
+				UPDATE users SET variants_enabled = COALESCE(:v, variants_enabled), tour_done = COALESCE(:t, tour_done)
+				 WHERE id = :u
+				""").param("v", change.variantsEnabled()).param("t", change.tourDone()).param("u", userId).update();
 		return of(userId);
 	}
 }

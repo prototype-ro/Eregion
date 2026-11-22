@@ -46,10 +46,10 @@ public class AccountController {
 		return preferences.of(CurrentUser.id(jwt));
 	}
 
-	/** Turns variants (branches and merging) on or off for this player, on every device. */
+	/** Changes the settings sent (variants, the tour) for this player, on every device; the rest keep their value. */
 	@PutMapping("/preferences")
-	public Preferences.Settings setPreferences(@AuthenticationPrincipal Jwt jwt, @RequestBody Preferences.Settings request) {
-		return preferences.setVariants(CurrentUser.id(jwt), request.variantsEnabled());
+	public Preferences.Settings setPreferences(@AuthenticationPrincipal Jwt jwt, @RequestBody Preferences.Update request) {
+		return preferences.update(CurrentUser.id(jwt), request);
 	}
 
 	@PostMapping("/resend-verification")

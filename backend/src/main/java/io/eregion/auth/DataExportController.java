@@ -43,7 +43,7 @@ public class DataExportController {
 		Map<String, Object> out = new LinkedHashMap<>();
 		out.put("exportedAt", java.time.Instant.now().toString());
 		out.put("account", jdbc.sql("""
-				SELECT email, display_name AS "displayName", email_verified AS "emailVerified", variants_enabled AS "variantsEnabled",
+				SELECT email, display_name AS "displayName", email_verified AS "emailVerified", variants_enabled AS "variantsEnabled", tour_done AS "tourDone",
 				       created_at::text AS "createdAt"
 				  FROM users WHERE id = :u
 				""").param("u", user).query().singleRow());
