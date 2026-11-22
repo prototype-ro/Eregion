@@ -117,7 +117,7 @@ function BulkDeleteForm({ decks, onClose, onDone }: BulkProps) {
     <div className="flex flex-col gap-5">
       <h2 className="font-display text-[44px] leading-none">Delete decks</h2>
       <p className="text-[15px] leading-snug">
-        Move {plural(decks.length, "deck")} to the trash? Their versions and branches go with them, and any that are public disappear from Explore. You can restore them from the trash for 30 days.
+        Move {plural(decks.length, "deck")} to the trash? Their versions and variants go with them, and any that are public disappear from Explore. You can restore them from the trash for 30 days.
       </p>
       <div className="flex gap-2.5">
         <button type="button" disabled={busy} onClick={() => void remove()} className={btn.large.dangerSolid}>
@@ -151,7 +151,7 @@ function DeleteForm({ deck, onClose, onDone }: Props & { deck: DeckSummary }) {
     <div className="flex flex-col gap-5">
       <h2 className="font-display text-[44px] leading-none">Delete deck</h2>
       <p className="text-[15px] leading-snug">
-        Move <span className="font-medium">{deck.name}</span> to the trash? Its {plural(deck.versionCount, "version")} and {plural(deck.branchCount, "branch", "branches")} go
+        Move <span className="font-medium">{deck.name}</span> to the trash? Its {plural(deck.versionCount, "version")} and {plural(deck.branchCount, "variant", "variants")} go
         with it{deck.visibility === "public" ? ", and it disappears from Explore" : ""}. You can restore it from the trash for 30 days.
       </p>
       {error && (

@@ -8,6 +8,7 @@ import { Flip, gsap, MOTION, REDUCED, useGSAP, whenMotionAllowed } from "@/lib/m
 import type { Timeline, VersionSummary } from "@/lib/types";
 import { NodeTip } from "./NodeTip";
 import { StrandLayer, type Strand } from "./StrandLayer";
+import { lineName } from "@/lib/lineName";
 
 const WINDOW = 30; // versions drawn by default when a history is long
 const ZOOM_MIN = 36;
@@ -50,7 +51,10 @@ interface Props {
   /** Used to remember, for this deck, whether all branches are shown and how far the timeline is zoomed. */
   deckId: string;
   /** A branch name was clicked: the builder opens that branch's menu under it. */
+  /** Opens a line's menu (rename, bring in, delete). Left out when variants are off: the names are then just labels. */
   onBranchClick?: (branchId: string, anchor: HTMLElement) => void;
+  /** Variants are on for this player: the strand colour can be picked and lines have menus. */
+  variants?: boolean;
   /** The branch whose menu is open, drawn as pressed. */
   menuBranchId?: string | null;
   /** The commander's art. The strands take their colour from it unless a colour was picked. */
@@ -110,7 +114,7 @@ const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year
  * saved version. A branch curves away from the version it split from, and a dashed curve joins a merge
  * to the branch it brought in. Hover or focus a dot for its note, date and what changed, and click it to open that version.
  */
-export function VersionTimeline({ timeline, current, published, onSelect, comparing = false, onCompare, controlsSlot = null, deckId, onBranchClick, menuBranchId = null, artUrl = null }: Props) {
+export function VersionTimeline({ timeline, current, published, onSelect, comparing = false, onCompare, controlsSlot = null, deckId, onBranchClick, menuBranchId = null, artUrl = null, variants = true }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
 
@@ -451,7 +455,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
           )}
         </p>
         <div className="flex items-center gap-3">
-        {(
+        {variants && (
           <div ref={pickerRef} className="relative">
             <button
               type="button"
@@ -498,8 +502,8 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
             type="button"
             aria-pressed={allBranches}
             onClick={toggleBranches}
-            title={allBranches ? "Show fewer branches" : `Show all ${timeline.branches.length} branches`}
-            aria-label={allBranches ? "Show fewer branches" : `Show all ${timeline.branches.length} branches, ${hiddenBranches} hidden`}
+            title={allBranches ? "Show fewer variants" : `Show all ${timeline.branches.length} lines`}
+            aria-label={allBranches ? "Show fewer variants" : `Show all ${timeline.branches.length} lines, ${hiddenBranches} hidden`}
             className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors [@media(pointer:coarse)]:h-11 ${allBranches ? "border-accent-text text-accent-text" : "border-line text-muted hover:border-ink hover:text-ink"}`}
           >
             <GitBranch size={16} aria-hidden className={`transition-transform duration-300 motion-reduce:transition-none ${allBranches ? "rotate-90" : ""}`} />
@@ -589,22 +593,35 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
             {lanes.map((branch, lane) => {
               const active = currentNode !== null && currentNode.lane === lane;
               return (
-                <button
-                  type="button"
-                  key={branch.id}
-                  data-flip-id={`b-${branch.id}`}
-                  data-branch-id={branch.id}
-                  title={`${branch.name}: open its menu`}
-                  aria-haspopup="menu"
-                  aria-expanded={menuBranchId === branch.id}
-                  onClick={(event) => onBranchClick?.(branch.id, event.currentTarget)}
-                  className={`absolute left-0 max-w-[124px] -translate-y-1/2 truncate pointer-events-auto cursor-pointer rounded-full border px-3 py-1 text-xs transition-colors [@media(pointer:coarse)]:min-h-11 hover:border-ink hover:text-ink ${
-                    active ? "border-[var(--strand)] text-ink" : "border-line text-muted"
-                  }`}
-                  style={{ top: PAD_TOP + lane * LANE }}
-                >
-                  {branch.main && branch.name !== "main" ? `${branch.name} (main)` : branch.name}
-                </button>
+                // With variants off the names are plain labels; with them on, each opens its line's menu.
+                onBranchClick ? (
+                  <button
+                    type="button"
+                    key={branch.id}
+                    data-flip-id={`b-${branch.id}`}
+                    data-branch-id={branch.id}
+                    title={`${lineName(branch.name)}: open its menu`}
+                    aria-haspopup="menu"
+                    aria-expanded={menuBranchId === branch.id}
+                    onClick={(event) => onBranchClick(branch.id, event.currentTarget)}
+                    className={`absolute left-0 max-w-[124px] -translate-y-1/2 truncate pointer-events-auto cursor-pointer rounded-full border px-3 py-1 text-xs transition-colors [@media(pointer:coarse)]:min-h-11 hover:border-ink hover:text-ink ${
+                      active ? "border-[var(--strand)] text-ink" : "border-line text-muted"
+                    }`}
+                    style={{ top: PAD_TOP + lane * LANE }}
+                  >
+                    {branch.main && branch.name !== "main" ? `${branch.name} (main deck)` : lineName(branch.name)}
+                  </button>
+                ) : (
+                  <span
+                    key={branch.id}
+                    data-flip-id={`b-${branch.id}`}
+                    data-branch-id={branch.id}
+                    className={`absolute left-0 max-w-[124px] -translate-y-1/2 truncate rounded-full border px-3 py-1 text-xs ${active ? "border-[var(--strand)] text-ink" : "border-line text-muted"}`}
+                    style={{ top: PAD_TOP + lane * LANE }}
+                  >
+                    {branch.main && branch.name !== "main" ? `${branch.name} (main deck)` : lineName(branch.name)}
+                  </span>
+                )
               );
             })}
           </div>
@@ -647,7 +664,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
                 onMouseLeave={hide}
                 onFocus={(event) => show(node, event.currentTarget, false)}
                 onBlur={hide}
-                aria-label={`Version ${number} on ${node.branchName}${node.version.note ? `, ${node.version.note}` : ""}${isPublished ? ", public" : ""}${node.version.mergeParent !== null ? `, merged v${node.version.mergeParent}` : ""}`}
+                aria-label={`Version ${number} on ${lineName(node.branchName)}${node.version.note ? `, ${node.version.note}` : ""}${isPublished ? ", public" : ""}${node.version.mergeParent !== null ? `, brought in v${node.version.mergeParent}` : ""}`}
                 aria-current={selected ? "true" : undefined}
                 className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center"
                 style={{ left: node.x, top: node.y, width: HIT, height: HIT }}
@@ -678,7 +695,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
         {last && tipVersion && (
           <>
           <p data-tip-line className="font-medium">
-            v{tipVersion.versionNumber} on {last.node.branchName}
+            v{tipVersion.versionNumber} on {lineName(last.node.branchName)}
             {last.node.head ? <span className="ml-2 font-mono text-xs font-normal text-muted">latest</span> : null}
           </p>
           <p data-tip-line className={`mt-1 ${tipVersion.note ? "" : "text-muted"}`}>{tipVersion.note || "No note"}</p>
@@ -690,7 +707,7 @@ export function VersionTimeline({ timeline, current, published, onSelect, compar
               <span className="text-accent-text">+{tipVersion.added}</span> <span>-{tipVersion.removed}</span> vs v{tipVersion.parentVersion}
             </p>
           )}
-          {tipVersion.mergeParent !== null && <p data-tip-line className="mt-1 text-xs text-accent-text">Merged in v{tipVersion.mergeParent}</p>}
+          {tipVersion.mergeParent !== null && <p data-tip-line className="mt-1 text-xs text-accent-text">Brought in v{tipVersion.mergeParent}</p>}
           {comparing && current !== null && tipVersion.versionNumber !== current && (
             <p data-tip-line className="mt-2 text-xs text-accent-text">Click to compare with v{current}</p>
           )}

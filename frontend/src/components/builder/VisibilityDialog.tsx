@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { api, ApiError } from "@/lib/api";
 import type { DeckDetail, Timeline, Visibility } from "@/lib/types";
 import { btn, field } from "@/lib/ui";
+import { lineName } from "@/lib/lineName";
 
 interface Props {
   open: boolean;
@@ -94,7 +95,7 @@ function Form({ onClose, deckId, timeline, visibility, publishedVersion, publicH
             >
               {versions.map((version) => (
                 <option key={version.versionNumber} value={version.versionNumber}>
-                  {`v${version.versionNumber} on ${version.branch}${version.note ? `, ${version.note}` : ""}`}
+                  {`v${version.versionNumber} on ${lineName(version.branch)}${version.note ? `, ${version.note}` : ""}`}
                 </option>
               ))}
             </select>

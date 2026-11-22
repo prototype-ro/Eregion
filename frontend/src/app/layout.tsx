@@ -9,7 +9,7 @@ const display = Pirata_One({ subsets: ["latin"], weight: "400", variable: "--fon
 const mono = Fragment_Mono({ subsets: ["latin"], weight: "400", variable: "--font-fragment-mono", display: "swap" });
 const sans = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap" });
 
-const description = "A Commander deck builder that keeps every version of your deck: see what changed, try ideas on a branch, and check its bracket.";
+const description = "A Commander deck builder that keeps every version of your deck: see what changed, try an idea as a variant, and check its bracket.";
 
 export const metadata: Metadata = {
   title: "Eregion",

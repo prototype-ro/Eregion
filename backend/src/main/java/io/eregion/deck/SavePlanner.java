@@ -53,6 +53,6 @@ public final class SavePlanner {
 			return new Append(base.branchId(), base.versionId());
 		}
 		throw ApiException.conflict("Version " + base.versionNumber()
-				+ " is not the latest on its branch. Save it as a new branch instead.");
+				+ " is not the latest on its line. Save it as a new variant instead.");
 	}
 }

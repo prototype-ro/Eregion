@@ -10,6 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { loginUrl } from "@/lib/auth";
 import type { DeckDetail, DeckDiff, Timeline, VersionSummary } from "@/lib/types";
 import { field } from "@/lib/ui";
+import { lineName } from "@/lib/lineName";
 
 const select = field.md;
 
@@ -39,7 +40,7 @@ function Diff() {
   const branchOf = (versionNumber: number) =>
     timeline?.branches.find((branch) => branch.versions.some((version) => version.versionNumber === versionNumber))?.name;
   const label = (version: VersionSummary) =>
-    `v${version.versionNumber}${timeline && timeline.branches.length > 1 ? ` on ${branchOf(version.versionNumber) ?? "?"}` : ""}${version.note ? `, ${version.note}` : ""}`;
+    `v${version.versionNumber}${timeline && timeline.branches.length > 1 ? ` on ${lineName(branchOf(version.versionNumber))}` : ""}${version.note ? `, ${version.note}` : ""}`;
 
   // Load the version list once and default to "previous to latest".
   useEffect(() => {

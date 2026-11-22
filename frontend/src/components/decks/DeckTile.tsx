@@ -41,7 +41,7 @@ export function deckMeta(deck: DeckSummary): string[] {
     plural(deck.cardCount, "card"),
     deck.cardCount > 0 ? formatPrice(deck.priceUsd) : null,
     deck.latestVersion > 0 ? `v${deck.latestVersion}${deck.latestOnMain ? "" : ` on ${deck.latestBranch}`}` : null,
-    deck.branchCount > 1 ? plural(deck.branchCount, "branch", "branches") : null,
+    deck.branchCount > 1 ? plural(deck.branchCount, "variant", "variants") : null,
   ].filter((part): part is string => part !== null);
 }
 

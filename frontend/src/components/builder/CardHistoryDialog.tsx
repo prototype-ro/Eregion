@@ -72,7 +72,7 @@ function Body({ line, deckId, timeline, current, onClose, onOpenVersion }: Props
       {history && history.versionsWith > 0 && (
         <>
           <section aria-label="Versions with this card">
-            <h3 className="border-b border-line pb-2.5 text-[15px] text-muted">Every version, by branch</h3>
+            <h3 className="border-b border-line pb-2.5 text-[15px] text-muted">Every version, by line</h3>
             <ul className="mt-3 flex flex-col gap-3.5">
               {timeline.branches.map((branch) => (
                 <li key={branch.id} className="flex items-center gap-3">

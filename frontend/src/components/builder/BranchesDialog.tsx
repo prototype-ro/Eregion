@@ -28,7 +28,7 @@ interface Props {
 /** Every branch on one line. Open a line for what can be done with it. */
 export function BranchesDialog(props: Props) {
   return (
-    <Dialog open={props.open} onClose={props.onClose} label="Branches" size="md">
+    <Dialog open={props.open} onClose={props.onClose} label="Variants" size="md">
       <Body {...props} />
     </Dialog>
   );
@@ -57,7 +57,7 @@ function Body({ onClose, deckId, timeline, currentBranchId, publishedVersion, lo
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="font-display text-[44px] leading-none">Branches</h2>
+      <h2 className="font-display text-[44px] leading-none">Variants</h2>
       <ul className="flex flex-col border-t border-line">
         {timeline.branches.map((branch) => {
           const status = statuses.get(branch.id);
@@ -73,7 +73,7 @@ function Body({ onClose, deckId, timeline, currentBranchId, publishedVersion, lo
                   </p>
                   <p className="font-mono text-xs text-muted">
                     {branch.versions.length} {branch.versions.length === 1 ? "version" : "versions"}
-                    {!isRoot && status && (status.ahead === 0 ? ", merged" : `, ${status.ahead} ahead${status.behind > 0 ? `, ${status.behind} behind` : ""}`)}
+                    {!isRoot && status && (status.ahead === 0 ? ", brought in" : `, ${status.ahead} ahead${status.behind > 0 ? `, ${status.behind} behind` : ""}`)}
                   </p>
                 </div>
                 <button

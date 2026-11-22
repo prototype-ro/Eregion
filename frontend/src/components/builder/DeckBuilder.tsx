@@ -49,6 +49,8 @@ import { CardHistoryDialog } from "./CardHistoryDialog";
 import { MergeDialog } from "./MergeDialog";
 import { SortDirectionButton } from "./SortDirectionButton";
 import { VersionActions } from "./VersionActions";
+import { lineName } from "@/lib/lineName";
+import { usePreferences } from "@/lib/preferences";
 import { RecentChanges } from "./RecentChanges";
 import { VersionTimeline } from "./VersionTimeline";
 import { exportDeck } from "@/lib/export";
@@ -221,6 +223,8 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   const [historyKey, setHistoryKey] = useState<string | null>(null);
   const proxies = useProxies(deck.id);
   const { assistant } = useFeatures();
+  // Variants (branches and merging) are an advanced choice in Account. Off, every deck keeps one simple line.
+  const { variantsEnabled } = usePreferences();
   const [proxyCardId, setProxyCardId] = useState<string | null>(null);
   const [loreOpen, setLoreOpen] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
@@ -474,7 +478,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     watch.observe(draftRow);
     return () => watch.disconnect();
   }, [draftRow]);
-  const needsBranch = viewingOlder || branching;
+  // With variants on, a save from an older version starts a new variant. With them off it goes on top of the line as the
+  // newest version, so the history stays one straight line and nothing is lost.
+  const needsBranch = variantsEnabled && (viewingOlder || branching);
+  const lineHead = timeline.branches.find((b) => b.id === version?.branchId)?.versions.at(-1)?.versionNumber ?? null;
+  const onTopOfOlder = viewingOlder && !needsBranch;
   // Only a real edit, or a branch asked for, shows the save controls. Just looking at an older version does not.
   const showDraft = dirty || branching;
   const canSave = lines.length > 0 && !saving && (needsBranch ? branchName.trim() !== "" : dirty);
@@ -569,7 +577,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
     } else {
       onReload();
     }
-    setToast(deletedId !== null ? "Branch deleted" : "Branch renamed");
+    setToast(deletedId !== null ? "Variant deleted" : "Variant renamed");
   }
 
   function startMerge(branch: Branch, into?: Branch) {
@@ -806,9 +814,9 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
       const saved = await api<VersionDetail>(`/api/decks/${deck.id}/versions`, {
         method: "POST",
         body: {
-          note: note.trim(),
+          note: note.trim() || (onTopOfOlder && version ? `Based on v${version.versionNumber}` : ""),
           cards: cardsPayload(),
-          fromVersion: version?.versionNumber,
+          fromVersion: onTopOfOlder ? (lineHead ?? version?.versionNumber) : version?.versionNumber,
           branchName: needsBranch ? branchName.trim() : undefined,
         },
       });
@@ -887,14 +895,14 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         {needsBranch && (
           <>
             <label className="sr-only" htmlFor="branch-name">
-              New branch name
+              Variant name
             </label>
             <input
               id="branch-name"
               value={branchName}
               onChange={(event) => setBranchName(event.target.value)}
               maxLength={40}
-              placeholder="Name the new branch"
+              placeholder="Name the variant"
               className={`${field} w-full border-accent-text sm:w-52`}
             />
           </>
@@ -903,11 +911,11 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         <button type="button" disabled={!canSave} onClick={save} className={btn.primary}>
           {saveNewLabel}
         </button>
-        {/* With changes made, starting a branch is a choice about this save, so it sits next to it. From an older
-            version every save branches, and before any change the switch is Branch off in the row below. */}
-        {dirty && version !== null && !viewingOlder && (
+        {/* With variants on and changes made, starting a variant is a choice about this save, so it sits next to it. From
+            an older version every save starts one, and before any change the switch is Try a variant in the row below. */}
+        {variantsEnabled && dirty && version !== null && !viewingOlder && (
           <button type="button" aria-pressed={branching} disabled={saving} onClick={() => setBranching((value) => !value)} className={btn.quiet}>
-            {branching ? `Keep on ${timeline.branches.find((b) => b.id === version.branchId)?.name ?? "this branch"}` : "Save as a branch"}
+            {branching ? `Keep on ${lineName(timeline.branches.find((b) => b.id === version.branchId)?.name)}` : "Save as a variant"}
           </button>
         )}
         {dirty ? (
@@ -926,7 +934,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
   }
 
   const canApply = version !== null && dirty && !saving && applyCheck.ok && lines.length > 0;
-  const saveNewLabel = saving ? "Saving" : needsBranch ? "Save as new branch" : version === null ? "Save first version" : "Save new version";
+  const saveNewLabel = saving ? "Saving" : needsBranch ? "Save as new variant" : version === null ? "Save first version" : onTopOfOlder ? "Save as newest version" : "Save new version";
   const applyHint = !version ? undefined : !dirty ? "Nothing changed yet" : applyCheck.ok ? `Save these changes over version ${version.versionNumber}, without adding a version` : (applyCheck.reason ?? undefined);
   const onApply = () => (versionIsPublic ? setConfirmApply(true) : void applyChanges());
   /** Opens the comparison of the open version with another, older first. */
@@ -1040,7 +1048,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
               {version && (
                 <>
                   <span aria-hidden="true">|</span>
-                  <span>{version.branchName}</span>
+                  <span>{lineName(version.branchName)}</span>
                 </>
               )}
               {!hasCommander && lines.length > 0 && (
@@ -1142,7 +1150,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         <Presence show={timelineOpen} collapse id="timeline-body" className="pt-2">
           {/* The dots need width a phone does not have; there the list below stands in for them. */}
           <div className="hidden sm:block">
-            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} controlsSlot={controlsSlot} deckId={deck.id} menuBranchId={branchMenu?.branchId ?? null} artUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} onBranchClick={(branchId, anchor) => setBranchMenu((open) => (open?.branchId === branchId ? null : { branchId, anchor }))} onCompare={compareWith} />
+            <VersionTimeline timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} controlsSlot={controlsSlot} deckId={deck.id} menuBranchId={branchMenu?.branchId ?? null} artUrl={baseLines.find((line) => line.board === "commander")?.imageArtCrop ?? null} variants={variantsEnabled} onBranchClick={variantsEnabled ? (branchId, anchor) => setBranchMenu((open) => (open?.branchId === branchId ? null : { branchId, anchor })) : undefined} onCompare={compareWith} />
           </div>
           {/* The newest saves with their notes, readable without hovering a dot. */}
           <RecentChanges timeline={timeline} current={version?.versionNumber ?? null} published={visibility === "public" ? publishedVersion : null} onSelect={selectVersion} comparing={comparing} onCompare={compareWith} />
@@ -1174,7 +1182,10 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
                 branchLocked={viewingOlder}
                 onToggleBranch={() => setBranching((value) => !value)}
                 onBranches={() => setBranchesOpen(true)}
+                variants={variantsEnabled}
+                hasVariants={timeline.branches.length > 1}
                 onMergeIntoMain={(() => {
+                  if (!variantsEnabled) return undefined;
                   const open = timeline.branches.find((branch) => branch.id === version.branchId);
                   const atHead = open?.versions.at(-1)?.versionNumber === version.versionNumber;
                   return open && !open.main && atHead ? () => startMerge(open) : undefined;
@@ -1417,7 +1428,7 @@ export function DeckBuilder({ deck, version, timeline, owned, onSaved, onSelectV
         onMerged={(merged, deleted) => {
           setMergeBranch(null);
           setBranchesOpen(false);
-          setToast(deleted ? "Merged, and the branch was deleted" : `Merged into ${mergeInto?.name ?? "main"}`);
+          setToast(deleted ? "Brought into the main deck, and the variant was deleted" : `Brought into ${lineName(mergeInto?.name)}`);
           onSelectVersion(merged.versionNumber);
         }}
       />

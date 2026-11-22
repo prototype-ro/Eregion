@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Branch, BranchStatus, Timeline } from "@/lib/types";
 import { deleteBlocker } from "@/lib/branches";
 import { btn } from "@/lib/ui";
+import { lineName } from "@/lib/lineName";
 
 interface Props {
   deckId: string;
@@ -29,7 +30,7 @@ const item = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center
 const head = (branch: Branch) => branch.versions[branch.versions.length - 1];
 
 /**
- * Everything you can do to one branch, in one short list: rename it, bring its changes into main or main's into it,
+ * Everything you can do to one variant, in one short list: rename it, bring its changes into the main deck or the main deck's into it,
  * compare it, delete it. Used by the menu on the timeline and by each row of the Branches list, so it behaves the same in both.
  */
 export function BranchActions({ deckId, branch, timeline, publishedVersion, locked, status: known, onMerge, onChanged, onClose, bare = false }: Props) {
@@ -124,7 +125,7 @@ export function BranchActions({ deckId, branch, timeline, publishedVersion, lock
                     <span className="text-ink">
                       {status.ahead} {status.ahead === 1 ? "version" : "versions"} ahead
                     </span>
-                    {status.behind > 0 && `, ${status.behind} behind ${root?.name ?? "main"}`}
+                    {status.behind > 0 && `, ${status.behind} behind ${lineName(root?.name)}`}
                   </>
                 )}
               </p>
@@ -151,7 +152,7 @@ export function BranchActions({ deckId, branch, timeline, publishedVersion, lock
               onClick={() => void run(() => api<Timeline>(`/api/decks/${deckId}/branches/${branch.id}`, { method: "DELETE" }), branch.id)}
               className="inline-flex min-h-10 items-center rounded-full bg-danger px-5 text-sm font-bold text-bg disabled:opacity-50"
             >
-              Delete branch
+              Delete variant
             </button>
             <button type="button" onClick={() => setMode("menu")} className={`${btn.quiet} !min-h-10 text-sm text-ink`}>
               Keep it
@@ -166,24 +167,24 @@ export function BranchActions({ deckId, branch, timeline, publishedVersion, lock
             </button>
             {!isRoot && status && status.ahead > 0 && (
               <button type="button" role="menuitem" disabled={locked} title={lockedHint} onClick={() => onMerge(branch)} className={`${item} text-accent-text`}>
-                Merge into {root?.name ?? "main"}
+                Bring into {lineName(root?.name)}
                 {locked && <span className="text-xs text-muted">{lockedHint}</span>}
               </button>
             )}
             {!isRoot && root && status && status.behind > 0 && (
               <button type="button" role="menuitem" disabled={locked} title={lockedHint} onClick={() => onMerge(root, branch)} className={item}>
-                Update from {root.name}
+                Update from {lineName(root.name)}
               </button>
             )}
             {!isRoot && root && tip && head(root) && (
               <Link role="menuitem" href={`/decks/${deckId}/diff?from=${head(root).versionNumber}&to=${tip.versionNumber}`} className={item}>
-                Compare with {root.name}
+                Compare with {lineName(root.name)}
               </Link>
             )}
             {!isRoot && (
               <>
                 <button type="button" role="menuitem" disabled={cannotDelete !== null} onClick={() => (setError(null), setMode("delete"))} className={`${item} text-danger`}>
-                  Delete branch
+                  Delete variant
                 </button>
                 {cannotDelete && <p className="px-3 pb-1 text-xs text-muted">{cannotDelete}</p>}
               </>

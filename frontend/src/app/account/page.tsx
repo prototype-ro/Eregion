@@ -7,6 +7,7 @@ import { Dialog } from "@/components/Dialog";
 import { Nav } from "@/components/Nav";
 import { api, ApiError } from "@/lib/api";
 import { getMe, refreshMe } from "@/lib/me";
+import { setVariants, usePreferences } from "@/lib/preferences";
 import type { User } from "@/lib/types";
 import { btn, field } from "@/lib/ui";
 
@@ -43,6 +44,7 @@ export default function AccountPage() {
         <Password />
         <Sessions />
         <Following />
+        <DeckHistory />
         <YourData />
         <DeleteAccount />
       </main>
@@ -170,6 +172,46 @@ interface FollowedDeck {
   name: string;
   ownerName: string;
   publishedVersion: number | null;
+}
+
+/** How a deck's history works for this player: one line of versions, or variants too. */
+function DeckHistory() {
+  const { variantsEnabled } = usePreferences();
+  // The box ticks at once; if the account cannot be saved it goes back and says so.
+  const [on, setOn] = useState(variantsEnabled);
+  useEffect(() => setOn(variantsEnabled), [variantsEnabled]);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <section className={section} aria-labelledby="history-heading">
+      <h2 id="history-heading" className="text-[28px] leading-tight font-medium tracking-[-0.02em]">Deck history</h2>
+      <div className="flex max-w-[560px] flex-col items-start gap-4">
+        <label className="flex items-start gap-3 text-[15px]">
+          <input
+            type="checkbox"
+            checked={on}
+            onChange={(event) => {
+              const wanted = event.target.checked;
+              setOn(wanted);
+              setError(null);
+              setVariants(wanted).catch(() => {
+                setOn(!wanted);
+                setError("Could not save that. Try again.");
+              });
+            }}
+            className="mt-1 h-5 w-5 accent-[var(--accent-text)]"
+          />
+          <span>
+            Variants (advanced)
+            <span className="block text-sm text-muted">
+              Keep two versions of a deck side by side, such as a budget build, and bring the changes you like back into the main deck. Off, every
+              deck keeps one simple line of versions.
+            </span>
+          </span>
+        </label>
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      </div>
+    </section>
+  );
 }
 
 /** The decks the player follows, and the weekly email about their new versions. */

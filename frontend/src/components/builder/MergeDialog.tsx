@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { deleteBlocker } from "@/lib/branches";
 import type { Branch, MergeConflict, MergePreview, MergeSide, Timeline, VersionDetail } from "@/lib/types";
 import { btn, field } from "@/lib/ui";
+import { lineName } from "@/lib/lineName";
 
 interface Props {
   open: boolean;
@@ -39,14 +40,14 @@ function describe(side: MergeSide): string {
  */
 export function MergeDialog(props: Props) {
   return (
-    <Dialog open={props.open} onClose={props.onClose} label={props.into ? `Bring ${props.branch?.name ?? "branch"} into ${props.into.name}` : "Merge into main"} size="md">
+    <Dialog open={props.open} onClose={props.onClose} label={props.into ? `Bring ${props.branch?.name ?? "variant"} into ${lineName(props.into.name)}` : "Bring into main deck"} size="md">
       {props.branch && <Body key={`${props.branch.id}-${props.into?.id ?? "main"}`} {...props} branch={props.branch} />}
     </Dialog>
   );
 }
 
 function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMerged }: Props & { branch: Branch }) {
-  const target = into?.name ?? "main";
+  const target = lineName(into?.name);
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [note, setNote] = useState("");
@@ -63,7 +64,7 @@ function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMer
         if (!cancelled) setPreview(result);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not preview the merge.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not compare the two lines.");
       });
     return () => {
       cancelled = true;
@@ -93,7 +94,7 @@ function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMer
       });
       onMerged(version, deleteAfter && blocker === null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "The merge did not go through.");
+      setError(err instanceof ApiError ? err.message : "Could not bring the changes in.");
       setBusy(false);
     }
   }
@@ -101,10 +102,10 @@ function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMer
   return (
     <div className="flex flex-col gap-7">
       <div>
-        <h2 className="font-display text-[44px] leading-none">{into ? `Bring ${branch.name} into ${target}` : `Merge ${branch.name}`}</h2>
+        <h2 className="font-display text-[44px] leading-none">{into ? `Bring ${lineName(branch.name)} into ${target}` : `Bring ${branch.name} into the main deck`}</h2>
         <p className="mt-2 text-[15px] text-muted">
           {preview
-            ? `Into ${target}. ${target} is at v${preview.mainVersion}, ${branch.name} at v${preview.sourceVersion}${preview.baseVersion !== null ? `, and they last shared v${preview.baseVersion}` : ""}.`
+            ? `Into the ${target}. The ${target} is at v${preview.mainVersion}, ${branch.name} at v${preview.sourceVersion}${preview.baseVersion !== null ? `, and they last shared v${preview.baseVersion}` : ""}.`
             : "Comparing the two lines."}
         </p>
       </div>
@@ -218,7 +219,7 @@ function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMer
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
-              placeholder={`Merged ${branch.name} into ${target}`}
+              placeholder={`Brought ${branch.name} into ${target}`}
               className={field.lg}
             />
           </div>
@@ -249,7 +250,7 @@ function Body({ onClose, deckId, timeline, publishedVersion, branch, into, onMer
             disabled={busy || unresolved > 0}
             className={btn.large.primary}
           >
-            {busy ? "Merging" : `Merge into ${target}`}
+            {busy ? "Bringing in" : `Bring into ${target}`}
           </button>
         )}
         <button type="button" onClick={onClose} className={btn.large.secondary}>

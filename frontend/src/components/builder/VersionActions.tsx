@@ -41,6 +41,10 @@ interface Props {
   branchLocked: boolean;
   onToggleBranch: () => void;
   onBranches: () => void;
+  /** The player turned variants on in Account: Try a variant, Bring into main deck and the variant help show. */
+  variants: boolean;
+  /** The deck already has more than one line, so they can be managed even with variants off. */
+  hasVariants: boolean;
   /** Bring the open branch's changes into main. Only given while a branch other than main is open at its newest version. */
   onMergeIntoMain?: () => void;
 }
@@ -49,7 +53,7 @@ const item = "flex min-h-9 [@media(pointer:coarse)]:min-h-11 w-full items-center
 const button = "pill inline-flex min-h-9 [@media(pointer:coarse)]:min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-ink px-3 text-sm font-medium disabled:opacity-40 sm:px-5";
 
 /** What can be done to the version that is open: compare, label, restore, publish, delete. */
-export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount }: Props) {
+export function VersionActions({ deckId, version, published, dirty, branchHead, onOpen, onReload, onPublish, onToast, onDeleted, canApply, applyHint, onApply, branching, branchLocked, onToggleBranch, onBranches, onMergeIntoMain, comparing, onToggleCompare, versionCount, variants, hasVariants }: Props) {
   const [helpOpen, setHelpOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -163,16 +167,16 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
           </Presence>
         ) : (
           <Presence key="normal" show appear={swapped.current} y={6} exit={false} className="flex flex-wrap items-center gap-2.5">
-            {/* Save lives beside the note while there are changes. Branch off starts an experiment before any change;
-                once there are changes, the same switch sits next to Save. From an older version a save always branches. */}
-            {!dirty && !branchLocked && (
+            {/* Save lives beside the note while there are changes. With variants on, Try a variant starts one before any
+                change; once there are changes, the same switch sits next to Save. */}
+            {variants && !dirty && !branchLocked && (
               <button
                 type="button"
                 aria-pressed={branching}
                 onClick={onToggleBranch}
                 className={`${button} ${branching ? "!border-accent-text !text-accent-text" : ""}`}
               >
-                Branch off
+                Try a variant
               </button>
             )}
             {versionCount > 1 && (
@@ -182,7 +186,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             )}
             {onMergeIntoMain && !dirty && (
               <button type="button" onClick={onMergeIntoMain} className={button}>
-                Merge into main
+                Bring into main deck
               </button>
             )}
           </Presence>
@@ -233,9 +237,11 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
                 </span>
               </button>
             )}
-            <button type="button" role="menuitem" onClick={run(onBranches)} className={`${item} menu-item`}>
-              Manage branches
-            </button>
+            {(variants || hasVariants) && (
+              <button type="button" role="menuitem" onClick={run(onBranches)} className={`${item} menu-item`}>
+                Manage variants
+              </button>
+            )}
             <button type="button" role="menuitem" onClick={run(() => setConfirmDelete(true))} disabled={busy || dirty} title={lockedHint} className={`${item} menu-item text-danger`}>
               <span>
                 Delete version
@@ -247,7 +253,7 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
         {!version.head && (
           <p className="flex items-center gap-2 text-sm text-muted sm:ml-auto">
             <ClockCounterClockwise size={16} aria-hidden className="shrink-0" />
-            Older version. Changes you save start a new branch.
+            {variants ? "Older version. Changes you save start a new variant." : "Older version. Saving makes these cards the newest version."}
           </p>
         )}
       </div>
@@ -293,13 +299,26 @@ export function VersionActions({ deckId, version, published, dirty, branchHead, 
             <span className="text-ink">Save new version</span> keeps what you had and adds a step to the deck&rsquo;s history. To change the version you are on
             instead, use <span className="text-ink">Replace v{number}</span> under More.
           </li>
-          <li>
-            <span className="text-ink">Branch off</span> to try an idea, such as a cheaper mana base, without touching your main deck. Each line of saves is a
-            branch; <span className="text-ink">main</span> is the one the deck opens on.
-          </li>
-          <li>
-            <span className="text-ink">Merge into main</span> brings a branch&rsquo;s changes back. When both lines changed the same card, you choose which to keep.
-          </li>
+          {variants ? (
+            <>
+              <li>
+                <span className="text-ink">Try a variant</span> to test an idea, such as a cheaper mana base, without touching your main deck. The deck
+                opens on the main deck; each variant is its own line of saves.
+              </li>
+              <li>
+                <span className="text-ink">Bring into main deck</span> takes a variant&rsquo;s changes back. When both changed the same card, you choose
+                which to keep.
+              </li>
+            </>
+          ) : (
+            <li>
+              Want two builds side by side, such as a budget one? Turn on{" "}
+              <Link href="/account#history-heading" className="text-ink underline underline-offset-4">
+                Variants in Account
+              </Link>
+              .
+            </li>
+          )}
           <li>
             <span className="text-ink">Compare</span> shows what changed between any two versions, cards and numbers. Nothing is ever lost: a deleted version
             can be brought back for 30 days.

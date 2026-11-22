@@ -55,7 +55,7 @@ class SavePlannerTest {
 		assertThatThrownBy(() -> SavePlanner.plan(true, older(), null))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("Version 5")
-				.hasMessageContaining("new branch");
+				.hasMessageContaining("new variant");
 		assertThat(SavePlanner.plan(true, older(), "Esper tempo")).isEqualTo(new Fork("Esper tempo", VERSION));
 	}
 
