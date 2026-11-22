@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DiffView } from "@/components/DiffView";
 import { api, ApiError } from "@/lib/api";
 import type { DeckDiff } from "@/lib/types";
-import { std } from "@/lib/ui";
 
 interface Step {
   versionNumber: number;
@@ -16,26 +14,35 @@ interface Step {
   changed: number;
 }
 
-const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const SHOWN = 3; // the newest versions listed before "Show all"
+const NAMES = 8; // card names listed per kind of change before "and N more"
+
+/** "Nov 19", with the year only when it is not this year. */
+function day(iso: string): string {
+  const date = new Date(iso);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
+function names(list: string[]): string {
+  return list.length > NAMES ? `${list.slice(0, NAMES).join(", ")} and ${list.length - NAMES} more` : list.join(", ");
+}
 
 /**
- * How a shared deck got to the version on show: each version it grew from, with the owner's note and what changed,
- * and the full diff of any step. This is what makes a deck on Eregion different from a list, so it sits right under
- * the deck's header. Nothing shows when the owner keeps the history private or there is only one version.
+ * How a shared deck got to the version on show, newest first and one line each: the owner's note, what moved and when.
+ * Opening a line lists the cards that came in and went out. Nothing shows when the owner keeps the history private or
+ * there is only one version.
  */
 export function PublicHistory({ deckId }: { deckId: string }) {
   const [steps, setSteps] = useState<Step[] | null>(null);
+  const [all, setAll] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const [diff, setDiff] = useState<DeckDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api<Step[]>(`/api/explore/${deckId}/history`)
-      .then((list) => {
-        setSteps(list);
-        // The newest step opens by itself: what changed most recently is the first question a visitor has.
-        if (list.length > 1) setOpen(list[list.length - 1].versionNumber);
-      })
+      .then(setSteps)
       .catch(() => setSteps([]));
   }, [deckId]);
 
@@ -55,51 +62,84 @@ export function PublicHistory({ deckId }: { deckId: string }) {
   }, [deckId, open, steps]);
 
   if (!steps || steps.length < 2) return null;
+  const first = steps[0].versionNumber;
+  const newest = [...steps].reverse();
+  const shown = all ? newest : newest.slice(0, SHOWN);
+
   return (
-    <section aria-labelledby="history-heading" className="mt-14 border-t border-line pt-10">
+    <section aria-labelledby="history-heading" className="mt-12 border-t border-line pt-8">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="history-heading" className="font-display text-[clamp(44px,5vw,72px)] leading-[0.92]">
+        <h2 id="history-heading" className="font-display text-[34px] leading-none">
           How it got here
         </h2>
         <p className="font-mono text-[13px] text-muted">{steps.length} versions</p>
       </div>
-      <ol className="mt-8 flex flex-col">
-        {steps.map((step, index) => {
-          const first = index === 0;
+      <ol className="mt-4 flex flex-col">
+        {shown.map((step) => {
+          const isFirst = step.versionNumber === first;
           const selected = open === step.versionNumber;
+          const moved = step.added > 0 || step.removed > 0 || step.changed > 0;
           return (
-            <li key={step.versionNumber} className="border-l-2 border-line pb-5 pl-5 last:pb-0" style={selected ? { borderColor: "var(--accent-text)" } : undefined}>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="font-mono text-sm text-accent-text">v{step.versionNumber}</span>
-                <span className="text-sm text-muted">{day(step.createdAt)}</span>
-                <span className="text-sm text-muted">{step.cardCount} {step.cardCount === 1 ? "card" : "cards"}</span>
-                {!first && (
-                  <span className="font-mono text-sm" aria-label={`${step.added} added, ${step.removed} removed, ${step.changed} changed`}>
-                    {step.added > 0 && <span className="text-add-text">+{step.added} </span>}
-                    {step.removed > 0 && <span className="text-danger">−{step.removed} </span>}
-                    {step.changed > 0 && <span className="text-muted">{step.changed} changed</span>}
-                    {step.added === 0 && step.removed === 0 && step.changed === 0 && <span className="text-muted">no card changes</span>}
-                  </span>
-                )}
-                {!first && (
-                  <button type="button" aria-expanded={selected} onClick={() => setOpen(selected ? null : step.versionNumber)} className={std("quiet")}>
-                    {selected ? "Hide changes" : "What changed"}
-                  </button>
-                )}
-              </div>
-              {step.note && <p className="mt-1 max-w-[68ch] text-[15px]">{step.note}</p>}
-              {first && <p className="mt-1 text-sm text-muted">The first version.</p>}
+            <li key={step.versionNumber}>
+              <button
+                type="button"
+                aria-expanded={isFirst ? undefined : selected}
+                disabled={isFirst}
+                onClick={() => setOpen(selected ? null : step.versionNumber)}
+                className={`grid w-full grid-cols-[3rem_minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-2 py-2 text-left text-sm transition-colors enabled:hover:bg-surface disabled:cursor-default [@media(pointer:coarse)]:min-h-11 sm:grid-cols-[3rem_minmax(0,1fr)_auto_4.5rem] ${selected ? "bg-surface" : ""}`}
+              >
+                <span className="font-mono text-accent-text">v{step.versionNumber}</span>
+                <span className="truncate text-ink">{isFirst ? `First version, ${step.cardCount} ${step.cardCount === 1 ? "card" : "cards"}` : step.note || "No note"}</span>
+                <span className="font-mono text-xs whitespace-nowrap" aria-label={isFirst ? undefined : `${step.added} added, ${step.removed} removed, ${step.changed} changed`}>
+                  {isFirst ? null : moved ? (
+                    <>
+                      {step.added > 0 && <span className="text-add-text">+{step.added} </span>}
+                      {step.removed > 0 && <span className="text-danger">&minus;{step.removed} </span>}
+                      {step.changed > 0 && <span className="text-muted">{step.changed} changed</span>}
+                    </>
+                  ) : (
+                    <span className="text-muted">no card changes</span>
+                  )}
+                </span>
+                <span className="hidden text-right text-xs whitespace-nowrap text-muted sm:block">{day(step.createdAt)}</span>
+              </button>
               {selected && (
-                <div className="mt-5">
-                  {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-                  {!error && !diff && <p className="text-sm text-muted">Loading the changes.</p>}
-                  {diff && <DiffView diff={diff} showOwned={false} />}
+                <div className="mb-2 ml-[3.75rem] flex flex-col gap-1 px-2 pb-2 text-sm">
+                  {error && <p role="alert" className="text-danger">{error}</p>}
+                  {!error && !diff && <p className="text-muted">Loading the changes.</p>}
+                  {diff && (
+                    <>
+                      {diff.added.length > 0 && (
+                        <p>
+                          <span className="text-add-text">In </span>
+                          {names(diff.added.map((card) => card.name))}
+                        </p>
+                      )}
+                      {diff.removed.length > 0 && (
+                        <p>
+                          <span className="text-danger">Out </span>
+                          {names(diff.removed.map((card) => card.name))}
+                        </p>
+                      )}
+                      {diff.changed.length > 0 && (
+                        <p>
+                          <span className="text-muted">Changed </span>
+                          {names(diff.changed.map((card) => `${card.name} ${card.from} to ${card.to}`))}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </li>
           );
         })}
       </ol>
+      {steps.length > SHOWN && (
+        <button type="button" aria-expanded={all} onClick={() => setAll((value) => !value)} className="mt-1 min-h-9 px-2 text-sm text-muted hover:text-ink">
+          {all ? "Show fewer" : `Show all ${steps.length} versions`}
+        </button>
+      )}
     </section>
   );
 }
