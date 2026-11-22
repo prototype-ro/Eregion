@@ -153,7 +153,7 @@ function Body({ onClose, owned, onDone }: Props) {
       <h2 className="font-display text-[44px] leading-none">Import custom art</h2>
       <p className="text-[15px] leading-snug text-muted">
         Name each image after its card, such as <span className="font-mono text-ink">Sol Ring.png</span>. To keep several arts for one card, add a label after a dash:{" "}
-        <span className="font-mono text-ink">Sol Ring - foil proxy.png</span>. PNG, JPEG or WebP, up to 10 MB each. The art is private to you until it is on a card in a version you publish.
+        <span className="font-mono text-ink">Sol Ring - foil proxy.png</span>. PNG, JPEG or WebP, up to 4 MB each. The art is private to you until it is on a card in a version you publish.
         Only add art you made or have the right to use.
       </p>
 

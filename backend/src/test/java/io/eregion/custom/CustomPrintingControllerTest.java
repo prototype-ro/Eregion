@@ -58,7 +58,7 @@ class CustomPrintingControllerTest extends PostgresTest {
 
 	private static RateLimits noLimits() {
 		return new RateLimits(new RateLimitProperties(
-				false, false, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+				false, false, "", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
 	}
 
 	private static Card card(String name) {

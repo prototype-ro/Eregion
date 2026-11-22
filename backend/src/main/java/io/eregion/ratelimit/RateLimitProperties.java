@@ -12,6 +12,8 @@ public record RateLimitProperties(
 		@DefaultValue("true") boolean enabled,
 		/** Trust X-Forwarded-For, which is right only behind a proxy that sets it and that the internet cannot bypass. */
 		@DefaultValue("false") boolean trustProxy,
+		/** Shared with the site's proxy when the site runs on another host (Vercel); empty when it does not. */
+		@DefaultValue("") String proxySecret,
 		@DefaultValue("20") int loginPerIp15Min,
 		@DefaultValue("8") int loginPerAccount15Min,
 		@DefaultValue("10") int registerPerIpHour,

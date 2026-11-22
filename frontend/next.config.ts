@@ -39,8 +39,8 @@ const nextConfig: NextConfig = {
   // Next blocks its development resources (hot reload, hydration) for any host but localhost, which leaves a page opened on 127.0.0.1
   // a static shell with no developer tools. Development only: it has no effect on a production build.
   allowedDevOrigins: ["127.0.0.1"],
-  // A self-contained server for the Docker image.
-  output: "standalone",
+  // A self-contained server for the Docker image. Vercel builds its own output, so it is left out there.
+  output: process.env.VERCEL ? undefined : "standalone",
   images: {
     // Card art comes from Scryfall's CDN, which is already optimized and refuses requests
     // from Next's server-side image optimizer (it requires a User-Agent). Browsers load
@@ -51,8 +51,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Importing a long list can take a while on the backend. The default proxy limit is 30 seconds.
     proxyTimeout: 120_000,
-    // Custom art uploads can be 10 MB, and the proxy only passes on this much of a request body.
-    proxyClientMaxBodySize: "16mb",
+    // Custom art uploads can be 4 MB (the most Vercel passes on), and the proxy only forwards this much of a body.
+    proxyClientMaxBodySize: "6mb",
   },
 };
 

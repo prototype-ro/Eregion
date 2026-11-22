@@ -122,7 +122,7 @@ public class RateLimits {
 	}
 
 	String ip(HttpServletRequest request) {
-		return ClientIp.of(request, properties.trustProxy());
+		return ClientIp.of(request, properties.trustProxy(), properties.proxySecret());
 	}
 
 	private static String normal(String value) {

@@ -33,7 +33,7 @@ class DataExportTest extends PostgresTest {
 		jdbc.sql("INSERT INTO deck_version_cards (version_id, card_id, board, quantity, tags) VALUES (:v, :c, 'main', 1, ARRAY['ramp','early'])")
 				.param("v", version).param("c", card).update();
 
-		RateLimits open = new RateLimits(new RateLimitProperties(false, false, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+		RateLimits open = new RateLimits(new RateLimitProperties(false, false, "", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
 		Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").claim("sub", user.toString()).issuedAt(Instant.now())
 				.expiresAt(Instant.now().plusSeconds(60)).build();
 		Map<String, Object> export = new DataExportController(jdbc, open).export(jwt).getBody();

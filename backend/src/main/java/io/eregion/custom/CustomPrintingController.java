@@ -36,7 +36,7 @@ import io.eregion.custom.CustomPrintingRepository.Image;
 @RequestMapping("/api")
 public class CustomPrintingController {
 
-	static final int MAX_BYTES = 10 * 1024 * 1024;
+	static final int MAX_BYTES = 4 * 1024 * 1024;
 	static final int MAX_PER_USER = 300;
 	static final int MAX_LABEL = 60;
 	/**
@@ -88,7 +88,7 @@ public class CustomPrintingController {
 			throw ApiException.badRequest("Choose an image file");
 		}
 		if (file.getSize() > MAX_BYTES) {
-			throw ApiException.badRequest("Images can be at most 10 MB");
+			throw ApiException.badRequest("Images can be at most 4 MB");
 		}
 		byte[] data = file.getBytes();
 		String type = ImageSniffer.contentType(data).orElseThrow(() -> ApiException.badRequest("Only PNG, JPEG and WebP images are accepted"));

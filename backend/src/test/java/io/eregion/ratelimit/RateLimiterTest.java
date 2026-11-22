@@ -87,7 +87,7 @@ class RateLimiterTest {
 	// ---- the limits of the app
 
 	private RateLimits limits(int loginAccount) {
-		var props = new RateLimitProperties(true, false, 20, loginAccount, 10, 10, 3, 120, 20, 40, 30, 240, 10, 30, 20, 30, 30, 30);
+		var props = new RateLimitProperties(true, false, "", 20, loginAccount, 10, 10, 3, 120, 20, 40, 30, 240, 10, 30, 20, 30, 30, 30);
 		return new RateLimits(props, limiter);
 	}
 
@@ -134,7 +134,7 @@ class RateLimiterTest {
 
 	@Test
 	void switchedOffMeansNoLimits() {
-		var off = new RateLimits(new RateLimitProperties(false, false, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), limiter);
+		var off = new RateLimits(new RateLimitProperties(false, false, "", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), limiter);
 		for (int i = 0; i < 10; i++) {
 			off.register(request("1.1.1.1"));
 		}
@@ -156,5 +156,28 @@ class RateLimiterTest {
 		assertThat(ClientIp.of(request, false)).isEqualTo("10.0.0.1");
 		// The last entry is the one the proxy appended. The first can be written by the caller.
 		assertThat(ClientIp.of(request, true)).isEqualTo("203.0.113.9");
+	}
+
+	@Test
+	void theSitesProxyNamesTheVisitorOnlyWithTheSharedSecret() {
+		var request = request("10.0.0.1");
+		request.addHeader("X-Forwarded-For", "76.76.21.21");
+		request.addHeader(ClientIp.ADDRESS_HEADER, "198.51.100.7");
+
+		// Without the secret, or with a wrong one, the header is ignored: anyone could send it.
+		assertThat(ClientIp.of(request, true, "")).isEqualTo("76.76.21.21");
+		request.addHeader(ClientIp.SECRET_HEADER, "guess");
+		assertThat(ClientIp.of(request, true, "s3cret")).isEqualTo("76.76.21.21");
+
+		var signed = request("10.0.0.1");
+		signed.addHeader("X-Forwarded-For", "76.76.21.21");
+		signed.addHeader(ClientIp.SECRET_HEADER, "s3cret");
+		signed.addHeader(ClientIp.ADDRESS_HEADER, "198.51.100.7");
+		assertThat(ClientIp.of(signed, true, "s3cret")).isEqualTo("198.51.100.7");
+
+		// A signed request without an address falls back to what the connection shows.
+		var empty = request("10.0.0.1");
+		empty.addHeader(ClientIp.SECRET_HEADER, "s3cret");
+		assertThat(ClientIp.of(empty, false, "s3cret")).isEqualTo("10.0.0.1");
 	}
 }
