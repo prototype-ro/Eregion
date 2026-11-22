@@ -86,14 +86,15 @@ function Body({ onClose, deckId, current, commanderArt, onChanged }: Props) {
     }
   }
 
-  const tile = "group flex w-full flex-col gap-2 rounded-2xl p-1.5 text-left transition-colors hover:bg-surface disabled:opacity-50";
+  // Each use sets its width: the grid cells fill their column, the commander tile stays one column wide.
+  const tile = "group flex flex-col gap-2 rounded-2xl p-1.5 text-left transition-colors hover:bg-surface disabled:opacity-50";
   const cards = (list: Backdrop[]) => (
     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {list.map((art) => {
         const chosen = current?.scryfallId === art.scryfallId;
         return (
           <li key={art.scryfallId}>
-            <button type="button" disabled={busy} aria-pressed={chosen} onClick={() => void pick(art)} className={tile}>
+            <button type="button" disabled={busy} aria-pressed={chosen} onClick={() => void pick(art)} className={`${tile} w-full`}>
               <img src={art.artUrl} alt="" className={`aspect-[4/3] w-full rounded-xl bg-surface object-cover ${chosen ? "ring-2 ring-accent-text" : ""}`} />
               <span className="px-1 text-sm leading-snug">
                 {art.name}
@@ -119,7 +120,7 @@ function Body({ onClose, deckId, current, commanderArt, onChanged }: Props) {
           Commander art
         </h3>
         {commanderArt ? (
-          <button type="button" disabled={busy} onClick={() => void pick(null)} aria-pressed={current === null} className={`${tile} w-56!`}>
+          <button type="button" disabled={busy} onClick={() => void pick(null)} aria-pressed={current === null} className={`${tile} w-[calc((100%-1.5rem)/4)] min-w-40`}>
             <img src={commanderArt} alt="" className={`aspect-[4/3] w-full rounded-xl object-cover ${current === null ? "ring-2 ring-accent-text" : ""}`} />
             <span className="px-1 text-sm">{current === null ? "In use" : "Use the commander's art"}</span>
           </button>
